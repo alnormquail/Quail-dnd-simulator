@@ -1,0 +1,46 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.userprefs
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+!**/packages/build/
+*.nuspec
+
+# Rider
+.idea/
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+
+# Blazor
+wwwroot/css/open-iconic/
+
+# User secrets
+secrets.json
+appsettings.*.json
+!appsettings.json
+!appsettings.Development.json

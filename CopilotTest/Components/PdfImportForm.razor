@@ -1,0 +1,127 @@
+@using CopilotTest.Services
+@using CopilotTest.Models
+@inject PdfImportService PdfImporter
+@inject CombatEngineService Combat
+
+<div class="pdf-import-panel">
+    <div class="pdf-browse-row">
+        <label class="btn btn-secondary">
+            📂 Browse for PDF…
+            <InputFile OnChange="OnFileSelected" accept=".pdf" style="display:none" />
+        </label>
+        <span class="pdf-browse-hint">Select a D&amp;D Beyond character sheet export</span>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="pdf-error">⚠️ @errorMessage</div>
+    }
+
+    @if (previewCombatant != null)
+    {
+        <div class="pdf-preview card">
+            <div class="pdf-preview-header">
+                <span class="pdf-preview-title">✅ Extracted: @previewCombatant.Name</span>
+                <button class="btn btn-ghost btn-sm" @onclick="ClearPreview">✕</button>
+            </div>
+
+            <div class="pdf-preview-stats">
+                <span class="stat-chip">HP @previewCombatant.MaxHitPoints</span>
+                <span class="stat-chip">AC @previewCombatant.ArmorClass</span>
+                <span class="stat-chip">Speed @previewCombatant.Speed ft</span>
+                <span class="stat-chip">Prof +@previewCombatant.ProficiencyBonus</span>
+            </div>
+
+            <div class="pdf-preview-abilities">
+                <span>STR @previewCombatant.Strength (@FormatMod(Combatant.GetModifier(previewCombatant.Strength)))</span>
+                <span>DEX @previewCombatant.Dexterity (@FormatMod(Combatant.GetModifier(previewCombatant.Dexterity)))</span>
+                <span>CON @previewCombatant.Constitution (@FormatMod(Combatant.GetModifier(previewCombatant.Constitution)))</span>
+                <span>INT @previewCombatant.Intelligence (@FormatMod(Combatant.GetModifier(previewCombatant.Intelligence)))</span>
+                <span>WIS @previewCombatant.Wisdom (@FormatMod(Combatant.GetModifier(previewCombatant.Wisdom)))</span>
+                <span>CHA @previewCombatant.Charisma (@FormatMod(Combatant.GetModifier(previewCombatant.Charisma)))</span>
+            </div>
+
+            @if (previewCombatant.Actions.Count > 0)
+            {
+                <div class="pdf-preview-actions">
+                    <strong>Actions (@previewCombatant.Actions.Count):</strong>
+                    @foreach (var action in previewCombatant.Actions.Take(8))
+                    {
+                        <span class="action-chip @(action.ActionType == ActionType.Attack ? "chip-attack" : "chip-spell")">
+                            @action.DisplayName
+                        </span>
+                    }
+                    @if (previewCombatant.Actions.Count > 8)
+                    {
+                        <span class="action-chip">+@(previewCombatant.Actions.Count - 8) more</span>
+                    }
+                </div>
+            }
+
+            <div class="pdf-preview-footer">
+                <div class="form-field-inline">
+                    <label>Name</label>
+                    <input class="form-input" @bind="previewCombatant.Name" />
+                </div>
+                <div class="form-field-inline">
+                    <label>Type</label>
+                    <select class="form-input" @bind="previewCombatant.Type">
+                        <option value="@CombatantType.PC">Player Character</option>
+                        <option value="@CombatantType.NPC">NPC</option>
+                        <option value="@CombatantType.Monster">Monster</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" @onclick="AddToEncounter">
+                    ➕ Add to Encounter
+                </button>
+            </div>
+        </div>
+    }
+
+</div>
+
+@code {
+    private string? errorMessage;
+    private Combatant? previewCombatant;
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        errorMessage = null;
+        previewCombatant = null;
+        var file = e.File;
+
+        try
+        {
+            using var ms = new MemoryStream();
+            await using var stream = file.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024);
+            await stream.CopyToAsync(ms);
+            var combatant = PdfImporter.ParseCharacterSheet(ms.ToArray());
+
+            if (combatant == null)
+                errorMessage = "Could not extract character data from that PDF.";
+            else
+                previewCombatant = combatant;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error reading file: {ex.Message}";
+        }
+    }
+
+    private void AddToEncounter()
+    {
+        if (previewCombatant == null) return;
+        Combat.AddCombatant(previewCombatant);
+        previewCombatant = null;
+        errorMessage = null;
+        StateHasChanged();
+    }
+
+    private void ClearPreview()
+    {
+        previewCombatant = null;
+        errorMessage = null;
+    }
+
+    private string FormatMod(int mod) => mod >= 0 ? $"+{mod}" : mod.ToString();
+}

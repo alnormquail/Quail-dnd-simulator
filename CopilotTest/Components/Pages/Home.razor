@@ -1,0 +1,59 @@
+@page "/"
+@using CopilotTest.Components
+@using CopilotTest.Services
+@using CopilotTest.Models
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+@rendermode InteractiveServer
+@inject CombatEngineService Combat
+@implements IDisposable
+
+<div class="app-container">
+    <header class="app-header">
+        <h1>⚔️ D&D Combat Simulator</h1>
+        <p class="subtitle">5th Edition Combat Engine — Powered by the D&D 5e API</p>
+    </header>
+
+    <CombatControls />
+
+    <div class="main-layout">
+        @if (Combat.State == CombatState.Setup)
+        {
+            <div class="setup-layout">
+                <div class="left-panel">
+                    <AddCombatantForm />
+                </div>
+                <div class="right-panel">
+                    <CombatantList />
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="combat-layout">
+                <div class="combat-left">
+                    <CombatantList />
+                </div>
+                <div class="combat-right">
+                    <CombatLogPanel />
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Combat.OnStateChanged += OnCombatStateChanged;
+    }
+
+    private void OnCombatStateChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Combat.OnStateChanged -= OnCombatStateChanged;
+    }
+}

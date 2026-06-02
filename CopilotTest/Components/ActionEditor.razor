@@ -1,0 +1,160 @@
+@using CopilotTest.Models
+
+<div class="action-editor">
+    <div class="action-editor-header">
+        <span class="section-label">⚔️ Actions</span>
+        <button class="btn-add-action" @onclick="AddAction">+ Add Action</button>
+    </div>
+
+    @if (!Actions.Any())
+    {
+        <div class="empty-actions">No actions yet. Click "+ Add Action" to add an attack, spell, or ability.</div>
+    }
+
+    @foreach (var action in Actions)
+    {
+        <div class="action-row @(editingId == action.Id ? "action-editing" : "")">
+            @if (editingId == action.Id)
+            {
+                <div class="action-form">
+                    <div class="action-form-row">
+                        <div class="form-field">
+                            <label>Name</label>
+                            <input class="form-input" @bind="action.Name" placeholder="Longsword / Fireball..." />
+                        </div>
+                        <div class="form-field">
+                            <label>Type</label>
+                            <select class="form-input" @bind="action.ActionType">
+                                @foreach (var t in Enum.GetValues<ActionType>())
+                                {
+                                    <option value="@t">@t</option>
+                                }
+                            </select>
+                        </div>
+                        @if (action.ActionType == ActionType.Spell || action.ActionType == ActionType.SpellAttack)
+                        {
+                            <div class="form-field">
+                                <label>Spell Level (0=cantrip)</label>
+                                <input type="number" class="form-input small" @bind="action.SpellLevel" min="0" max="9" />
+                            </div>
+                        }
+                    </div>
+
+                    <div class="action-form-row">
+                        @if (action.ActionType == ActionType.Attack || action.ActionType == ActionType.SpellAttack)
+                        {
+                            <div class="form-field">
+                                <label>Attack Bonus</label>
+                                <input type="number" class="form-input small" @bind="action.AttackBonus" />
+                            </div>
+                        }
+                        @if (action.ActionType == ActionType.Spell)
+                        {
+                            <div class="form-field">
+                                <label>Save DC</label>
+                                <input type="number" class="form-input small" @bind="action.SaveDC" min="0" />
+                            </div>
+                            <div class="form-field">
+                                <label>Save Ability</label>
+                                <select class="form-input" @bind="action.SaveAbility">
+                                    @foreach (var a in Enum.GetValues<AbilityScore>())
+                                    {
+                                        <option value="@a">@a</option>
+                                    }
+                                </select>
+                            </div>
+                        }
+                        <div class="form-field">
+                            <label>Damage Dice</label>
+                            <input class="form-input small" @bind="action.DamageDice" placeholder="1d8" />
+                        </div>
+                        <div class="form-field">
+                            <label>Dmg Bonus</label>
+                            <input type="number" class="form-input small" @bind="action.DamageBonus" />
+                        </div>
+                        <div class="form-field">
+                            <label>Damage Type</label>
+                            <select class="form-input" @bind="action.DamageType">
+                                @foreach (var dt in Enum.GetValues<DamageType>())
+                                {
+                                    <option value="@dt">@dt</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="action-form-row">
+                        <div class="form-field">
+                            <label>Range</label>
+                            <input class="form-input small" @bind="action.Range" placeholder="5 ft" />
+                        </div>
+                        <div class="form-field">
+                            <label>Uses/Day (0=unlimited)</label>
+                            <input type="number" class="form-input small" @bind="action.UsesPerDay" min="0"
+                                   @oninput="(e) => SyncUses(action, e)" />
+                        </div>
+                    </div>
+
+                    <div class="form-field">
+                        <label>Description (optional)</label>
+                        <textarea class="form-input" rows="2" @bind="action.Description" placeholder="Brief description..."></textarea>
+                    </div>
+
+                    <div class="action-form-btns">
+                        <button class="btn btn-primary" @onclick="() => editingId = Guid.Empty">✓ Done</button>
+                        <button class="btn-remove" @onclick="() => RemoveAction(action)">🗑 Remove</button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="action-summary" @onclick="() => editingId = action.Id">
+                    <span class="action-type-badge action-@action.ActionType.ToString().ToLower()">@GetTypeIcon(action.ActionType)</span>
+                    <span class="action-name">@action.DisplayName</span>
+                    <span class="action-short">@action.ShortSummary</span>
+                    @if (action.IsLimited)
+                    {
+                        <span class="uses-badge @(action.CanUse ? "" : "uses-empty")">@action.UsesRemaining/@action.UsesPerDay/day</span>
+                    }
+                    <button class="btn-remove action-remove" @onclick:stopPropagation="true" @onclick="() => RemoveAction(action)">✕</button>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public List<CombatAction> Actions { get; set; } = new();
+    [Parameter] public EventCallback ActionsChanged { get; set; }
+
+    private Guid editingId = Guid.Empty;
+
+    private void AddAction()
+    {
+        var a = new CombatAction { Name = "New Attack", ActionType = ActionType.Attack };
+        Actions.Add(a);
+        editingId = a.Id;
+        ActionsChanged.InvokeAsync();
+    }
+
+    private void RemoveAction(CombatAction action)
+    {
+        Actions.Remove(action);
+        if (editingId == action.Id) editingId = Guid.Empty;
+        ActionsChanged.InvokeAsync();
+    }
+
+    private void SyncUses(CombatAction action, ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var v))
+            action.UsesRemaining = v;
+    }
+
+    private static string GetTypeIcon(ActionType t) => t switch
+    {
+        ActionType.Attack => "⚔️",
+        ActionType.SpellAttack => "✨",
+        ActionType.Spell => "🔮",
+        _ => "💫"
+    };
+}

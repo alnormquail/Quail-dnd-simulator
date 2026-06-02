@@ -1,0 +1,423 @@
+@using CopilotTest.Models
+@using CopilotTest.Services
+@inject DndApiService DndApi
+@inject CombatEngineService Combat
+@implements IDisposable
+
+<div class="add-combatant-panel">
+    <h3>Add Combatant</h3>
+
+    <div class="combatant-type-tabs">
+        <button class="tab-btn @(activeTab == "pc" ? "active" : "")" @onclick='() => SetTab("pc")'>⚔️ Player Character</button>
+        <button class="tab-btn @(activeTab == "npc" ? "active" : "")" @onclick='() => SetTab("npc")'>🧙 NPC / Ally</button>
+        <button class="tab-btn @(activeTab == "monster" ? "active" : "")" @onclick='() => SetTab("monster")'>👹 Monster</button>
+    </div>
+
+    @if (activeTab == "monster")
+    {
+        <div class="monster-sub-tabs">
+            <button class="sub-tab-btn @(monsterSubTab == "search" ? "active" : "")" @onclick='() => monsterSubTab = "search"'>🔍 Search / Browse</button>
+            <button class="sub-tab-btn @(monsterSubTab == "manual" ? "active" : "")" @onclick='() => monsterSubTab = "manual"'>✏️ Enter Manually</button>
+            <button class="sub-tab-btn @(monsterSubTab == "pdf" ? "active" : "")" @onclick='() => monsterSubTab = "pdf"'>📄 Import PDF</button>
+        </div>
+
+        @if (monsterSubTab == "search")
+        {
+        <div class="monster-search">
+            <div class="api-status api-offline">
+                📦 @DndApi.ApiStatusMessage
+            </div>
+            <label>Search Monster</label>
+            <div class="search-row">
+                <input class="form-input" placeholder="e.g. Goblin, Dragon..." value="@monsterSearch" @oninput="OnMonsterSearch" />
+                <button class="btn btn-random-monster" @onclick="SelectRandomMonster" title="Pick a random monster from the SRD list" disabled="@isLoadingMonsters">🎲 Random</button>
+                @if (isLoadingMonsters)
+                {
+                    <span class="spinner">⏳</span>
+                }
+            </div>
+
+            @if (searchResults.Count > 0)
+            {
+                <div class="search-results">
+                    @foreach (var m in searchResults.Take(10))
+                    {
+                        <div class="search-result-item @(selectedMonsterIndex == m.Index ? "selected" : "")" @onclick="() => SelectMonster(m)">
+                            @m.Name
+                        </div>
+                    }
+                </div>
+            }
+
+            @if (loadedMonster != null)
+            {
+                <div class="monster-preview card">
+                    <div class="monster-header">
+                        <strong>@loadedMonster.Name</strong>
+                        <span class="badge">CR @loadedMonster.Challenge_Rating</span>
+                        <span class="badge badge-type">@loadedMonster.Size @loadedMonster.Type</span>
+                    </div>
+                    <div class="stat-grid">
+                        <div><label>HP</label><span>@loadedMonster.Hit_Points</span></div>
+                        <div><label>AC</label><span>@loadedMonster.GetArmorClass()</span></div>
+                        <div><label>STR</label><span>@loadedMonster.Strength</span></div>
+                        <div><label>DEX</label><span>@loadedMonster.Dexterity</span></div>
+                        <div><label>CON</label><span>@loadedMonster.Constitution</span></div>
+                    </div>
+                    @if (loadedMonster.Actions.Any(a => a.Attack_Bonus.HasValue))
+                    {
+                        <div class="attack-info">
+                            <label>Primary Attack:</label>
+                            @{
+                                var atk = loadedMonster.Actions.First(a => a.Attack_Bonus.HasValue);
+                            }
+                            <span>@atk.Name (+@atk.Attack_Bonus to hit, @(atk.Damage.FirstOrDefault()?.Damage_Dice?.Value ?? "1d6") dmg)</span>
+                        </div>
+                    }
+                    <div class="form-row">
+                        <label>Quantity</label>
+                        <input type="number" class="form-input small" @bind="monsterQuantity" min="1" max="20" />
+                    </div>
+                    <button class="btn btn-primary" @onclick="AddMonsterFromApi">Add @(monsterQuantity > 1 ? $"{monsterQuantity}x " : "")@loadedMonster.Name</button>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(apiError))
+            {
+                <div class="error-msg">@apiError</div>
+            }
+        </div>
+        }
+        else
+        {
+            <div class="manual-form card">
+                <div class="form-row">
+                    <label>Name *</label>
+                    <input class="form-input" @bind="monsterForm.Name" placeholder="Cave Troll" />
+                </div>
+                <div class="form-section-title">Combat Stats</div>
+                <div class="stat-grid">
+                    <div class="form-field">
+                        <label>Max HP</label>
+                        <input type="number" class="form-input" @bind="monsterForm.MaxHitPoints" min="1" />
+                    </div>
+                    <div class="form-field">
+                        <label>Armor Class</label>
+                        <input type="number" class="form-input" @bind="monsterForm.ArmorClass" min="1" />
+                    </div>
+                    <div class="form-field">
+                        <label>Prof. Bonus</label>
+                        <input type="number" class="form-input" @bind="monsterForm.ProficiencyBonus" min="2" />
+                    </div>
+                    <div class="form-field">
+                        <label>CR (optional)</label>
+                        <input class="form-input" @bind="monsterCR" placeholder="1/4" />
+                    </div>
+                </div>
+                <div class="form-section-title">Ability Scores</div>
+                <div class="stat-grid ability-grid">
+                    <div class="form-field ability-field">
+                        <label>STR</label>
+                        <input type="number" class="form-input" @bind="monsterForm.Strength" min="1" max="30" />
+                        <span class="modifier">(@FormatMod(Combatant.GetModifier(monsterForm.Strength)))</span>
+                    </div>
+                    <div class="form-field ability-field">
+                        <label>DEX</label>
+                        <input type="number" class="form-input" @bind="monsterForm.Dexterity" min="1" max="30" />
+                        <span class="modifier">(@FormatMod(Combatant.GetModifier(monsterForm.Dexterity)))</span>
+                    </div>
+                    <div class="form-field ability-field">
+                        <label>CON</label>
+                        <input type="number" class="form-input" @bind="monsterForm.Constitution" min="1" max="30" />
+                        <span class="modifier">(@FormatMod(Combatant.GetModifier(monsterForm.Constitution)))</span>
+                    </div>
+                    <div class="form-field ability-field">
+                        <label>INT</label>
+                        <input type="number" class="form-input" @bind="monsterForm.Intelligence" min="1" max="30" />
+                        <span class="modifier">(@FormatMod(Combatant.GetModifier(monsterForm.Intelligence)))</span>
+                    </div>
+                    <div class="form-field ability-field">
+                        <label>WIS</label>
+                        <input type="number" class="form-input" @bind="monsterForm.Wisdom" min="1" max="30" />
+                        <span class="modifier">(@FormatMod(Combatant.GetModifier(monsterForm.Wisdom)))</span>
+                    </div>
+                    <div class="form-field ability-field">
+                        <label>CHA</label>
+                        <input type="number" class="form-input" @bind="monsterForm.Charisma" min="1" max="30" />
+                        <span class="modifier">(@FormatMod(Combatant.GetModifier(monsterForm.Charisma)))</span>
+                    </div>
+                </div>
+                <ActionEditor Actions="monsterForm.Actions" />
+                <div class="form-row mt-8">
+                    <label>Quantity</label>
+                    <input type="number" class="form-input small" @bind="monsterQuantity" min="1" max="20" />
+                </div>
+                <button class="btn btn-primary" @onclick="AddManualMonster" disabled="@string.IsNullOrWhiteSpace(monsterForm.Name)">
+                    Add @(monsterQuantity > 1 ? $"{monsterQuantity}x " : "")Monster
+                </button>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="monster-sub-tabs">
+            <button class="sub-tab-btn @(pcSubTab == "manual" ? "active" : "")" @onclick='() => pcSubTab = "manual"'>✏️ Enter Manually</button>
+            <button class="sub-tab-btn @(pcSubTab == "pdf" ? "active" : "")" @onclick='() => pcSubTab = "pdf"'>📄 Import PDF</button>
+        </div>
+
+        @if (pcSubTab == "pdf")
+        {
+            <PdfImportForm />
+        }
+        else
+        {
+        <div class="manual-form card">
+            <div class="form-row">
+                <label>Name *</label>
+                <input class="form-input" @bind="form.Name" placeholder="@(activeTab == "pc" ? "Thorin Ironforge" : "Town Guard")" />
+            </div>
+
+            <div class="form-section-title">Combat Stats</div>
+            <div class="stat-grid">
+                <div class="form-field">
+                    <label>Max HP</label>
+                    <input type="number" class="form-input" @bind="form.MaxHitPoints" min="1" />
+                </div>
+                <div class="form-field">
+                    <label>Armor Class</label>
+                    <input type="number" class="form-input" @bind="form.ArmorClass" min="1" />
+                </div>
+                <div class="form-field">
+                    <label>Speed</label>
+                    <input type="number" class="form-input" @bind="form.Speed" min="0" />
+                </div>
+                <div class="form-field">
+                    <label>Prof. Bonus</label>
+                    <input type="number" class="form-input" @bind="form.ProficiencyBonus" min="2" />
+                </div>
+            </div>
+
+            <div class="form-section-title">Ability Scores</div>
+            <div class="stat-grid ability-grid">
+                <div class="form-field ability-field">
+                    <label>STR</label>
+                    <input type="number" class="form-input" @bind="form.Strength" min="1" max="30" />
+                    <span class="modifier">(@FormatMod(Combatant.GetModifier(form.Strength)))</span>
+                </div>
+                <div class="form-field ability-field">
+                    <label>DEX</label>
+                    <input type="number" class="form-input" @bind="form.Dexterity" min="1" max="30" />
+                    <span class="modifier">(@FormatMod(Combatant.GetModifier(form.Dexterity)))</span>
+                </div>
+                <div class="form-field ability-field">
+                    <label>CON</label>
+                    <input type="number" class="form-input" @bind="form.Constitution" min="1" max="30" />
+                    <span class="modifier">(@FormatMod(Combatant.GetModifier(form.Constitution)))</span>
+                </div>
+                <div class="form-field ability-field">
+                    <label>INT</label>
+                    <input type="number" class="form-input" @bind="form.Intelligence" min="1" max="30" />
+                    <span class="modifier">(@FormatMod(Combatant.GetModifier(form.Intelligence)))</span>
+                </div>
+                <div class="form-field ability-field">
+                    <label>WIS</label>
+                    <input type="number" class="form-input" @bind="form.Wisdom" min="1" max="30" />
+                    <span class="modifier">(@FormatMod(Combatant.GetModifier(form.Wisdom)))</span>
+                </div>
+                <div class="form-field ability-field">
+                    <label>CHA</label>
+                    <input type="number" class="form-input" @bind="form.Charisma" min="1" max="30" />
+                    <span class="modifier">(@FormatMod(Combatant.GetModifier(form.Charisma)))</span>
+                </div>
+            </div>
+
+            <ActionEditor Actions="form.Actions" />
+
+            <button class="btn btn-primary mt-8" @onclick="AddManualCombatant" disabled="@string.IsNullOrWhiteSpace(form.Name)">
+                Add @(activeTab == "pc" ? "Player Character" : "NPC")
+            </button>
+        </div>
+        }
+    }
+</div>
+
+@code {
+    private string activeTab = "pc";
+    private string monsterSubTab = "search";
+    private string pcSubTab = "manual";
+    private string monsterSearch = "";
+    private string selectedMonsterIndex = "";
+    private string? apiError;
+    private bool isLoadingMonsters = false;
+    private int monsterQuantity = 1;
+    private string monsterCR = "";
+    private List<MonsterSummary> searchResults = new();
+    private MonsterDetail? loadedMonster;
+    private Combatant form = new Combatant { MaxHitPoints = 30, ArmorClass = 14, ProficiencyBonus = 2,
+        Actions = new() { new CombatAction { Name = "Longsword", ActionType = ActionType.Attack, AttackBonus = 5, DamageDice = "1d8", DamageBonus = 3, DamageType = DamageType.Slashing } } };
+    private Combatant monsterForm = new Combatant { Name = "", MaxHitPoints = 15, ArmorClass = 12, Strength = 14, Dexterity = 10, Constitution = 14, Intelligence = 6, Wisdom = 10, Charisma = 6, ProficiencyBonus = 2,
+        Actions = new() { new CombatAction { Name = "Claws", ActionType = ActionType.Attack, AttackBonus = 4, DamageDice = "1d8", DamageBonus = 2, DamageType = DamageType.Slashing } } };
+
+    protected override void OnInitialized()
+    {
+        Combat.OnStateChanged += OnCombatStateChanged;
+    }
+
+    private void OnCombatStateChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Combat.OnStateChanged -= OnCombatStateChanged;
+    }
+
+    private void SetTab(string tab)
+    {
+        activeTab = tab;
+        monsterSubTab = "search";
+        pcSubTab = "manual";
+        form = new Combatant { MaxHitPoints = 30, ArmorClass = 14, ProficiencyBonus = 2,
+            Actions = new() { new CombatAction { Name = "Longsword", ActionType = ActionType.Attack, AttackBonus = 5, DamageDice = "1d8", DamageBonus = 3, DamageType = DamageType.Slashing } } };
+        monsterForm = new Combatant { Name = "", MaxHitPoints = 15, ArmorClass = 12, Strength = 14, Dexterity = 10, Constitution = 14, Intelligence = 6, Wisdom = 10, Charisma = 6, ProficiencyBonus = 2,
+            Actions = new() { new CombatAction { Name = "Claws", ActionType = ActionType.Attack, AttackBonus = 4, DamageDice = "1d8", DamageBonus = 2, DamageType = DamageType.Slashing } } };
+        monsterSearch = "";
+        monsterCR = "";
+        searchResults.Clear();
+        loadedMonster = null;
+        selectedMonsterIndex = "";
+        apiError = null;
+    }
+
+    private async Task OnMonsterSearch(ChangeEventArgs e)
+    {
+        monsterSearch = e.Value?.ToString() ?? "";
+        if (monsterSearch.Length < 2)
+        {
+            searchResults.Clear();
+            return;
+        }
+
+        isLoadingMonsters = true;
+        apiError = null;
+        try
+        {
+            searchResults = await DndApi.SearchMonstersAsync(monsterSearch);
+        }
+        catch
+        {
+            apiError = "Could not reach D&D API. Check your connection.";
+        }
+        finally
+        {
+            isLoadingMonsters = false;
+        }
+    }
+
+    private async Task SelectRandomMonster()
+    {
+        var randomSummary = DndApi.GetRandomMonsterSummary();
+        monsterSearch = string.Empty;
+        searchResults.Clear();
+        await SelectMonster(randomSummary);
+    }
+
+    private async Task SelectMonster(MonsterSummary summary)
+    {
+        selectedMonsterIndex = summary.Index;
+        isLoadingMonsters = true;
+        apiError = null;
+        try
+        {
+            loadedMonster = await DndApi.GetMonsterDetailAsync(summary.Index);
+            monsterQuantity = 1;
+        }
+        catch
+        {
+            apiError = $"Failed to load {summary.Name} details.";
+        }
+        finally
+        {
+            isLoadingMonsters = false;
+        }
+    }
+
+    private void AddMonsterFromApi()
+    {
+        if (loadedMonster == null) return;
+        for (int i = 0; i < monsterQuantity; i++)
+        {
+            var c = DndApi.MonsterToCombatant(loadedMonster);
+            if (monsterQuantity > 1) c.Name = $"{loadedMonster.Name} {i + 1}";
+            Combat.AddCombatant(c);
+        }
+        loadedMonster = null;
+        selectedMonsterIndex = "";
+        monsterSearch = "";
+        searchResults.Clear();
+        monsterQuantity = 1;
+    }
+
+    private void AddManualCombatant()
+    {
+        if (string.IsNullOrWhiteSpace(form.Name)) return;
+        var c = new Combatant
+        {
+            Name = form.Name,
+            Type = activeTab == "pc" ? CombatantType.PC : CombatantType.NPC,
+            MaxHitPoints = form.MaxHitPoints,
+            CurrentHitPoints = form.MaxHitPoints,
+            ArmorClass = form.ArmorClass,
+            Speed = form.Speed,
+            ProficiencyBonus = form.ProficiencyBonus,
+            Strength = form.Strength,
+            Dexterity = form.Dexterity,
+            Constitution = form.Constitution,
+            Intelligence = form.Intelligence,
+            Wisdom = form.Wisdom,
+            Charisma = form.Charisma,
+            Actions = form.Actions
+        };
+        Combat.AddCombatant(c);
+        form = new Combatant { MaxHitPoints = 30, ArmorClass = 14, ProficiencyBonus = 2,
+            Actions = new() { new CombatAction { Name = "Longsword", ActionType = ActionType.Attack, AttackBonus = 5, DamageDice = "1d8", DamageBonus = 3, DamageType = DamageType.Slashing } } };
+    }
+
+    private void AddManualMonster()
+    {
+        if (string.IsNullOrWhiteSpace(monsterForm.Name)) return;
+        for (int i = 0; i < monsterQuantity; i++)
+        {
+            var c = new Combatant
+            {
+                Name = monsterQuantity > 1 ? $"{monsterForm.Name} {i + 1}" : monsterForm.Name,
+                Type = CombatantType.Monster,
+                MaxHitPoints = monsterForm.MaxHitPoints,
+                CurrentHitPoints = monsterForm.MaxHitPoints,
+                ArmorClass = monsterForm.ArmorClass,
+                ProficiencyBonus = monsterForm.ProficiencyBonus,
+                Strength = monsterForm.Strength,
+                Dexterity = monsterForm.Dexterity,
+                Constitution = monsterForm.Constitution,
+                Intelligence = monsterForm.Intelligence,
+                Wisdom = monsterForm.Wisdom,
+                Charisma = monsterForm.Charisma,
+                Actions = monsterForm.Actions.Select(a => new CombatAction
+                {
+                    Name = a.Name, ActionType = a.ActionType, AttackBonus = a.AttackBonus,
+                    DamageDice = a.DamageDice, DamageBonus = a.DamageBonus, DamageType = a.DamageType,
+                    SaveDC = a.SaveDC, SaveAbility = a.SaveAbility, SpellLevel = a.SpellLevel,
+                    Range = a.Range, Description = a.Description, UsesPerDay = a.UsesPerDay, UsesRemaining = a.UsesPerDay
+                }).ToList()
+            };
+            Combat.AddCombatant(c);
+        }
+        monsterForm = new Combatant { Name = "", MaxHitPoints = 15, ArmorClass = 12, Strength = 14, Dexterity = 10, Constitution = 14, Intelligence = 6, Wisdom = 10, Charisma = 6, ProficiencyBonus = 2,
+            Actions = new() { new CombatAction { Name = "Claws", ActionType = ActionType.Attack, AttackBonus = 4, DamageDice = "1d8", DamageBonus = 2, DamageType = DamageType.Slashing } } };
+        monsterQuantity = 1;
+        monsterCR = "";
+    }
+
+    private string FormatMod(int mod) => mod >= 0 ? $"+{mod}" : mod.ToString();
+}

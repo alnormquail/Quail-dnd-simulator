@@ -1,0 +1,193 @@
+@using CopilotTest.Models
+@using CopilotTest.Services
+@inject CombatEngineService Combat
+@implements IDisposable
+
+<div class="combatants-panel">
+    <h3>Combatants <span class="count-badge">@Combat.Combatants.Count</span></h3>
+
+    @if (!Combat.Combatants.Any())
+    {
+        <div class="empty-state">No combatants added yet. Add at least one hero and one monster to begin.</div>
+    }
+    else
+    {
+        <div class="combatant-groups">
+            @foreach (var group in Combat.Combatants.GroupBy(c => c.Type).OrderBy(g => g.Key))
+            {
+                <div class="combatant-group">
+                    <div class="group-header">
+                        @GetGroupIcon(group.Key) @group.Key.ToString()s (@group.Count())
+                    </div>
+                    @foreach (var c in group)
+                    {
+                        <div class="combatant-card @GetCardClass(c) @(IsCurrentTurn(c) ? "active-turn" : "")">
+                            @if (IsCurrentTurn(c))
+                            {
+                                <div class="turn-indicator">▶ ACTIVE TURN</div>
+                            }
+                            <div class="combatant-header">
+                                <div class="combatant-name">
+                                    <span class="type-icon">@GetTypeIcon(c.Type)</span>
+                                    <strong>@c.Name</strong>
+                                    @if (!string.IsNullOrEmpty(c.ClassDisplay))
+                                    {
+                                        <span class="class-badge">@c.ClassDisplay</span>
+                                    }
+                                    @if (Combat.State == CombatState.Active)
+                                    {
+                                        <span class="initiative-badge" title="Initiative">⚡@c.Initiative</span>
+                                    }
+                                </div>
+                                @if (Combat.State == CombatState.Setup)
+                                {
+                                    @if (c.Type != CombatantType.Monster)
+                                    {
+                                        var inRoster = Combat.IsInRoster(c.Id);
+                                        <button class="btn-roster @(inRoster ? "roster-saved" : "")" @onclick="() => ToggleRoster(c)"
+                                                title="@(inRoster ? "Remove from saved roster" : "Save to roster (persists across encounters)")">@(inRoster ? "⭐" : "☆")</button>
+                                    }
+                                    <button class="btn-remove" @onclick="() => Combat.RemoveCombatant(c.Id)" title="Remove">✕</button>
+                                }
+                            </div>
+
+                            <div class="hp-bar-container">
+                                <div class="hp-bar @GetHpBarClass(c)" style="width: @GetHpPercent(c)%;"></div>
+                            </div>
+                            <div class="combatant-stats">
+                                <span class="stat-item" title="Hit Points">❤️ @c.HpDisplay</span>
+                                <span class="stat-item" title="Armor Class">🛡️ AC @c.ArmorClass</span>
+                                <span class="stat-item" title="Attack Bonus">⚔️ +@c.AttackBonus (@c.DamageDice)</span>
+                                @if (c.IsBarbarianClass)
+                                {
+                                    <span class="stat-item rage-uses-badge" title="Rage uses remaining">
+                                        🔥 @c.RageUsesRemaining/@c.RageUsesPerDay rage@(c.RageUsesPerDay == 1 ? "" : "s")
+                                    </span>
+                                }
+                            </div>
+                            <div class="status-line @(c.IsRaging ? "status-raging" : "")">@c.StatusDisplay</div>
+
+                            @if (c.Conditions.Any())
+                            {
+                                <div class="conditions">
+                                    @foreach (var cond in c.Conditions)
+                                    {
+                                        <span class="condition-tag">@cond</span>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@if (Combat.State == CombatState.Setup)
+{
+    <div class="saved-roster-panel">
+        <h4 class="roster-header">⭐ Party Roster</h4>
+        <div class="roster-list">
+            @foreach (var r in Combat.SavedRoster)
+            {
+                var alreadyIn = Combat.Combatants.Any(c => c.Id == r.Id);
+                var isPreloaded = PreloadedCharacters.All.Any(p => p.Id == r.Id);
+                <div class="roster-entry @(alreadyIn ? "roster-entry-in" : "")">
+                    <div class="roster-entry-left">
+                        <span class="roster-name">@GetTypeIcon(r.Type) @r.Name</span>
+                        @if (!string.IsNullOrEmpty(r.ClassDisplay))
+                        {
+                            <span class="roster-class">@r.ClassDisplay</span>
+                        }
+                        <span class="roster-stats">❤️ @r.MaxHitPoints &nbsp;🛡️ @r.ArmorClass</span>
+                    </div>
+                    <div class="roster-actions">
+                        @if (!alreadyIn)
+                        {
+                            <button class="btn btn-sm btn-add" @onclick="() => Combat.AddFromRoster(r.Id)" title="Add to current encounter">+ Add</button>
+                        }
+                        else
+                        {
+                            <span class="roster-in-badge">✓ Added</span>
+                        }
+                        @if (!isPreloaded)
+                        {
+                            <button class="btn-roster roster-saved" @onclick="() => Combat.RemoveFromRoster(r.Id)" title="Remove from roster">⭐</button>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private string GetGroupIcon(CombatantType type) => type switch
+    {
+        CombatantType.PC => "⚔️",
+        CombatantType.NPC => "🧙",
+        CombatantType.Monster => "👹",
+        _ => "?"
+    };
+
+    private string GetTypeIcon(CombatantType type) => type switch
+    {
+        CombatantType.PC => "⚔️",
+        CombatantType.NPC => "🧙",
+        CombatantType.Monster => "👹",
+        _ => "?"
+    };
+
+    private string GetCardClass(Combatant c)
+    {
+        if (c.IsDead) return "combatant-dead";
+        if (c.Type == CombatantType.PC && c.IsUnconscious) return "combatant-unconscious";
+        if (c.CurrentHitPoints <= c.MaxHitPoints / 4) return "combatant-critical";
+        if (c.CurrentHitPoints <= c.MaxHitPoints / 2) return "combatant-bloodied";
+        return "";
+    }
+
+    private string GetHpBarClass(Combatant c)
+    {
+        if (c.IsDead) return "hp-dead";
+        if (c.CurrentHitPoints <= c.MaxHitPoints / 4) return "hp-critical";
+        if (c.CurrentHitPoints <= c.MaxHitPoints / 2) return "hp-bloodied";
+        return "hp-healthy";
+    }
+
+    private double GetHpPercent(Combatant c)
+    {
+        if (c.MaxHitPoints <= 0) return 0;
+        return Math.Max(0, Math.Min(100, (double)c.CurrentHitPoints / c.MaxHitPoints * 100));
+    }
+
+    private bool IsCurrentTurn(Combatant c)
+    {
+        if (Combat.State != CombatState.Active) return false;
+        return Combat.CurrentCombatant?.Id == c.Id;
+    }
+
+    private void ToggleRoster(Combatant c)
+    {
+        if (Combat.IsInRoster(c.Id))
+            Combat.RemoveFromRoster(c.Id);
+        else
+            Combat.SaveToRoster(c);
+    }
+
+    protected override void OnInitialized()
+    {
+        Combat.OnStateChanged += OnCombatStateChanged;
+    }
+
+    private void OnCombatStateChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Combat.OnStateChanged -= OnCombatStateChanged;
+    }
+}

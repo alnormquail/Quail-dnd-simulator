@@ -1,0 +1,273 @@
+@using CopilotTest.Models
+@using CopilotTest.Services
+@inject CombatEngineService Combat
+@implements IDisposable
+
+<div class="combat-controls">
+    @if (Combat.State == CombatState.Setup)
+    {
+        <div class="setup-actions">
+            <div class="combatant-summary">
+                @{
+                    var pcs = Combat.Combatants.Count(c => c.Type == CombatantType.PC);
+                    var npcs = Combat.Combatants.Count(c => c.Type == CombatantType.NPC);
+                    var monsters = Combat.Combatants.Count(c => c.Type == CombatantType.Monster);
+                }
+                <span>⚔️ @pcs PC(s)</span>
+                <span>🧙 @npcs NPC(s)</span>
+                <span>👹 @monsters Monster(s)</span>
+            </div>
+
+            @if (Combat.Combatants.Count >= 2)
+            {
+                <button class="btn btn-start" @onclick="Combat.StartCombat">
+                    ⚔️ Begin Combat!
+                </button>
+            }
+            else
+            {
+                <div class="warning-msg">Add at least 2 combatants (heroes and monsters) to start.</div>
+            }
+        </div>
+    }
+    else if (Combat.State == CombatState.Active)
+    {
+        <div class="active-controls">
+            <div class="round-info">
+                <div class="round-badge">Round @Combat.CurrentRound</div>
+                @if (Combat.CurrentCombatant != null)
+                {
+                    <div class="current-turn">
+                        @GetTypeIcon(Combat.CurrentCombatant.Type) <strong>@Combat.CurrentCombatant.Name</strong>'s turn
+                        <span class="initiative-info">(Initiative @Combat.CurrentCombatant.Initiative)</span>
+                    </div>
+                }
+            </div>
+
+            @{
+                var current = Combat.CurrentCombatant;
+                bool isManualTurn = current != null && current.Type != CombatantType.Monster;
+            }
+
+            @if (isManualTurn && current != null)
+            {
+                @* ── Manual action picker for PCs / NPCs ── *@
+                var targets = Combat.GetCurrentTargets();
+                var usableActions = current.Actions.Where(a => a.CanUse).ToList();
+
+                <div class="manual-turn-panel">
+                    <div class="manual-label">
+                        🎮 Choose an action for <strong>@current.Name</strong>
+                        @if (current.IsRaging)
+                        {
+                            <span class="raging-indicator">🔥 RAGING (+@current.RageBonus dmg, physical resistance)</span>
+                        }
+                        @if (targets.Count == 1)
+                        {
+                            <span class="target-hint">→ targeting <strong>@targets[0].Name</strong></span>
+                        }
+                        else if (targets.Count > 1)
+                        {
+                            <span class="target-hint">→ @targets.Count targets available</span>
+                        }
+                    </div>
+
+                    @* ── Rage button (shown when barbarian has uses and isn't raging yet) ── *@
+                    @if (current.IsBarbarianClass && !current.IsRaging && current.RageUsesRemaining > 0)
+                    {
+                        <button class="btn-rage" @onclick="() => Combat.EnterRage(current)"
+                                title="Enter a rage this turn: +@current.RageBonus melee damage, resistance to physical damage">
+                            🔥 Enter Rage
+                            <span class="rage-uses">@current.RageUsesRemaining use@(current.RageUsesRemaining == 1 ? "" : "s") left</span>
+                        </button>
+                    }
+
+                    @if (usableActions.Count == 0)
+                    {
+                        <div class="no-actions-msg">No usable actions available.</div>
+                    }
+                    else if (targets.Count == 0)
+                    {
+                        <div class="no-actions-msg">No valid targets — click Auto-Turn to skip.</div>
+                    }
+                    else if (targets.Count == 1)
+                    {
+                        @* Single target: just show action buttons *@
+                        <div class="action-picker">
+                            @foreach (var action in usableActions)
+                            {
+                                var a = action; @* capture for closure *@
+                                <button class="action-card @GetActionCardClass(a)"
+                                        @onclick="() => Combat.ExecuteActionForCurrent(a)"
+                                        title="@a.ShortSummary">
+                                    <span class="action-card-icon">@GetActionIcon(a)</span>
+                                    <span class="action-card-name">@a.DisplayName</span>
+                                    <span class="action-card-summary">@a.ShortSummary</span>
+                                    @if (a.IsLimited)
+                                    {
+                                        <span class="action-uses">@a.UsesRemaining/@a.UsesPerDay</span>
+                                    }
+                                </button>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        @* Multiple targets: two-step — pick action then pick target *@
+                        @if (selectedAction == null)
+                        {
+                            <div class="action-picker">
+                                @foreach (var action in usableActions)
+                                {
+                                    var a = action;
+                                    <button class="action-card @GetActionCardClass(a)"
+                                            @onclick="() => selectedAction = a"
+                                            title="@a.ShortSummary">
+                                        <span class="action-card-icon">@GetActionIcon(a)</span>
+                                        <span class="action-card-name">@a.DisplayName</span>
+                                        <span class="action-card-summary">@a.ShortSummary</span>
+                                        @if (a.IsLimited)
+                                        {
+                                            <span class="action-uses">@a.UsesRemaining/@a.UsesPerDay</span>
+                                        }
+                                    </button>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="target-picker">
+                                <div class="target-picker-label">
+                                    <span>🎯 <strong>@selectedAction.DisplayName</strong> — pick a target:</span>
+                                    <button class="btn-back" @onclick="() => selectedAction = null">← Back</button>
+                                </div>
+                                <div class="target-list">
+                                    @foreach (var t in targets)
+                                    {
+                                        var tgt = t;
+                                        <button class="target-card" @onclick="() => PickActionTarget(tgt)">
+                                            <span>@GetTypeIcon(tgt.Type) <strong>@tgt.Name</strong></span>
+                                            <span class="target-hp">❤️ @tgt.HpDisplay</span>
+                                            <span class="target-ac">🛡️ AC @tgt.ArmorClass</span>
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            }
+
+            <div class="action-buttons">
+                @if (isManualTurn)
+                {
+                    <button class="btn btn-action" @onclick="AutoTurn" title="Let the AI choose and execute this turn">
+                        🤖 Auto-Turn
+                    </button>
+                }
+                else
+                {
+                    <button class="btn btn-action" @onclick="Combat.SimulateTurn" title="Simulate the monster's turn">
+                        ▶ Next Turn
+                    </button>
+                }
+                <button class="btn btn-round" @onclick="Combat.SimulateRound" title="Simulate all remaining turns this round">
+                    ⏭ Full Round
+                </button>
+                <button class="btn btn-reset" @onclick="Combat.ResetCombat" title="Clear all combatants and start fresh">
+                    🗑 Full Reset
+                </button>
+            </div>
+
+            <div class="turn-order">
+                <span class="turn-order-label">Turn Order:</span>
+                @foreach (var c in Combat.ActiveCombatants)
+                {
+                    <span class="turn-chip @(Combat.CurrentCombatant?.Id == c.Id ? "active-chip" : "")">
+                        @GetTypeIcon(c.Type) @c.Name
+                    </span>
+                }
+            </div>
+        </div>
+    }
+    else if (Combat.State == CombatState.Finished)
+    {
+        <div class="finished-state">
+            <div class="victory-banner">🏆 Combat Finished!</div>
+            @{
+                var survivors = Combat.ActiveCombatants;
+            }
+            @if (survivors.Any())
+            {
+                <div class="survivors">
+                    <strong>Survivors:</strong>
+                    @foreach (var s in survivors)
+                    {
+                        <span class="survivor-chip">@GetTypeIcon(s.Type) @s.Name (@s.HpDisplay HP)</span>
+                    }
+                </div>
+            }
+            <button class="btn btn-start" @onclick="Combat.NewEncounter">🔄 New Encounter</button>
+            <button class="btn btn-retry" @onclick="Combat.RetryCombat" title="Replay the same monsters against the party">🔁 Retry</button>
+            <button class="btn btn-reset" @onclick="Combat.ResetCombat" title="Clear all combatants including saved roster characters">🗑 Full Reset</button>
+        </div>
+    }
+</div>
+
+@code {
+    private CombatAction? selectedAction;
+
+    private void AutoTurn()
+    {
+        selectedAction = null;
+        Combat.SimulateTurn();
+    }
+
+    private void PickActionTarget(Combatant target)
+    {
+        if (selectedAction == null) return;
+        var action = selectedAction;
+        selectedAction = null;
+        Combat.ExecuteActionAgainstTarget(action, target);
+    }
+
+    protected override void OnInitialized()
+    {
+        Combat.OnStateChanged += OnCombatStateChanged;
+    }
+
+    private void OnCombatStateChanged()
+    {
+        selectedAction = null; // reset picker on any state change
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Combat.OnStateChanged -= OnCombatStateChanged;
+    }
+
+    private string GetTypeIcon(CombatantType type) => type switch
+    {
+        CombatantType.PC => "⚔️",
+        CombatantType.NPC => "🧙",
+        CombatantType.Monster => "👹",
+        _ => "?"
+    };
+
+    private string GetActionIcon(CombatAction a) => a.ActionType switch
+    {
+        ActionType.Attack => "⚔️",
+        ActionType.SpellAttack => "✨",
+        ActionType.Spell => "🔮",
+        _ => "💫"
+    };
+
+    private string GetActionCardClass(CombatAction a) => a.ActionType switch
+    {
+        ActionType.Attack => "action-card-attack",
+        ActionType.SpellAttack => "action-card-spellatk",
+        ActionType.Spell => "action-card-spell",
+        _ => "action-card-other"
+    };
+}

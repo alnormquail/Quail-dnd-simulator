@@ -1,0 +1,52 @@
+@using CopilotTest.Models
+@using CopilotTest.Services
+@inject CombatEngineService Combat
+@implements IDisposable
+
+<div class="combat-log-panel">
+    <div class="log-header">
+        <h3>📜 Combat Log</h3>
+        @if (Combat.Log.Count > 0)
+        {
+            <span class="log-count">@Combat.Log.Count entries</span>
+        }
+    </div>
+
+    @if (!Combat.Log.Any())
+    {
+        <div class="empty-state">Combat log will appear here once combat starts.</div>
+    }
+    else
+    {
+        <div class="log-entries" id="log-container">
+            @foreach (var entry in Combat.Log.AsEnumerable().Reverse())
+            {
+                <div class="log-entry @Combat.GetEntryClass(entry.EntryType)">
+                    <span class="log-icon">@Combat.GetEntryIcon(entry.EntryType)</span>
+                    @if (entry.EntryType != LogEntryType.RoundStart)
+                    {
+                        <span class="log-actor">[@entry.ActorName]</span>
+                    }
+                    <span class="log-message">@entry.Message</span>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Combat.OnStateChanged += OnCombatStateChanged;
+    }
+
+    private void OnCombatStateChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Combat.OnStateChanged -= OnCombatStateChanged;
+    }
+}
