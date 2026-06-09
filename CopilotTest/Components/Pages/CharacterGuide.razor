@@ -1,0 +1,569 @@
+@page "/character-guide"
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+@rendermode InteractiveServer
+
+<PageTitle>Character Reference Guide</PageTitle>
+
+<div class="app-container">
+    <header class="app-header">
+        <h1>📖 Character Reference Guide</h1>
+        <p class="subtitle">Select your character for a quick combat reference</p>
+    </header>
+
+    <!-- ── Character Selector ── -->
+    <div class="guide-character-grid">
+        @foreach (var character in PreloadedCharacters.All.Where(c => GuideData.ContainsKey(c.Id)))
+        {
+            <button class="guide-char-card @(Selected?.Id == character.Id ? "selected" : "")"
+                    @onclick="() => Select(character)">
+                <div class="char-card-icon">@GetClassEmoji(character.CharacterClass)</div>
+                <div class="char-card-name">@character.Name</div>
+                <div class="char-card-class">@character.ClassDisplay</div>
+                <div class="char-card-race">@GetRace(character.Id)</div>
+            </button>
+        }
+    </div>
+
+    <!-- ── Reference Guide Panel ── -->
+    @if (Selected != null && GuideData.TryGetValue(Selected.Id, out var guide))
+    {
+        <div class="guide-panel">
+
+            <!-- Header -->
+            <div class="guide-header">
+                <h2>@Selected.Name</h2>
+                <p class="guide-subtitle">@Selected.ClassDisplay &bull; @guide.Race &bull; @guide.Background</p>
+            </div>
+
+            <!-- Combat Stats Row -->
+            <div class="guide-stats-row">
+                <div class="guide-stat"><span class="stat-label">AC</span><span class="stat-value">@Selected.ArmorClass</span></div>
+                <div class="guide-stat"><span class="stat-label">Max HP</span><span class="stat-value">@Selected.MaxHitPoints</span></div>
+                <div class="guide-stat"><span class="stat-label">Speed</span><span class="stat-value">@Selected.Speed ft</span></div>
+                <div class="guide-stat"><span class="stat-label">Initiative</span><span class="stat-value">@FormatBonus(Selected.DexterityModifier)</span></div>
+                <div class="guide-stat"><span class="stat-label">Proficiency</span><span class="stat-value">@FormatBonus(Selected.ProficiencyBonus)</span></div>
+                @if (HasSpells(Selected))
+                {
+                    <div class="guide-stat"><span class="stat-label">Spell Save DC</span><span class="stat-value">@(8 + Selected.ProficiencyBonus + Selected.CharismaModifier)</span></div>
+                    <div class="guide-stat"><span class="stat-label">Spell Attack</span><span class="stat-value">@FormatBonus(Selected.ProficiencyBonus + Selected.CharismaModifier)</span></div>
+                }
+                @if (Selected.IsBarbarianClass)
+                {
+                    <div class="guide-stat"><span class="stat-label">Rages/Day</span><span class="stat-value">@Selected.RageUsesPerDay</span></div>
+                    <div class="guide-stat"><span class="stat-label">Rage Bonus</span><span class="stat-value">+@Selected.RageBonus dmg</span></div>
+                }
+            </div>
+
+            <!-- Session Tracker -->
+            <div class="guide-section tracker-section">
+                <h3>🎲 Session Tracker</h3>
+                <div class="tracker-grid">
+
+                    <!-- HP -->
+                    <div class="tracker-block">
+                        <div class="tracker-label">Hit Points</div>
+                        <div class="tracker-hp-row">
+                            <button class="tracker-btn" @onclick="() => AdjustHp(-1)">−</button>
+                            <div class="tracker-hp-display">
+                                <span class="tracker-hp-current @(CurrentHp <= Selected.MaxHitPoints / 4 ? "hp-critical" : CurrentHp <= Selected.MaxHitPoints / 2 ? "hp-low" : "")">@CurrentHp</span>
+                                <span class="tracker-hp-sep">/</span>
+                                <span class="tracker-hp-max">@Selected.MaxHitPoints</span>
+                            </div>
+                            <button class="tracker-btn" @onclick="() => AdjustHp(1)">+</button>
+                        </div>
+                        <div class="tracker-hp-bar">
+                            <div class="tracker-hp-fill @(CurrentHp <= Selected.MaxHitPoints / 4 ? "fill-critical" : CurrentHp <= Selected.MaxHitPoints / 2 ? "fill-low" : "")" style="width: @(Math.Max(0, CurrentHp * 100 / Selected.MaxHitPoints))%"></div>
+                        </div>
+                        <button class="tracker-reset-btn" @onclick="ResetHp">Reset to Max</button>
+                    </div>
+
+                    <!-- Spell Slots -->
+                    @if (guide.SpellSlots != null)
+                    {
+                        <div class="tracker-block">
+                            <div class="tracker-label">Spell Slots</div>
+                            @foreach (var tier in guide.SpellSlots)
+                            {
+                                <div class="tracker-slot-row">
+                                    <span class="tracker-slot-label">@tier.Label</span>
+                                    <div class="tracker-pips">
+                                        @for (int i = 0; i < tier.Total; i++)
+                                        {
+                                            var idx = i;
+                                            var tierId = tier.Label;
+                                            var used = SlotUsed(tierId, idx);
+                                            <button class="tracker-pip @(used ? "pip-used" : "pip-avail")" @onclick="() => ToggleSlot(tierId, idx)" title="@(used ? "Expended" : "Available")"></button>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                            <button class="tracker-reset-btn" @onclick="ResetSlots">Reset All Slots</button>
+                        </div>
+                    }
+
+                    <!-- Sorcery Points -->
+                    @if (guide.SorceryPoints != null)
+                    {
+                        <div class="tracker-block">
+                            <div class="tracker-label">Sorcery Points</div>
+                            <div class="tracker-pips">
+                                @for (int i = 0; i < guide.SorceryPoints.PointsPerDay; i++)
+                                {
+                                    var idx = i;
+                                    var used = SpUsed(idx);
+                                    <button class="tracker-pip tracker-pip-sp @(used ? "pip-used" : "pip-avail")" @onclick="() => ToggleSp(idx)" title="@(used ? "Spent" : "Available")"></button>
+                                }
+                            </div>
+                            <div class="tracker-sp-count">@(guide.SorceryPoints.PointsPerDay - SpentSp.Count) / @guide.SorceryPoints.PointsPerDay remaining</div>
+                            <button class="tracker-reset-btn" @onclick="ResetSp">Reset Points</button>
+                        </div>
+                    }
+
+                </div>
+            </div>
+
+            <!-- Ability Scores -->
+            <div class="guide-section">
+                <h3>Ability Scores</h3>
+                <div class="guide-abilities">
+                    @foreach (var ab in GetAbilities(Selected))
+                    {
+                        <div class="guide-ability">
+                            <div class="ability-label">@ab.Label</div>
+                            <div class="ability-score">@ab.Score</div>
+                            <div class="ability-mod @(ab.Mod >= 0 ? "pos" : "neg")">@FormatBonus(ab.Mod)</div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Saving Throws & Proficient Skills -->
+            <div class="guide-two-col">
+                <div class="guide-section">
+                    <h3>Saving Throws (Proficient)</h3>
+                    <div class="guide-tags">
+                        @foreach (var st in guide.SavingThrows)
+                        {
+                            <span class="guide-tag proficient">✦ @st</span>
+                        }
+                    </div>
+                </div>
+                <div class="guide-section">
+                    <h3>Proficient Skills</h3>
+                    <div class="guide-tags">
+                        @foreach (var sk in guide.ProficientSkills)
+                        {
+                            <span class="guide-tag proficient">✦ @sk</span>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Defenses & Special Traits -->
+            @if (guide.Defenses.Length > 0)
+            {
+                <div class="guide-section">
+                    <h3>Defenses &amp; Special Traits</h3>
+                    <div class="guide-tags">
+                        @foreach (var d in guide.Defenses)
+                        {
+                            <span class="guide-tag defense">🛡 @d</span>
+                        }
+                    </div>
+                </div>
+            }
+
+            <!-- Actions & Spells Table -->
+            <div class="guide-section">
+                <h3>Actions, Attacks &amp; Spells</h3>
+                <table class="guide-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th>Range</th>
+                            <th>Effect</th>
+                            <th>Uses</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var action in Selected.Actions)
+                        {
+                            <tr class="@GetActionRowClass(action)">
+                                <td><strong>@action.DisplayName</strong></td>
+                                <td><span class="action-type-badge @GetActionBadgeClass(action)">@GetActionTypeLabel(action)</span></td>
+                                <td>@action.Range</td>
+                                <td>
+                                    @if (action.ActionType == ActionType.Spell && action.SaveDC > 0)
+                                    {
+                                        <span class="save-dc-inline">DC @action.SaveDC @action.SaveAbility save</span>
+                                        @if (!string.IsNullOrEmpty(action.Description))
+                                        {
+                                            <div class="action-desc">@action.Description</div>
+                                        }
+                                        else if (action.DamageType != DamageType.None)
+                                        {
+                                            <div class="action-desc">@action.DamageDice @action.DamageType damage</div>
+                                        }
+                                    }
+                                    else if (!string.IsNullOrEmpty(action.Description))
+                                    {
+                                        @action.Description
+                                    }
+                                    else
+                                    {
+                                        @action.ShortSummary
+                                    }
+                                </td>
+                                <td class="uses-cell">@GetUsesLabel(action)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Key Class Features -->
+            @if (guide.ClassFeatures.Length > 0)
+            {
+                <div class="guide-section">
+                    <h3>Key Class Features</h3>
+                    <ul class="guide-features">
+                        @foreach (var feat in guide.ClassFeatures)
+                        {
+                            <li>@feat</li>
+                        }
+                    </ul>
+                </div>
+            }
+
+            <!-- Sorcery Points -->
+            @if (guide.SorceryPoints is { } sp)
+            {
+                <div class="guide-section guide-sp-section">
+                    <h3>🔮 Sorcery Points — @sp.PointsPerDay per Long Rest</h3>
+                    <p class="sp-intro">Sorcery Points (SP) are a flexible resource. Spend them on <strong>Metamagic</strong> or convert them to/from extra spell slots via <strong>Font of Magic</strong>.</p>
+
+                    <div class="sp-columns">
+
+                        <!-- SP → Spell Slots -->
+                        <div class="sp-box">
+                            <div class="sp-box-title">🔁 SP → Spell Slot</div>
+                            <div class="sp-box-note">Bonus Action — slot vanishes after Long Rest</div>
+                            <table class="sp-table">
+                                <thead><tr><th>Slot Level</th><th>SP Cost</th></tr></thead>
+                                <tbody>
+                                    <tr><td>1st</td><td>2 SP</td></tr>
+                                    <tr><td>2nd</td><td>3 SP</td></tr>
+                                    <tr><td>3rd</td><td>5 SP</td></tr>
+                                    <tr><td>4th</td><td>6 SP</td></tr>
+                                    <tr><td>5th</td><td>7 SP</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Spell Slot → SP -->
+                        <div class="sp-box">
+                            <div class="sp-box-title">💠 Spell Slot → SP</div>
+                            <div class="sp-box-note">Bonus Action — max SP gained = half your level</div>
+                            <table class="sp-table">
+                                <thead><tr><th>Slot Level</th><th>SP Gained</th></tr></thead>
+                                <tbody>
+                                    <tr><td>1st</td><td>1 SP</td></tr>
+                                    <tr><td>2nd</td><td>2 SP</td></tr>
+                                    <tr><td>3rd</td><td>3 SP</td></tr>
+                                    <tr><td>4th</td><td>4 SP</td></tr>
+                                    <tr><td>5th</td><td>5 SP</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Metamagic Options -->
+                        <div class="sp-box sp-box-metamagic">
+                            <div class="sp-box-title">✨ Metamagic Options</div>
+                            <div class="sp-box-note">Only one can be applied per spell (unless stated)</div>
+                            <div class="sp-metamagic-list">
+                                @foreach (var m in sp.Metamagic)
+                                {
+                                    <div class="sp-meta-entry">
+                                        <div class="sp-meta-header">
+                                            <span class="sp-meta-name">@m.Name</span>
+                                            <span class="sp-meta-cost">@m.Cost SP</span>
+                                        </div>
+                                        <div class="sp-meta-desc">@m.Description</div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Quick Cheat Sheet -->
+                    <div class="sp-cheatsheet">
+                        <div class="sp-cheat-title">⚡ Quick Cheat Sheet</div>
+                        @foreach (var hint in sp.CheatSheet)
+                        {
+                            <div class="sp-cheat-row">
+                                <span class="sp-cheat-label">@hint.Scenario</span>
+                                <span class="sp-cheat-arrow">→</span>
+                                <span class="sp-cheat-action">@hint.Action</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            <!-- Wild Magic Surge -->
+            @if (guide.WildMagicInfo != null)
+            {
+                <div class="guide-section guide-wildmagic">
+                    <h3>🌀 Sorcery Points &amp; Wild Magic Surges</h3>
+                    <p class="wm-intro">@guide.WildMagicInfo.Intro</p>
+                    <div class="wm-triggers">
+                        @foreach (var t in guide.WildMagicInfo.Triggers)
+                        {
+                            <div class="wm-trigger-row">
+                                <span class="wm-trigger-icon">⚡</span>
+                                <span>@t</span>
+                            </div>
+                        }
+                    </div>
+                    @if (guide.WildMagicInfo.SurgeExamples.Length > 0)
+                    {
+                        <div class="wm-examples-label">Sample surge outcomes (d100):</div>
+                        <div class="wm-examples">
+                            @foreach (var ex in guide.WildMagicInfo.SurgeExamples)
+                            {
+                                <div class="wm-example">@ex</div>
+                            }
+                        </div>
+                    }
+                    <p class="wm-tip">💡 @guide.WildMagicInfo.PlayTip</p>
+                </div>
+            }
+
+            <!-- Tips for Playing -->
+            <div class="guide-section guide-tips">
+                <h3>💡 Tips for Playing @Selected.Name</h3>
+                <ul class="guide-tip-list">
+                    @foreach (var tip in guide.PlayTips)
+                    {
+                        <li>@tip</li>
+                    }
+                </ul>
+            </div>
+
+        </div>
+    }
+</div>
+
+@code {
+    private Combatant? Selected { get; set; }
+
+    private void Select(Combatant c)
+    {
+        var newChar = Selected?.Id == c.Id ? null : c;
+        Selected = newChar;
+        if (newChar != null) ResetTracker(newChar);
+    }
+
+    // ── Session Tracker ──────────────────────────────────────────────────────
+    private int CurrentHp { get; set; }
+    private HashSet<string> UsedSlots { get; set; } = new();
+    private HashSet<int>    SpentSp   { get; set; } = new();
+
+    private void ResetTracker(Combatant c)
+    {
+        CurrentHp = c.MaxHitPoints;
+        UsedSlots.Clear();
+        SpentSp.Clear();
+    }
+
+    private void AdjustHp(int delta)
+    {
+        if (Selected == null) return;
+        CurrentHp = Math.Clamp(CurrentHp + delta, 0, Selected.MaxHitPoints);
+    }
+
+    private void ResetHp() { if (Selected != null) CurrentHp = Selected.MaxHitPoints; }
+
+    private bool SlotUsed(string tier, int idx) => UsedSlots.Contains($"{tier}:{idx}");
+    private void ToggleSlot(string tier, int idx)
+    {
+        var key = $"{tier}:{idx}";
+        if (!UsedSlots.Remove(key)) UsedSlots.Add(key);
+    }
+    private void ResetSlots() => UsedSlots.Clear();
+
+    private bool SpUsed(int idx) => SpentSp.Contains(idx);
+    private void ToggleSp(int idx) { if (!SpentSp.Remove(idx)) SpentSp.Add(idx); }
+    private void ResetSp() => SpentSp.Clear();
+
+    // ── Helpers ─────────────────────────────────────────────────────────────
+
+    private static string FormatBonus(int n) => n >= 0 ? $"+{n}" : $"{n}";
+
+    private static bool HasSpells(Combatant c) =>
+        c.Actions.Any(a => a.ActionType is ActionType.Spell or ActionType.SpellAttack);
+
+    private static string GetClassEmoji(string cls) => cls switch
+    {
+        "Sorcerer"  => "✨",
+        "Barbarian" => "⚔️",
+        "Rogue"     => "🗡️",
+        "Wizard"    => "📚",
+        "Cleric"    => "✝️",
+        "Paladin"   => "⚜️",
+        "Ranger"    => "🏹",
+        "Fighter"   => "🛡️",
+        "Druid"     => "🌿",
+        "Bard"      => "🎵",
+        "Monk"      => "👊",
+        "Warlock"   => "🔮",
+        _           => "🎲"
+    };
+
+    private static readonly Dictionary<Guid, string> RaceMap = new()
+    {
+        [new Guid("a1000000-0000-0000-0000-000000000001")] = "Kobold",
+        [new Guid("a1000000-0000-0000-0000-000000000002")] = "Dwarf",
+        [new Guid("a1000000-0000-0000-0000-000000000003")] = "Halfling",
+        [new Guid("a1000000-0000-0000-0000-000000000004")] = "High Elf",
+    };
+
+    private string GetRace(Guid id) => RaceMap.TryGetValue(id, out var r) ? r : "—";
+
+    private record AbilityInfo(string Label, int Score, int Mod);
+
+    private static List<AbilityInfo> GetAbilities(Combatant c) =>
+    [
+        new("STR", c.Strength,     c.StrengthModifier),
+        new("DEX", c.Dexterity,    c.DexterityModifier),
+        new("CON", c.Constitution, c.ConstitutionModifier),
+        new("INT", c.Intelligence, c.IntelligenceModifier),
+        new("WIS", c.Wisdom,       c.WisdomModifier),
+        new("CHA", c.Charisma,     c.CharismaModifier),
+    ];
+
+    private static string GetActionTypeLabel(CombatAction action)
+    {
+        if (action.ActionType == ActionType.Attack) return "Weapon";
+        if (action.SpellLevel == 0) return "Cantrip";
+        return action.ActionType == ActionType.SpellAttack ? "Spell Atk" : "Spell";
+    }
+
+    private static string GetActionBadgeClass(CombatAction action) =>
+        action.ActionType == ActionType.Attack ? "badge-weapon" :
+        action.SpellLevel == 0 ? "badge-cantrip" : "badge-spell";
+
+    private static string GetActionRowClass(CombatAction action) =>
+        action.ActionType == ActionType.Attack ? "row-weapon" :
+        action.SpellLevel switch { 0 => "row-cantrip", 1 => "row-spell1", 2 => "row-spell2", _ => "row-spell3" };
+
+    private static string GetUsesLabel(CombatAction action) =>
+        action.IsLimited ? $"{action.UsesPerDay} slots" : "∞";
+
+    // ── Static Guide Data ───────────────────────────────────────────────────
+
+    private record MetamagicEntry(string Name, string Cost, string Description);
+    private record SpCheatEntry(string Scenario, string Action);
+    private record SorceryPointsData(
+        int PointsPerDay,
+        MetamagicEntry[] Metamagic,
+        SpCheatEntry[] CheatSheet
+    );
+
+    private record SpellSlotTier(string Label, int Total);
+    private record WildMagicData(string Intro, string[] Triggers, string[] SurgeExamples, string PlayTip);
+
+    private record CharacterGuideEntry(
+        string Race,
+        string Background,
+        string[] SavingThrows,
+        string[] ProficientSkills,
+        string[] Defenses,
+        string[] ClassFeatures,
+        string[] PlayTips,
+        SorceryPointsData? SorceryPoints = null,
+        SpellSlotTier[]? SpellSlots = null,
+        WildMagicData? WildMagicInfo = null
+    );
+
+    private static readonly Dictionary<Guid, CharacterGuideEntry> GuideData = new()
+    {
+        // ── Winnie Vale the Sorcerer ───────────────────────────────────────
+        [new Guid("a1000000-0000-0000-0000-000000000004")] = new(
+            Race: "High Elf",
+            Background: "Noble",
+            SavingThrows: ["Constitution +5", "Charisma +7"],
+            ProficientSkills: ["Deception +7", "History +5", "Insight +3", "Perception +3", "Performance +7", "Persuasion +7"],
+            Defenses:
+            [
+                "Immunity to magical sleep effects",
+                "Advantage on saving throws against the charmed condition"
+            ],
+            ClassFeatures:
+            [
+                "Sorcery Points: 5 per long rest — fuel Metamagic or convert into extra spell slots via Font of Magic.",
+                "Font of Magic: Convert 2 SP → 1st-level slot, or 3 SP → 2nd-level slot when you run low.",
+                "Shield (Reaction): Spend a 1st-level slot to gain +5 AC until your next turn — can turn a hit into a miss.",
+                "Spell Slots: 4 × 1st level, 3 × 2nd level — use Font of Magic to extend them.",
+                "High Elf Cantrip: Knows an extra cantrip from the Wizard spell list."
+            ],
+            PlayTips:
+            [
+                "Hold Person is your best spell — a paralyzed humanoid auto-fails STR/DEX saves and every hit is a critical!",
+                "Save your 2nd-level slots for Hold Person on bosses or dangerous humanoid enemies.",
+                "Shield is a Reaction — use it the moment an attack roll just barely hits you for an instant +5 AC.",
+                "Fire Bolt and Chill Touch are unlimited cantrips — use them freely every turn to conserve slots.",
+                "Thunderwave pushes enemies away on a failed CON DC 15 save — great if they get too close.",
+                "Sleep is most reliable against low-HP enemies; don't rely on it vs. bosses.",
+                "Your AC is only 11 — stay as far from melee as possible and use Shield as a last resort.",
+                "In a pinch, convert Sorcery Points into extra spell slots via Font of Magic before running dry."
+            ],
+            SorceryPoints: new(
+                PointsPerDay: 5,
+                Metamagic:
+                [
+                    new("Subtle Spell", "1", "Cast a spell without Verbal or Somatic components — undetectable by enemies. No one can tell you cast it. Great for social situations or when silenced."),
+                    new("Heightened Spell", "3", "One target of your spell has Disadvantage on their first saving throw against it. Spend this on Hold Person for maximum effect on a key enemy.")
+                ],
+                CheatSheet:
+                [
+                    new("Running low on 2nd-level slots",        "Spend 3 SP → create a temporary 2nd-level slot (Bonus Action)"),
+                    new("Boss needs to fail Hold Person",        "Spend 3 SP → Heightened Spell (boss rolls DEX save at Disadvantage)"),
+                    new("Need to cast undetected",               "Spend 1 SP → Subtle Spell (no V/S components required)"),
+                    new("Have spare 1st-level slots, need SP",   "Expend a 1st-level slot → gain 1 SP (Bonus Action)"),
+                    new("Have spare 2nd-level slots, need SP",   "Expend a 2nd-level slot → gain 2 SP (Bonus Action)"),
+                    new("Enemy hits you out of nowhere",         "REACTION: cast Shield (+5 AC, may turn hit into miss) — costs a 1st-level slot")
+                ]
+            ),
+            SpellSlots:
+            [
+                new("1st Level", 4),
+                new("2nd Level", 3),
+            ],
+            WildMagicInfo: new(
+                Intro: "Wild Magic Sorcerers are driven by an untamed magical force. Every time you spend Sorcery Points or cast a leveled spell, you risk triggering a Wild Magic Surge — a chaotic burst of uncontrolled arcane energy that can help or hinder anyone nearby.",
+                Triggers:
+                [
+                    "Casting a leveled spell (1st+): The DM may ask you to roll d20. On a 1, roll on the Wild Magic Surge table (d100).",
+                    "Using Tides of Chaos: After you gain advantage from Tides of Chaos, the DM can force a surge the next time you cast a leveled spell — this also recharges Tides of Chaos.",
+                    "Spending Sorcery Points via Font of Magic: Converting SP to spell slots or vice versa can be a surge trigger at DM discretion.",
+                    "Spending SP on Heightened Spell or Subtle Spell: Any Metamagic use is a potential trigger depending on your DM's style."
+                ],
+                SurgeExamples:
+                [
+                    "01–02: Roll on this table again at the start of each turn for 1 minute.",
+                    "03–04: You cast Fireball centered on yourself (3d6 fire, DEX DC 13 save).",
+                    "05–06: You cast Magic Missile as a 5th-level spell.",
+                    "07–08: All spell slots are restored. (Yes, really!)",
+                    "09–10: You become invisible until the start of your next turn.",
+                    "11–12: You regain 2d10 HP.",
+                    "13–14: You can't speak — only emit squeaks for 1 minute.",
+                    "15–16: You cast Confusion centered on yourself (WIS DC 13)."
+                ],
+                PlayTip: "Surges are unpredictable but not all bad. If your DM uses them, lean into Tides of Chaos — using it intentionally lets you control when a surge is most likely, and the advantage it grants is always worth the risk."
+            )
+        ),
+    };
+}

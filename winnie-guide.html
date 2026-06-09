@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Character Reference Guide</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+    --bg-dark:       #0d1a1c;
+    --bg-panel:      #0f2428;
+    --bg-card:       #0a2d33;
+    --bg-card-hover: #0e3840;
+    --accent:        #9D2235;
+    --gold:          #FFA300;
+    --text:          #f0eeea;
+    --text-dim:      #8A8D8F;
+    --border:        #1a4a52;
+    --green:         #006272;
+    --yellow:        #FFA300;
+    --red:           #9D2235;
+    --purple:        #7a3a6e;
+    --radius:        8px;
+    --shadow:        0 4px 20px rgba(0,0,0,0.6);
+}
+body { background: var(--bg-dark); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; line-height: 1.5; }
+
+.container { max-width: 1100px; margin: 0 auto; padding: 20px 16px; }
+
+/* Header */
+.app-header { text-align: center; padding: 24px 0 20px; border-bottom: 2px solid var(--gold); margin-bottom: 24px; }
+.app-header h1 { font-size: 1.8rem; color: var(--gold); letter-spacing: 2px; }
+.app-header p { color: var(--text-dim); margin-top: 4px; }
+
+/* Character switcher */
+.char-tabs { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+.char-tab { background: var(--bg-card); border: 2px solid var(--border); border-radius: var(--radius); padding: 14px 22px; cursor: pointer; text-align: center; transition: all 0.2s; color: var(--text); font-family: inherit; min-width: 160px; }
+.char-tab:hover { border-color: var(--gold); background: var(--bg-card-hover); }
+.char-tab.active { border-color: var(--gold); box-shadow: 0 0 16px rgba(255,163,0,0.2); }
+.char-tab-icon { font-size: 1.8rem; }
+.char-tab-name { font-weight: 700; color: var(--gold); font-size: 0.95rem; margin-top: 4px; }
+.char-tab-class { font-size: 0.78rem; color: var(--text-dim); }
+
+.char-panel { display: none; }
+.char-panel.active { display: flex; flex-direction: column; gap: 22px; }
+
+/* Guide panel */
+.guide-panel { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; display: flex; flex-direction: column; gap: 22px; box-shadow: var(--shadow); }
+.guide-header { border-bottom: 2px solid var(--gold); padding-bottom: 14px; }
+.guide-header h2 { font-size: 1.7rem; color: var(--gold); }
+.guide-subtitle { color: var(--text-dim); margin-top: 4px; font-size: 0.9rem; }
+
+/* Section */
+.guide-section { display: flex; flex-direction: column; gap: 10px; }
+.guide-section h3 { font-size: 0.78rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+
+/* Stats row */
+.guide-stats-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.guide-stat { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 16px; display: flex; flex-direction: column; align-items: center; min-width: 84px; gap: 2px; }
+.stat-label { font-size: 0.67rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
+.stat-value { font-size: 1.3rem; font-weight: 700; color: var(--gold); }
+
+/* Tracker */
+.tracker-section { background: rgba(0,98,114,0.07); border: 1px solid rgba(0,98,114,0.3); border-radius: var(--radius); padding: 16px; }
+.tracker-section h3 { color: var(--gold) !important; border-bottom-color: rgba(255,163,0,0.2) !important; }
+.tracker-grid { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 10px; }
+.tracker-block { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; min-width: 180px; }
+.tracker-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 600; }
+.tracker-hp-row { display: flex; align-items: center; gap: 10px; }
+.tracker-hp-display { display: flex; align-items: baseline; gap: 4px; flex: 1; justify-content: center; }
+.tracker-hp-current { font-size: 2rem; font-weight: 700; color: var(--green); transition: color 0.3s; }
+.tracker-hp-current.hp-low { color: var(--yellow); }
+.tracker-hp-current.hp-critical { color: var(--red); }
+.tracker-hp-sep { color: var(--text-dim); font-size: 1.2rem; }
+.tracker-hp-max { font-size: 1rem; color: var(--text-dim); }
+.tracker-btn { background: var(--bg-dark); border: 1px solid var(--border); color: var(--text); width: 32px; height: 32px; border-radius: 50%; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
+.tracker-btn:hover { background: var(--bg-card-hover); border-color: var(--gold); }
+.tracker-hp-bar { height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; }
+.tracker-hp-fill { height: 100%; background: var(--green); border-radius: 3px; transition: width 0.3s, background 0.3s; }
+.tracker-hp-fill.fill-low { background: var(--yellow); }
+.tracker-hp-fill.fill-critical { background: var(--red); }
+.tracker-reset-btn { background: transparent; border: 1px solid var(--border); color: var(--text-dim); font-size: 0.72rem; padding: 3px 8px; border-radius: 4px; cursor: pointer; align-self: flex-start; }
+.tracker-reset-btn:hover { border-color: var(--gold); color: var(--gold); }
+.tracker-slot-row { display: flex; align-items: center; gap: 10px; }
+.tracker-slot-label { font-size: 0.78rem; color: var(--text-dim); min-width: 70px; }
+.tracker-pips { display: flex; gap: 6px; flex-wrap: wrap; }
+.tracker-pip { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--green); background: var(--green); cursor: pointer; transition: all 0.15s; box-shadow: 0 0 6px rgba(0,98,114,0.6); }
+.tracker-pip:hover { transform: scale(1.15); }
+.tracker-pip.pip-used { background: transparent; border-color: var(--border); box-shadow: none; }
+.tracker-pip-sp { border-color: var(--purple); background: var(--purple); box-shadow: 0 0 6px rgba(122,58,110,0.6); }
+.tracker-pip-sp.pip-used { background: transparent; border-color: var(--border); box-shadow: none; }
+.tracker-sp-count { font-size: 0.8rem; color: #cc88c8; font-weight: 600; }
+.tracker-pip-lay { border-color: var(--gold); background: var(--gold); box-shadow: 0 0 6px rgba(255,163,0,0.5); }
+.tracker-pip-lay.pip-used { background: transparent; border-color: var(--border); box-shadow: none; }
+.tracker-lay-count { font-size: 0.8rem; color: var(--gold); font-weight: 600; }
+
+/* Abilities */
+.guide-abilities { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+.guide-ability { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 6px; text-align: center; }
+.ability-label { font-size: 0.68rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+.ability-score { font-size: 1.2rem; font-weight: 700; }
+.ability-mod { font-size: 0.88rem; font-weight: 600; }
+.ability-mod.pos { color: var(--green); }
+.ability-mod.neg { color: var(--red); }
+
+/* Two-col */
+.guide-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+/* Tags */
+.guide-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.guide-tag { padding: 4px 10px; border-radius: 4px; font-size: 0.82rem; display: inline-block; }
+.guide-tag.proficient { background: rgba(0,98,114,0.2); border: 1px solid var(--green); color: var(--text); }
+.guide-tag.defense { background: rgba(157,34,53,0.15); border: 1px solid var(--accent); color: var(--text); }
+.guide-tag.gold { background: rgba(255,163,0,0.12); border: 1px solid rgba(255,163,0,0.5); color: var(--gold); }
+
+/* Table */
+.guide-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.guide-table th { background: var(--bg-dark); color: var(--text-dim); text-transform: uppercase; font-size: 0.68rem; letter-spacing: 1px; padding: 8px 10px; text-align: left; border-bottom: 2px solid var(--border); }
+.guide-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.row-spell1 { background: rgba(0,98,114,0.07); }
+.row-spell2 { background: rgba(122,58,110,0.09); }
+.action-type-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
+.badge-cantrip { background: rgba(0,98,114,0.25); border: 1px solid var(--green); color: #5bbfcc; }
+.badge-spell   { background: rgba(122,58,114,0.3); border: 1px solid var(--purple); color: #cc88c8; }
+.badge-weapon  { background: rgba(138,141,143,0.2); border: 1px solid rgba(138,141,143,0.4); color: var(--text-dim); }
+.save-dc-inline { font-weight: 600; color: var(--gold); }
+.action-desc { font-size: 0.8rem; color: var(--text-dim); margin-top: 3px; font-style: italic; }
+.uses-cell { white-space: nowrap; font-weight: 700; color: var(--gold); text-align: center; }
+
+/* Features */
+.guide-features { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.guide-features li { padding: 8px 12px; background: var(--bg-card); border-left: 3px solid var(--green); border-radius: 0 var(--radius) var(--radius) 0; font-size: 0.86rem; }
+.guide-features li.gold-border { border-left-color: var(--gold); }
+
+/* Sorcery Points */
+.guide-sp-section { background: rgba(122,58,110,0.08); border: 1px solid rgba(122,58,110,0.35); border-radius: var(--radius); padding: 18px; }
+.guide-sp-section h3 { color: #cc88c8 !important; border-bottom-color: rgba(122,58,110,0.4) !important; }
+.sp-intro { font-size: 0.87rem; color: var(--text-dim); margin-bottom: 14px; }
+.sp-columns { display: grid; grid-template-columns: 1fr 1fr 1.5fr; gap: 12px; margin-bottom: 16px; }
+.sp-box { background: var(--bg-card); border: 1px solid rgba(122,58,110,0.3); border-radius: var(--radius); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.sp-box-title { font-weight: 700; font-size: 0.85rem; color: #cc88c8; }
+.sp-box-note { font-size: 0.75rem; color: var(--text-dim); font-style: italic; }
+.sp-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.sp-table th { color: var(--text-dim); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.8px; padding: 4px 6px; border-bottom: 1px solid var(--border); text-align: left; }
+.sp-table td { padding: 5px 6px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.sp-table td:last-child { color: #cc88c8; font-weight: 700; }
+.sp-metamagic-list { display: flex; flex-direction: column; gap: 10px; }
+.sp-meta-entry { border-left: 3px solid var(--purple); padding-left: 10px; }
+.sp-meta-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px; }
+.sp-meta-name { font-weight: 700; font-size: 0.88rem; color: #cc88c8; }
+.sp-meta-cost { background: rgba(122,58,110,0.4); color: #cc88c8; border-radius: 10px; padding: 1px 8px; font-size: 0.72rem; font-weight: 700; }
+.sp-meta-desc { font-size: 0.8rem; color: var(--text-dim); line-height: 1.45; }
+.sp-cheatsheet { background: var(--bg-dark); border: 1px solid rgba(122,58,110,0.3); border-radius: var(--radius); padding: 12px 16px; }
+.sp-cheat-title { font-weight: 700; font-size: 0.8rem; color: var(--gold); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+.sp-cheat-row { display: grid; grid-template-columns: auto 20px 1fr; gap: 6px; align-items: baseline; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.83rem; }
+.sp-cheat-label { color: var(--text-dim); }
+.sp-cheat-arrow { color: rgba(122,58,110,0.8); font-weight: 700; text-align: center; }
+.sp-cheat-action { color: var(--text); }
+
+/* Wild Magic */
+.guide-wildmagic { background: rgba(255,163,0,0.04); border: 1px solid rgba(255,163,0,0.2); border-radius: var(--radius); padding: 16px; }
+.guide-wildmagic h3 { color: var(--gold) !important; border-bottom-color: rgba(255,163,0,0.25) !important; }
+.wm-intro { font-size: 0.87rem; color: var(--text-dim); line-height: 1.55; margin-bottom: 12px; }
+.wm-triggers { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.wm-trigger-row { display: flex; gap: 10px; align-items: baseline; font-size: 0.85rem; padding: 6px 10px; background: var(--bg-card); border-left: 3px solid var(--gold); border-radius: 0 var(--radius) var(--radius) 0; }
+.wm-trigger-icon { color: var(--gold); flex-shrink: 0; }
+.wm-examples-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); margin-bottom: 8px; }
+.wm-examples { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 6px; margin-bottom: 12px; }
+.wm-example { font-size: 0.8rem; padding: 5px 10px; background: var(--bg-dark); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-dim); }
+.wm-tip { font-size: 0.85rem; color: var(--text); padding: 8px 12px; background: rgba(255,163,0,0.07); border-radius: var(--radius); line-height: 1.5; }
+
+/* Tips */
+.guide-tips { background: rgba(255,163,0,0.04); border: 1px solid rgba(255,163,0,0.18); border-radius: var(--radius); padding: 16px; }
+.guide-tips h3 { color: var(--gold) !important; border-bottom-color: rgba(255,163,0,0.25) !important; }
+.guide-tip-list { list-style: none; display: flex; flex-direction: column; gap: 7px; }
+.guide-tip-list li { padding: 5px 0 5px 24px; position: relative; font-size: 0.87rem; line-height: 1.5; }
+.guide-tip-list li::before { content: '💡'; position: absolute; left: 0; font-size: 0.78rem; top: 6px; }
+
+@media (max-width: 700px) { .sp-columns { grid-template-columns: 1fr; } .guide-two-col { grid-template-columns: 1fr; } .guide-abilities { grid-template-columns: repeat(3,1fr); } }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header class="app-header">
+    <h1>📖 Character Reference Guide</h1>
+    <p>Quick Combat Reference — Session Tracker</p>
+  </header>
+
+  <!-- Character Switcher -->
+  <div class="char-tabs">
+    <button class="char-tab active" onclick="switchChar('winnie', this)">
+      <div class="char-tab-icon">✨</div>
+      <div class="char-tab-name">Winnie Vale</div>
+      <div class="char-tab-class">Sorcerer 5 · High Elf</div>
+    </button>
+    <button class="char-tab" onclick="switchChar('kennyth', this)">
+      <div class="char-tab-icon">⚜️</div>
+      <div class="char-tab-name">Kennyth</div>
+      <div class="char-tab-class">Paladin 5 · Gnome</div>
+    </button>
+  </div>
+
+  <!-- ══ WINNIE VALE ══════════════════════════════════════════════ -->
+  <div id="panel-winnie" class="char-panel active"><div class="guide-panel">
+
+    <!-- Header -->
+    <div class="guide-header">
+      <h2>Winnie Vale (Eowyn Valecrown)</h2>
+      <p class="guide-subtitle">Sorcerer 5 &bull; High Elf &bull; Noble</p>
+    </div>
+
+    <!-- Combat Stats -->
+    <div class="guide-stats-row">
+      <div class="guide-stat"><span class="stat-label">AC</span><span class="stat-value">11</span></div>
+      <div class="guide-stat"><span class="stat-label">Max HP</span><span class="stat-value">32</span></div>
+      <div class="guide-stat"><span class="stat-label">Speed</span><span class="stat-value">30 ft</span></div>
+      <div class="guide-stat"><span class="stat-label">Initiative</span><span class="stat-value">+1</span></div>
+      <div class="guide-stat"><span class="stat-label">Proficiency</span><span class="stat-value">+3</span></div>
+      <div class="guide-stat"><span class="stat-label">Spell Save DC</span><span class="stat-value">15</span></div>
+      <div class="guide-stat"><span class="stat-label">Spell Attack</span><span class="stat-value">+7</span></div>
+    </div>
+
+    <!-- Session Tracker -->
+    <div class="guide-section tracker-section">
+      <h3>🎲 Session Tracker</h3>
+      <div class="tracker-grid">
+
+        <!-- HP -->
+        <div class="tracker-block">
+          <div class="tracker-label">Hit Points</div>
+          <div class="tracker-hp-row">
+            <button class="tracker-btn" onclick="adjustHp(-1)">−</button>
+            <div class="tracker-hp-display">
+              <span class="tracker-hp-current" id="hp-current">32</span>
+              <span class="tracker-hp-sep">/</span>
+              <span class="tracker-hp-max">32</span>
+            </div>
+            <button class="tracker-btn" onclick="adjustHp(1)">+</button>
+          </div>
+          <div class="tracker-hp-bar"><div class="tracker-hp-fill" id="hp-bar" style="width:100%"></div></div>
+          <button class="tracker-reset-btn" onclick="resetHp()">Reset to Max</button>
+        </div>
+
+        <!-- Spell Slots -->
+        <div class="tracker-block">
+          <div class="tracker-label">Spell Slots</div>
+          <div class="tracker-slot-row">
+            <span class="tracker-slot-label">1st Level</span>
+            <div class="tracker-pips" id="slots-1">
+              <button class="tracker-pip pip-avail" onclick="toggleSlot(this)"></button>
+              <button class="tracker-pip pip-avail" onclick="toggleSlot(this)"></button>
+              <button class="tracker-pip pip-avail" onclick="toggleSlot(this)"></button>
+              <button class="tracker-pip pip-avail" onclick="toggleSlot(this)"></button>
+            </div>
+          </div>
+          <div class="tracker-slot-row">
+            <span class="tracker-slot-label">2nd Level</span>
+            <div class="tracker-pips" id="slots-2">
+              <button class="tracker-pip pip-avail" onclick="toggleSlot(this)"></button>
+              <button class="tracker-pip pip-avail" onclick="toggleSlot(this)"></button>
+              <button class="tracker-pip pip-avail" onclick="toggleSlot(this)"></button>
+            </div>
+          </div>
+          <button class="tracker-reset-btn" onclick="resetSlots()">Reset All Slots</button>
+        </div>
+
+        <!-- Sorcery Points -->
+        <div class="tracker-block">
+          <div class="tracker-label">Sorcery Points</div>
+          <div class="tracker-pips" id="sp-pips">
+            <button class="tracker-pip tracker-pip-sp pip-avail" onclick="toggleSp(this)"></button>
+            <button class="tracker-pip tracker-pip-sp pip-avail" onclick="toggleSp(this)"></button>
+            <button class="tracker-pip tracker-pip-sp pip-avail" onclick="toggleSp(this)"></button>
+            <button class="tracker-pip tracker-pip-sp pip-avail" onclick="toggleSp(this)"></button>
+            <button class="tracker-pip tracker-pip-sp pip-avail" onclick="toggleSp(this)"></button>
+          </div>
+          <div class="tracker-sp-count" id="sp-count">5 / 5 remaining</div>
+          <button class="tracker-reset-btn" onclick="resetSp()">Reset Points</button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Ability Scores -->
+    <div class="guide-section">
+      <h3>Ability Scores</h3>
+      <div class="guide-abilities">
+        <div class="guide-ability"><div class="ability-label">STR</div><div class="ability-score">8</div><div class="ability-mod neg">−1</div></div>
+        <div class="guide-ability"><div class="ability-label">DEX</div><div class="ability-score">13</div><div class="ability-mod pos">+1</div></div>
+        <div class="guide-ability"><div class="ability-label">CON</div><div class="ability-score">14</div><div class="ability-mod pos">+2</div></div>
+        <div class="guide-ability"><div class="ability-label">INT</div><div class="ability-score">14</div><div class="ability-mod pos">+2</div></div>
+        <div class="guide-ability"><div class="ability-label">WIS</div><div class="ability-score">10</div><div class="ability-mod pos">+0</div></div>
+        <div class="guide-ability"><div class="ability-label">CHA</div><div class="ability-score">18</div><div class="ability-mod pos">+4</div></div>
+      </div>
+    </div>
+
+    <!-- Saving Throws & Skills -->
+    <div class="guide-two-col">
+      <div class="guide-section">
+        <h3>Saving Throws (Proficient)</h3>
+        <div class="guide-tags">
+          <span class="guide-tag proficient">✦ Constitution +5</span>
+          <span class="guide-tag proficient">✦ Charisma +7</span>
+        </div>
+      </div>
+      <div class="guide-section">
+        <h3>Proficient Skills</h3>
+        <div class="guide-tags">
+          <span class="guide-tag proficient">✦ Deception +7</span>
+          <span class="guide-tag proficient">✦ History +5</span>
+          <span class="guide-tag proficient">✦ Insight +3</span>
+          <span class="guide-tag proficient">✦ Perception +3</span>
+          <span class="guide-tag proficient">✦ Performance +7</span>
+          <span class="guide-tag proficient">✦ Persuasion +7</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Defenses -->
+    <div class="guide-section">
+      <h3>Defenses &amp; Special Traits</h3>
+      <div class="guide-tags">
+        <span class="guide-tag defense">🛡 Immunity to magical sleep effects</span>
+        <span class="guide-tag defense">🛡 Advantage on saving throws against charmed</span>
+      </div>
+    </div>
+
+    <!-- Actions & Spells -->
+    <div class="guide-section">
+      <h3>Actions, Attacks &amp; Spells</h3>
+      <table class="guide-table">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Range</th><th>Effect</th><th>Uses</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Chill Touch</strong></td><td><span class="action-type-badge badge-cantrip">Cantrip</span></td><td>Touch</td><td>+7 to hit, 2d10 Necrotic dmg</td><td class="uses-cell">∞</td></tr>
+          <tr><td><strong>Fire Bolt</strong></td><td><span class="action-type-badge badge-cantrip">Cantrip</span></td><td>120 ft</td><td>+7 to hit, 2d10 Fire dmg</td><td class="uses-cell">∞</td></tr>
+          <tr><td><strong>Friends</strong></td><td><span class="action-type-badge badge-cantrip">Cantrip</span></td><td>10 ft</td><td>Concentration 1 min: Advantage on CHA checks vs one non-hostile creature. Creature knows afterwards.</td><td class="uses-cell">∞</td></tr>
+          <tr><td><strong>Minor Illusion</strong></td><td><span class="action-type-badge badge-cantrip">Cantrip</span></td><td>30 ft</td><td>Create a sound or 5 ft cube image for 1 minute. Creatures can investigate (INT vs DC 15).</td><td class="uses-cell">∞</td></tr>
+          <tr><td><strong>Prestidigitation</strong></td><td><span class="action-type-badge badge-cantrip">Cantrip</span></td><td>10 ft</td><td>Minor magical tricks: clean/soil, light/snuff, chill/warm, sensory effects, etc.</td><td class="uses-cell">∞</td></tr>
+          <tr class="row-spell1"><td><strong>Shield (Lvl 1)</strong></td><td><span class="action-type-badge badge-spell">Spell</span></td><td>Self</td><td>REACTION when you'd be hit: +5 AC until start of your next turn. May turn the hit into a miss.</td><td class="uses-cell">4 slots</td></tr>
+          <tr class="row-spell1"><td><strong>Sleep (Lvl 1)</strong></td><td><span class="action-type-badge badge-spell">Spell</span></td><td>90 ft</td><td>Roll 5d8 — that many HP of creatures (lowest HP first) fall unconscious for 1 minute. Wakes on damage.</td><td class="uses-cell">4 slots</td></tr>
+          <tr class="row-spell1"><td><strong>Thunderwave (Lvl 1)</strong></td><td><span class="action-type-badge badge-spell">Spell</span></td><td>15 ft Cube</td><td><span class="save-dc-inline">DC 15 Constitution save</span><div class="action-desc">2d8 Thunder damage</div></td><td class="uses-cell">4 slots</td></tr>
+          <tr class="row-spell2"><td><strong>Hold Person (Lvl 2)</strong></td><td><span class="action-type-badge badge-spell">Spell</span></td><td>60 ft</td><td><span class="save-dc-inline">DC 15 Wisdom save</span><div class="action-desc">Paralyzed — target auto-fails STR/DEX saves and all hits against it are critical hits! Repeats WIS save each turn.</div></td><td class="uses-cell">3 slots</td></tr>
+          <tr class="row-spell2"><td><strong>Aganazzar's Scorcher (Lvl 2)</strong></td><td><span class="action-type-badge badge-spell">Spell</span></td><td>30 ft Line</td><td><span class="save-dc-inline">DC 15 Dexterity save</span><div class="action-desc">3d8 Fire damage</div></td><td class="uses-cell">3 slots</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Key Class Features -->
+    <div class="guide-section">
+      <h3>Key Class Features</h3>
+      <ul class="guide-features">
+        <li>Sorcery Points: 5 per long rest — fuel Metamagic or convert into extra spell slots via Font of Magic.</li>
+        <li>Font of Magic: Convert 2 SP → 1st-level slot, or 3 SP → 2nd-level slot when you run low.</li>
+        <li>Shield (Reaction): Spend a 1st-level slot to gain +5 AC until your next turn — can turn a hit into a miss.</li>
+        <li>Spell Slots: 4 × 1st level, 3 × 2nd level — use Font of Magic to extend them.</li>
+        <li>High Elf Cantrip: Knows an extra cantrip from the Wizard spell list.</li>
+      </ul>
+    </div>
+
+    <!-- Sorcery Points -->
+    <div class="guide-section guide-sp-section">
+      <h3>🔮 Sorcery Points — 5 per Long Rest</h3>
+      <p class="sp-intro">Sorcery Points (SP) are a flexible resource. Spend them on <strong>Metamagic</strong> or convert them to/from extra spell slots via <strong>Font of Magic</strong>.</p>
+      <div class="sp-columns">
+        <div class="sp-box">
+          <div class="sp-box-title">🔁 SP → Spell Slot</div>
+          <div class="sp-box-note">Bonus Action — slot vanishes after Long Rest</div>
+          <table class="sp-table">
+            <thead><tr><th>Slot Level</th><th>SP Cost</th></tr></thead>
+            <tbody>
+              <tr><td>1st</td><td>2 SP</td></tr>
+              <tr><td>2nd</td><td>3 SP</td></tr>
+              <tr><td>3rd</td><td>5 SP</td></tr>
+              <tr><td>4th</td><td>6 SP</td></tr>
+              <tr><td>5th</td><td>7 SP</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="sp-box">
+          <div class="sp-box-title">💠 Spell Slot → SP</div>
+          <div class="sp-box-note">Bonus Action — max SP gained = half your level</div>
+          <table class="sp-table">
+            <thead><tr><th>Slot Level</th><th>SP Gained</th></tr></thead>
+            <tbody>
+              <tr><td>1st</td><td>1 SP</td></tr>
+              <tr><td>2nd</td><td>2 SP</td></tr>
+              <tr><td>3rd</td><td>3 SP</td></tr>
+              <tr><td>4th</td><td>4 SP</td></tr>
+              <tr><td>5th</td><td>5 SP</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="sp-box">
+          <div class="sp-box-title">✨ Metamagic Options</div>
+          <div class="sp-box-note">Only one per spell (unless stated)</div>
+          <div class="sp-metamagic-list">
+            <div class="sp-meta-entry">
+              <div class="sp-meta-header"><span class="sp-meta-name">Subtle Spell</span><span class="sp-meta-cost">1 SP</span></div>
+              <div class="sp-meta-desc">Cast without Verbal or Somatic components — undetectable. Great for social situations or when silenced.</div>
+            </div>
+            <div class="sp-meta-entry">
+              <div class="sp-meta-header"><span class="sp-meta-name">Heightened Spell</span><span class="sp-meta-cost">3 SP</span></div>
+              <div class="sp-meta-desc">One target has Disadvantage on their first saving throw. Spend this on Hold Person for maximum effect on a key enemy.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="sp-cheatsheet">
+        <div class="sp-cheat-title">⚡ Quick Cheat Sheet</div>
+        <div class="sp-cheat-row"><span class="sp-cheat-label">Running low on 2nd-level slots</span><span class="sp-cheat-arrow">→</span><span class="sp-cheat-action">Spend 3 SP → create a temporary 2nd-level slot (Bonus Action)</span></div>
+        <div class="sp-cheat-row"><span class="sp-cheat-label">Boss needs to fail Hold Person</span><span class="sp-cheat-arrow">→</span><span class="sp-cheat-action">Spend 3 SP → Heightened Spell (boss rolls at Disadvantage)</span></div>
+        <div class="sp-cheat-row"><span class="sp-cheat-label">Need to cast undetected</span><span class="sp-cheat-arrow">→</span><span class="sp-cheat-action">Spend 1 SP → Subtle Spell (no V/S components required)</span></div>
+        <div class="sp-cheat-row"><span class="sp-cheat-label">Have spare 1st-level slots, need SP</span><span class="sp-cheat-arrow">→</span><span class="sp-cheat-action">Expend a 1st-level slot → gain 1 SP (Bonus Action)</span></div>
+        <div class="sp-cheat-row"><span class="sp-cheat-label">Have spare 2nd-level slots, need SP</span><span class="sp-cheat-arrow">→</span><span class="sp-cheat-action">Expend a 2nd-level slot → gain 2 SP (Bonus Action)</span></div>
+        <div class="sp-cheat-row"><span class="sp-cheat-label">Enemy hits you out of nowhere</span><span class="sp-cheat-arrow">→</span><span class="sp-cheat-action">REACTION: cast Shield (+5 AC, may turn hit into miss) — costs a 1st-level slot</span></div>
+      </div>
+    </div>
+
+    <!-- Wild Magic -->
+    <div class="guide-section guide-wildmagic">
+      <h3>🌀 Sorcery Points &amp; Wild Magic Surges</h3>
+      <p class="wm-intro">Wild Magic Sorcerers are driven by an untamed magical force. Every time you spend Sorcery Points or cast a leveled spell, you risk triggering a Wild Magic Surge — a chaotic burst of uncontrolled arcane energy that can help or hinder anyone nearby.</p>
+      <div class="wm-triggers">
+        <div class="wm-trigger-row"><span class="wm-trigger-icon">⚡</span><span>Casting a leveled spell (1st+): The DM may ask you to roll d20. On a 1, roll on the Wild Magic Surge table (d100).</span></div>
+        <div class="wm-trigger-row"><span class="wm-trigger-icon">⚡</span><span>Using Tides of Chaos: After gaining advantage from Tides of Chaos, the DM can force a surge the next time you cast a leveled spell — this also recharges Tides of Chaos.</span></div>
+        <div class="wm-trigger-row"><span class="wm-trigger-icon">⚡</span><span>Spending Sorcery Points via Font of Magic: Converting SP to spell slots or vice versa can be a surge trigger at DM discretion.</span></div>
+        <div class="wm-trigger-row"><span class="wm-trigger-icon">⚡</span><span>Spending SP on Heightened Spell or Subtle Spell: Any Metamagic use is a potential trigger depending on your DM's style.</span></div>
+      </div>
+      <div class="wm-examples-label">Sample surge outcomes (d100):</div>
+      <div class="wm-examples">
+        <div class="wm-example">01–02: Roll on this table again at the start of each turn for 1 minute.</div>
+        <div class="wm-example">03–04: You cast Fireball centered on yourself (3d6 fire, DEX DC 13 save).</div>
+        <div class="wm-example">05–06: You cast Magic Missile as a 5th-level spell.</div>
+        <div class="wm-example">07–08: All spell slots are restored. (Yes, really!)</div>
+        <div class="wm-example">09–10: You become invisible until the start of your next turn.</div>
+        <div class="wm-example">11–12: You regain 2d10 HP.</div>
+        <div class="wm-example">13–14: You can't speak — only emit squeaks for 1 minute.</div>
+        <div class="wm-example">15–16: You cast Confusion centered on yourself (WIS DC 13).</div>
+      </div>
+      <p class="wm-tip">💡 Surges are unpredictable but not all bad. If your DM uses them, lean into Tides of Chaos — using it intentionally lets you control when a surge is most likely, and the advantage it grants is always worth the risk.</p>
+    </div>
+
+    <!-- Tips -->
+    <div class="guide-section guide-tips">
+      <h3>💡 Tips for Playing Winnie Vale</h3>
+      <ul class="guide-tip-list">
+        <li>Hold Person is your best spell — a paralyzed humanoid auto-fails STR/DEX saves and every hit is a critical!</li>
+        <li>Save your 2nd-level slots for Hold Person on bosses or dangerous humanoid enemies.</li>
+        <li>Shield is a Reaction — use it the moment an attack roll just barely hits you for an instant +5 AC.</li>
+        <li>Fire Bolt and Chill Touch are unlimited cantrips — use them freely every turn to conserve slots.</li>
+        <li>Thunderwave pushes enemies away on a failed CON DC 15 save — great if they get too close.</li>
+        <li>Sleep is most reliable against low-HP enemies; don't rely on it vs. bosses.</li>
+        <li>Your AC is only 11 — stay as far from melee as possible and use Shield as a last resort.</li>
+        <li>In a pinch, convert Sorcery Points into extra spell slots via Font of Magic before running dry.</li>
+      </ul>
+    </div>
+
+  </div></div>
+  <!-- end panel-winnie -->
+
+  <!-- ══ KENNYTH ══════════════════════════════════════════════════ -->
+  <div id="panel-kennyth" class="char-panel"><div class="guide-panel">
+
+    <div class="guide-header">
+      <h2>Kennyth</h2>
+      <p class="guide-subtitle">Paladin 5 &bull; Gnome &bull; Custom Background</p>
+    </div>
+
+    <div class="guide-stats-row">
+      <div class="guide-stat"><span class="stat-label">AC</span><span class="stat-value">12</span></div>
+      <div class="guide-stat"><span class="stat-label">Max HP</span><span class="stat-value">44</span></div>
+      <div class="guide-stat"><span class="stat-label">Speed</span><span class="stat-value">30 ft</span></div>
+      <div class="guide-stat"><span class="stat-label">Initiative</span><span class="stat-value">+2</span></div>
+      <div class="guide-stat"><span class="stat-label">Proficiency</span><span class="stat-value">+3</span></div>
+      <div class="guide-stat"><span class="stat-label">Spell Save DC</span><span class="stat-value">11</span></div>
+      <div class="guide-stat"><span class="stat-label">Spell Attack</span><span class="stat-value">+3</span></div>
+    </div>
+
+    <!-- Kennyth Tracker -->
+    <div class="guide-section tracker-section">
+      <h3>🎲 Session Tracker</h3>
+      <div class="tracker-grid">
+        <div class="tracker-block">
+          <div class="tracker-label">Hit Points</div>
+          <div class="tracker-hp-row">
+            <button class="tracker-btn" onclick="adjustHp2(-1)">−</button>
+            <div class="tracker-hp-display">
+              <span class="tracker-hp-current" id="hp2-current">44</span>
+              <span class="tracker-hp-sep">/</span>
+              <span class="tracker-hp-max">44</span>
+            </div>
+            <button class="tracker-btn" onclick="adjustHp2(1)">+</button>
+          </div>
+          <div class="tracker-hp-bar"><div class="tracker-hp-fill" id="hp2-bar" style="width:100%"></div></div>
+          <button class="tracker-reset-btn" onclick="resetHp2()">Reset to Max</button>
+        </div>
+        <div class="tracker-block">
+          <div class="tracker-label">Spell Slots</div>
+          <div class="tracker-slot-row">
+            <span class="tracker-slot-label">1st Level</span>
+            <div class="tracker-pips" id="k-slots-1">
+              <button class="tracker-pip pip-avail" onclick="toggleSlot(this)"></button>
+              <button class="tracker-pip pip-avail" onclick="toggleSlot(this)"></button>
+              <button class="tracker-pip pip-avail" onclick="toggleSlot(this)"></button>
+              <button class="tracker-pip pip-avail" onclick="toggleSlot(this)"></button>
+            </div>
+          </div>
+          <div class="tracker-slot-row">
+            <span class="tracker-slot-label">2nd Level</span>
+            <div class="tracker-pips" id="k-slots-2">
+              <button class="tracker-pip pip-avail" onclick="toggleSlot(this)"></button>
+              <button class="tracker-pip pip-avail" onclick="toggleSlot(this)"></button>
+            </div>
+          </div>
+          <button class="tracker-reset-btn" onclick="resetKSlots()">Reset All Slots</button>
+        </div>
+        <div class="tracker-block">
+          <div class="tracker-label">Lay on Hands Pool (25 HP)</div>
+          <div class="tracker-pips" id="loh-pips" style="flex-wrap:wrap; max-width:200px">
+            <button class="tracker-pip tracker-pip-lay pip-avail" onclick="toggleLoh(this)"></button>
+            <button class="tracker-pip tracker-pip-lay pip-avail" onclick="toggleLoh(this)"></button>
+            <button class="tracker-pip tracker-pip-lay pip-avail" onclick="toggleLoh(this)"></button>
+            <button class="tracker-pip tracker-pip-lay pip-avail" onclick="toggleLoh(this)"></button>
+            <button class="tracker-pip tracker-pip-lay pip-avail" onclick="toggleLoh(this)"></button>
+            <button class="tracker-pip tracker-pip-lay pip-avail" onclick="toggleLoh(this)"></button>
+            <button class="tracker-pip tracker-pip-lay pip-avail" onclick="toggleLoh(this)"></button>
+            <button class="tracker-pip tracker-pip-lay pip-avail" onclick="toggleLoh(this)"></button>
+            <button class="tracker-pip tracker-pip-lay pip-avail" onclick="toggleLoh(this)"></button>
+            <button class="tracker-pip tracker-pip-lay pip-avail" onclick="toggleLoh(this)"></button>
+            <button class="tracker-pip tracker-pip-lay pip-avail" onclick="toggleLoh(this)"></button>
+            <button class="tracker-pip tracker-pip-lay pip-avail" onclick="toggleLoh(this)"></button>
+            <button class="tracker-pip tracker-pip-lay pip-avail" onclick="toggleLoh(this)"></button>
+            <button class="tracker-pip tracker-pip-lay pip-avail" onclick="toggleLoh(this)"></button>
+            <button class="tracker-pip tracker-pip-lay pip-avail" onclick="toggleLoh(this)"></button>
+            <button class="tracker-pip tracker-pip-lay pip-avail" onclick="toggleLoh(this)"></button>
+            <button class="tracker-pip tracker-pip-lay pip-avail" onclick="toggleLoh(this)"></button>
+            <button class="tracker-pip tracker-pip-lay pip-avail" onclick="toggleLoh(this)"></button>
+            <button class="tracker-pip tracker-pip-lay pip-avail" onclick="toggleLoh(this)"></button>
+            <button class="tracker-pip tracker-pip-lay pip-avail" onclick="toggleLoh(this)"></button>
+            <button class="tracker-pip tracker-pip-lay pip-avail" onclick="toggleLoh(this)"></button>
+            <button class="tracker-pip tracker-pip-lay pip-avail" onclick="toggleLoh(this)"></button>
+            <button class="tracker-pip tracker-pip-lay pip-avail" onclick="toggleLoh(this)"></button>
+            <button class="tracker-pip tracker-pip-lay pip-avail" onclick="toggleLoh(this)"></button>
+            <button class="tracker-pip tracker-pip-lay pip-avail" onclick="toggleLoh(this)"></button>
+          </div>
+          <div class="tracker-lay-count" id="loh-count">25 / 25 HP remaining</div>
+          <button class="tracker-reset-btn" onclick="resetLoh()">Reset Pool</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="guide-section">
+      <h3>Ability Scores</h3>
+      <div class="guide-abilities">
+        <div class="guide-ability"><div class="ability-label">STR</div><div class="ability-score">10</div><div class="ability-mod pos">+0</div></div>
+        <div class="guide-ability"><div class="ability-label">DEX</div><div class="ability-score">15</div><div class="ability-mod pos">+2</div></div>
+        <div class="guide-ability"><div class="ability-label">CON</div><div class="ability-score">15</div><div class="ability-mod pos">+2</div></div>
+        <div class="guide-ability"><div class="ability-label">INT</div><div class="ability-score">15</div><div class="ability-mod pos">+2</div></div>
+        <div class="guide-ability"><div class="ability-label">WIS</div><div class="ability-score">12</div><div class="ability-mod pos">+1</div></div>
+        <div class="guide-ability"><div class="ability-label">CHA</div><div class="ability-score">10</div><div class="ability-mod pos">+0</div></div>
+      </div>
+    </div>
+
+    <div class="guide-two-col">
+      <div class="guide-section">
+        <h3>Saving Throws (Proficient)</h3>
+        <div class="guide-tags">
+          <span class="guide-tag proficient">✦ Wisdom +4</span>
+          <span class="guide-tag proficient">✦ Charisma +3</span>
+        </div>
+      </div>
+      <div class="guide-section">
+        <h3>Proficient Skills</h3>
+        <div class="guide-tags">
+          <span class="guide-tag proficient">✦ Athletics +3</span>
+          <span class="guide-tag proficient">✦ Medicine +4</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="guide-section">
+      <h3>Special Saves &amp; Traits</h3>
+      <div class="guide-tags">
+        <span class="guide-tag gold">🧠 Advantage on INT saves (Gnome)</span>
+        <span class="guide-tag gold">🧠 Advantage on WIS saves (Gnome)</span>
+        <span class="guide-tag gold">🧠 Advantage on CHA saves (Gnome)</span>
+      </div>
+    </div>
+
+    <div class="guide-section">
+      <h3>Actions, Attacks &amp; Spells</h3>
+      <table class="guide-table">
+        <thead><tr><th>Name</th><th>Type</th><th>Range</th><th>Effect</th><th>Uses</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Greatsword</strong></td><td><span class="action-type-badge badge-weapon">Weapon</span></td><td>5 ft</td><td>+3 to hit, 2d6 Slashing — Heavy, Two-Handed, Graze</td><td class="uses-cell">∞</td></tr>
+          <tr><td><strong>Divine Smite</strong></td><td><span class="action-type-badge badge-spell">Bonus Action</span></td><td>Self</td><td>After hitting with a melee attack, expend a spell slot: 1st = +2d8 Radiant, 2nd = +3d8, +1d8 vs Undead/Fiends. Triggers Wild Magic on CHA score or lower (d20).</td><td class="uses-cell">Slots</td></tr>
+          <tr><td><strong>Mending</strong></td><td><span class="action-type-badge badge-cantrip">Cantrip</span></td><td>Touch</td><td>Repairs a single break or tear in an object. No combat use.</td><td class="uses-cell">∞</td></tr>
+          <tr><td><strong>Prestidigitation</strong></td><td><span class="action-type-badge badge-cantrip">Cantrip</span></td><td>10 ft</td><td>Minor magical tricks — clean, soil, light, chill, warm, sensory effects.</td><td class="uses-cell">∞</td></tr>
+          <tr><td><strong>Spare the Dying</strong></td><td><span class="action-type-badge badge-cantrip">Cantrip</span></td><td>15 ft</td><td>A dying creature (0 HP) becomes stable. Does not restore HP.</td><td class="uses-cell">∞</td></tr>
+          <tr><td><strong>Guidance</strong></td><td><span class="action-type-badge badge-cantrip">Cantrip</span></td><td>Touch</td><td>Concentration 1 min: target adds 1d4 to one ability check of their choice.</td><td class="uses-cell">∞</td></tr>
+          <tr class="row-spell1"><td><strong>Divine Sense (Lvl 1)</strong></td><td><span class="action-type-badge badge-spell">Bonus Action</span></td><td>60 ft</td><td>For 10 min: know location of Celestials, Fiends, and Undead within 60 ft, and their creature type. Also detects consecrated/desecrated places.</td><td class="uses-cell">4 slots</td></tr>
+          <tr class="row-spell1"><td><strong>Protection from Evil and Good (Lvl 1)</strong></td><td><span class="action-type-badge badge-spell">Spell</span></td><td>Touch</td><td>Concentration 10 min: target is protected — Aberrations, Celestials, Elementals, Fey, Fiends, Undead have Disadvantage on attacks vs. target and can't charm/frighten/possess them.</td><td class="uses-cell">4 slots</td></tr>
+          <tr class="row-spell1"><td><strong>Shield of Faith (Lvl 1)</strong></td><td><span class="action-type-badge badge-spell">Bonus Action</span></td><td>60 ft</td><td>Concentration 10 min: target gains +2 AC. Stack this on yourself or your tankiest ally.</td><td class="uses-cell">4 slots</td></tr>
+          <tr class="row-spell2"><td><strong>Aid (Lvl 2)</strong></td><td><span class="action-type-badge badge-spell">Spell</span></td><td>30 ft</td><td>8 hours: up to 3 creatures gain +5 Max HP and current HP. Great before a big fight.</td><td class="uses-cell">2 slots</td></tr>
+          <tr class="row-spell2"><td><strong>Zone of Truth (Lvl 2)</strong></td><td><span class="action-type-badge badge-spell">Spell</span></td><td>60 ft</td><td><span class="save-dc-inline">DC 11 Charisma save</span><div class="action-desc">10 min: creatures in 15 ft sphere can't lie. They know they're in the zone. Useful for interrogation.</div></td><td class="uses-cell">2 slots</td></tr>
+          <tr class="row-spell2"><td><strong>Find Steed (Lvl 2)</strong></td><td><span class="action-type-badge badge-spell">Spell</span></td><td>30 ft</td><td>Summon a loyal mount (Warhorse, Pony, etc.) that persists until dismissed or killed. Intelligent — can communicate telepathically.</td><td class="uses-cell">2 slots</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="guide-section">
+      <h3>Key Class Features</h3>
+      <ul class="guide-features">
+        <li class="gold-border">Lay on Hands (25 HP pool/long rest): As an Action, restore any amount of HP from your pool to a touched creature. Or spend 5 HP to cure one disease or poison.</li>
+        <li class="gold-border">Divine Smite (Bonus Action after a hit): Expend a spell slot to deal +2d8 Radiant (1st slot), +3d8 (2nd slot). Add +1d8 vs Undead or Fiends. Triggers a Wild Magic roll!</li>
+        <li>Channel Divinity: Sacred Weapon — As a Bonus Action, add your CHA modifier to attack rolls with one weapon for 1 minute.</li>
+        <li>Extra Attack: Make 2 attacks whenever you take the Attack action.</li>
+        <li>Aura of Protection: You and all allies within 10 ft add your CHA modifier (+0) to saving throws.</li>
+        <li>Spellcasting (CHA-based): Spell Save DC 11, Spell Attack +3. Slots: 4 × 1st, 2 × 2nd.</li>
+        <li>Gnome Cunning: Advantage on all INT, WIS, and CHA saving throws against magic.</li>
+      </ul>
+    </div>
+
+    <div class="guide-tips">
+      <h3>💡 Tips for Playing Kennyth</h3>
+      <ul class="guide-tip-list">
+        <li>Open with Shield of Faith on yourself (Bonus Action) for a free +2 AC before your first attack.</li>
+        <li>Divine Smite is your burst damage — save it for when you land a hit on a dangerous enemy, especially on a crit (double the dice!).</li>
+        <li>On a critical hit + Divine Smite with a 2nd-level slot vs Undead/Fiend: 4d6 (sword) + 6d8 (smite) + 2d8 (undead) — potentially massive.</li>
+        <li>Lay on Hands is flexible — use it to stabilize a downed ally (1 HP) or pre-emptively top someone off before a big fight.</li>
+        <li>Aid before combat is a free 5 HP for up to 3 people — cast it when you know a fight is coming.</li>
+        <li>Protection from Evil and Good shuts down Fiend/Undead attacks — huge in the right encounters.</li>
+        <li>Your CHA is +0 so Aura of Protection adds nothing yet — focus on STR or DEX for future ASIs.</li>
+        <li>Gnome Cunning means you almost never fail magical INT/WIS/CHA saves — you're surprisingly resistant to mind control.</li>
+      </ul>
+    </div>
+
+  </div></div>
+  <!-- end panel-kennyth -->
+
+</div>
+
+<script>
+function switchChar(id, tab) {
+  document.querySelectorAll('.char-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.char-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('panel-' + id).classList.add('active');
+  tab.classList.add('active');
+}
+
+// ── Winnie HP ──
+const MAX_HP = 32;
+let currentHp = MAX_HP;
+function adjustHp(delta) { currentHp = Math.max(0, Math.min(MAX_HP, currentHp + delta)); updateHp(); }
+function resetHp() { currentHp = MAX_HP; updateHp(); }
+function updateHp() {
+  const el = document.getElementById('hp-current'), bar = document.getElementById('hp-bar');
+  el.textContent = currentHp;
+  el.className = 'tracker-hp-current' + (currentHp <= MAX_HP/4 ? ' hp-critical' : currentHp <= MAX_HP/2 ? ' hp-low' : '');
+  bar.style.width = Math.max(0, currentHp*100/MAX_HP) + '%';
+  bar.className = 'tracker-hp-fill' + (currentHp <= MAX_HP/4 ? ' fill-critical' : currentHp <= MAX_HP/2 ? ' fill-low' : '');
+}
+
+// ── Kennyth HP ──
+const MAX_HP2 = 44;
+let currentHp2 = MAX_HP2;
+function adjustHp2(delta) { currentHp2 = Math.max(0, Math.min(MAX_HP2, currentHp2 + delta)); updateHp2(); }
+function resetHp2() { currentHp2 = MAX_HP2; updateHp2(); }
+function updateHp2() {
+  const el = document.getElementById('hp2-current'), bar = document.getElementById('hp2-bar');
+  el.textContent = currentHp2;
+  el.className = 'tracker-hp-current' + (currentHp2 <= MAX_HP2/4 ? ' hp-critical' : currentHp2 <= MAX_HP2/2 ? ' hp-low' : '');
+  bar.style.width = Math.max(0, currentHp2*100/MAX_HP2) + '%';
+  bar.className = 'tracker-hp-fill' + (currentHp2 <= MAX_HP2/4 ? ' fill-critical' : currentHp2 <= MAX_HP2/2 ? ' fill-low' : '');
+}
+
+// ── Generic slot toggle ──
+function toggleSlot(btn) { btn.classList.toggle('pip-avail'); btn.classList.toggle('pip-used'); }
+function resetSlots() {
+  document.querySelectorAll('#slots-1 .tracker-pip, #slots-2 .tracker-pip').forEach(p => { p.classList.add('pip-avail'); p.classList.remove('pip-used'); });
+}
+function resetKSlots() {
+  document.querySelectorAll('#k-slots-1 .tracker-pip, #k-slots-2 .tracker-pip').forEach(p => { p.classList.add('pip-avail'); p.classList.remove('pip-used'); });
+}
+
+// ── Winnie Sorcery Points ──
+function toggleSp(btn) { btn.classList.toggle('pip-avail'); btn.classList.toggle('pip-used'); updateSpCount(); }
+function resetSp() {
+  document.querySelectorAll('#sp-pips .tracker-pip').forEach(p => { p.classList.add('pip-avail'); p.classList.remove('pip-used'); });
+  updateSpCount();
+}
+function updateSpCount() {
+  document.getElementById('sp-count').textContent = document.querySelectorAll('#sp-pips .pip-avail').length + ' / 5 remaining';
+}
+
+// ── Kennyth Lay on Hands ──
+function toggleLoh(btn) { btn.classList.toggle('pip-avail'); btn.classList.toggle('pip-used'); updateLohCount(); }
+function resetLoh() {
+  document.querySelectorAll('#loh-pips .tracker-pip').forEach(p => { p.classList.add('pip-avail'); p.classList.remove('pip-used'); });
+  updateLohCount();
+}
+function updateLohCount() {
+  const avail = document.querySelectorAll('#loh-pips .pip-avail').length;
+  document.getElementById('loh-count').textContent = avail + ' / 25 HP remaining';
+}
+</script>
+</body>
+</html>
