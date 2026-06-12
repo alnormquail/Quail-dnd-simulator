@@ -13,6 +13,7 @@ public class DndDbContext : DbContext
     public DbSet<InventoryItem> InventoryItems => Set<InventoryItem>();
     public DbSet<CharacterSkill> CharacterSkills => Set<CharacterSkill>();
     public DbSet<SpellSlot> SpellSlots => Set<SpellSlot>();
+    public DbSet<CharacterFeature> CharacterFeatures => Set<CharacterFeature>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -39,6 +40,10 @@ public class DndDbContext : DbContext
             b.HasMany(c => c.SpellSlots)
              .WithOne()
              .HasForeignKey(s => s.CharacterId)
+             .OnDelete(DeleteBehavior.Cascade);
+            b.HasMany(c => c.Features)
+             .WithOne()
+             .HasForeignKey(f => f.CharacterId)
              .OnDelete(DeleteBehavior.Cascade);
         });
 

@@ -79,6 +79,74 @@ public static class LevelUpRules
         return table.Select((max, i) => (Level: i + 1, Max: max)).Where(t => t.Max > 0).ToList();
     }
 
+    // ── Feature grants ───────────────────────────────────────────────────────
+
+    public record FeatureGrant(string Name, string Description);
+
+    /// <summary>
+    /// Class features automatically added to the sheet at a level (base class only —
+    /// subclass features vary, so they're surfaced as hints instead).
+    /// Covers levels 2-10 for the classes in the party.
+    /// </summary>
+    public static FeatureGrant[] FeatureGrants(string characterClass, int newLevel)
+    {
+        var cls = characterClass.Trim().ToLowerInvariant();
+        return (cls, newLevel) switch
+        {
+            // ── Barbarian ──
+            ("barbarian", 5) => [new("Extra Attack", "Attack twice whenever you take the Attack action."),
+                                 new("Fast Movement", "+10 ft speed while not wearing heavy armor.")],
+            ("barbarian", 7) => [new("Feral Instinct", "Advantage on Initiative rolls."),
+                                 new("Instinctive Pounce", "When you Rage, move up to half your speed for free.")],
+            ("barbarian", 9) => [new("Brutal Strike", "When attacking with Reckless Attack, you can forgo advantage on one attack to deal +1d10 damage and push or slow the target.")],
+
+            // ── Bard ──
+            ("bard", 5)  => [new("Font of Inspiration", "Regain all Bardic Inspiration uses on a short or long rest.")],
+            ("bard", 7)  => [new("Countercharm", "Reaction when you or an ally within 30 ft fails a save vs charm/fright: the save is rerolled with advantage.")],
+            ("bard", 10) => [new("Magical Secrets", "Learn two spells from any class's spell list.")],
+
+            // ── Druid ──
+            ("druid", 5)  => [new("Wild Resurgence", "Once per turn, expend a spell slot to regain a Wild Shape use; or 1/long rest expend a Wild Shape use to gain a level 1 spell slot.")],
+            ("druid", 7)  => [new("Elemental Fury (improvement)", "Subclass-dependent feature improvements; see PHB.")],
+            ("druid", 9)  => [new("5th-level spells", "You can now prepare and cast 5th-level Druid spells.")],
+
+            // ── Fighter ──
+            ("fighter", 5) => [new("Extra Attack", "Attack twice whenever you take the Attack action."),
+                               new("Tactical Shift", "When you use Second Wind, also move up to half your speed without provoking opportunity attacks.")],
+            ("fighter", 9) => [new("Indomitable", "Reroll a failed saving throw, adding your Fighter level (1/long rest)."),
+                               new("Tactical Master", "Swap a weapon's mastery property for Push, Sap, or Slow.")],
+            ("fighter", 10) => [new("Subclass feature (level 10)", "Your subclass grants a feature at this level — see PHB.")],
+
+            // ── Paladin ──
+            ("paladin", 6)  => [new("Aura of Protection", "You and allies within 10 ft add your CHA modifier to all saving throws while you're conscious.")],
+            ("paladin", 9)  => [new("Abjure Foes (Channel Divinity)", "Frighten foes within 60 ft: CHA save or frightened for 1 minute, only able to move, act, or use a bonus action each turn.")],
+            ("paladin", 10) => [new("Aura of Courage", "You and allies in your aura can't be frightened.")],
+
+            // ── Rogue ──
+            ("rogue", 5) => [new("Cunning Strike", "Trade Sneak Attack dice for effects: 1d6 for Poison/Trip/Withdraw."),
+                             new("Uncanny Dodge", "Reaction when hit by an attack you can see: halve its damage.")],
+            ("rogue", 7) => [new("Evasion", "On DEX saves for half damage: take none on success, half on failure."),
+                             new("Reliable Talent", "Treat d20 rolls of 9 or lower as 10 on proficient ability checks.")],
+            ("rogue", 9) => [new("Subclass feature (level 9)", "Your subclass grants a feature at this level — see PHB.")],
+
+            // ── Sorcerer ──
+            ("sorcerer", 5) => [new("Sorcerous Restoration", "Once per long rest, regain half your Sorcerer level in Sorcery Points on a short rest.")],
+            ("sorcerer", 7) => [new("Sorcery Incarnate", "When you have no Sorcery Points, regain 2 by using Innate Sorcery; you can also use two Metamagic options on one spell while Innate Sorcery is active.")],
+            ("sorcerer", 9) => [new("5th-level spells", "You can now learn and cast 5th-level Sorcerer spells.")],
+
+            // ── Wizard ──
+            ("wizard", 5) => [new("Memorize Spell", "Swap one prepared spell after a short rest.")],
+            ("wizard", 9) => [new("5th-level spells", "You can now prepare and cast 5th-level Wizard spells.")],
+
+            // ── Cleric ──
+            ("cleric", 5) => [new("Sear Undead", "Destroy Undead: on Turn Undead, deal 1d8 × WIS mod radiant damage to undead that fail.")],
+            ("cleric", 7) => [new("Blessed Strikes", "Add 1d8 radiant damage to a cantrip or weapon strike once per turn.")],
+            ("cleric", 10) => [new("Divine Intervention", "Once per long rest, cast any Cleric spell of 5th level or lower without a slot.")],
+
+            _ => [],
+        };
+    }
+
     // ── Feature hints ────────────────────────────────────────────────────────
 
     /// <summary>Short reminders of what each class gains at a level (levels 2-12, common classes).</summary>

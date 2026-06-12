@@ -25,6 +25,22 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<DndDbContext>();
     db.Database.EnsureCreated();
 
+    // EnsureCreated never alters existing databases, so add tables introduced
+    // after first release by hand (schema must match the EF model exactly).
+    db.Database.ExecuteSqlRaw("""
+        CREATE TABLE IF NOT EXISTS "CharacterFeatures" (
+            "Id" TEXT NOT NULL CONSTRAINT "PK_CharacterFeatures" PRIMARY KEY,
+            "CharacterId" TEXT NOT NULL,
+            "Name" TEXT NOT NULL,
+            "Description" TEXT NOT NULL,
+            "Source" TEXT NOT NULL,
+            "LevelGained" INTEGER NOT NULL,
+            CONSTRAINT "FK_CharacterFeatures_Characters_CharacterId"
+                FOREIGN KEY ("CharacterId") REFERENCES "Characters" ("Id") ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS "IX_CharacterFeatures_CharacterId" ON "CharacterFeatures" ("CharacterId");
+        """);
+
     var chars = scope.ServiceProvider.GetRequiredService<CharacterService>();
     chars.SeedIfEmpty();
 }

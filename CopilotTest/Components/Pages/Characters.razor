@@ -131,6 +131,10 @@
     private void CreateCharacter()
     {
         if (string.IsNullOrWhiteSpace(newName)) return;
+        // Class-appropriate starting HP: max die at level 1 + average per level after
+        var hitDie = LevelUpRules.GetHitDie(newClass);
+        var startHp = hitDie + (newLevel - 1) * (hitDie / 2 + 1);
+
         var c = new Character
         {
             Name             = newName.Trim(),
@@ -138,10 +142,16 @@
             CharacterLevel   = newLevel,
             Race             = newRace.Trim(),
             Type             = CombatantType.PC,
-            MaxHitPoints     = 10,
+            MaxHitPoints     = startHp,
             ArmorClass       = 10,
-            ProficiencyBonus = newLevel switch { <= 4 => 2, <= 8 => 3, <= 12 => 4, <= 16 => 5, _ => 6 }
+            ProficiencyBonus = LevelUpRules.ProficiencyForLevel(newLevel)
         };
+
+        // Casters start with their class's spell slots already set up
+        foreach (var (slotLevel, max) in LevelUpRules.SlotsForLevel(newClass, newLevel))
+        {
+            c.SpellSlots.Add(new SpellSlot { CharacterId = c.Id, Level = slotLevel, MaxSlots = max });
+        }
         CharacterService.Create(c);
         showNewForm = false;
         Nav.NavigateTo($"/characters/{c.Id}");

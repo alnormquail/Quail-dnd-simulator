@@ -142,6 +142,46 @@ else
                 }
             </div>
 
+            @* Features & Traits *@
+            <div class="section-title" style="margin-top:20px">
+                Features &amp; Traits
+                @if (editMode)
+                {
+                    <button class="btn btn-sm btn-add" style="margin-left:12px" @onclick="AddFeature">+ Add Feature</button>
+                }
+            </div>
+            @if (!character.Features.Any())
+            {
+                <div style="color:var(--text-dim);padding:12px 0">No features recorded yet — they're added automatically when you level up, or via Edit.</div>
+            }
+            else
+            {
+                <div class="feature-list">
+                    @foreach (var feat in character.Features.OrderBy(f => f.LevelGained).ThenBy(f => f.Name))
+                    {
+                        <div class="feature-row">
+                            @if (editMode)
+                            {
+                                <div class="feature-edit-grid">
+                                    <input class="form-input" @bind="feat.Name" placeholder="Feature name" />
+                                    <input class="form-input" @bind="feat.Source" placeholder="Source (e.g. Paladin 6)" />
+                                    <button class="btn-remove" @onclick="() => character.Features.Remove(feat)">✕</button>
+                                </div>
+                                <textarea class="form-input" rows="2" @bind="feat.Description" placeholder="What it does"></textarea>
+                            }
+                            else
+                            {
+                                <div class="feature-header">
+                                    <span class="feature-name">@feat.Name</span>
+                                    @if (!string.IsNullOrEmpty(feat.Source)) { <span class="feature-source">@feat.Source</span> }
+                                </div>
+                                <div class="feature-desc">@feat.Description</div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+
             @* Combat Stats edit *@
             @if (editMode)
             {
@@ -165,6 +205,16 @@ else
     @if (activeTab == "spells")
     {
         <div class="sheet-tab-content">
+
+            @* Spellcasting summary *@
+            @if (SpellcastingAbility() is { } castStat)
+            {
+                <div class="spellcast-summary">
+                    <div class="spellcast-chip"><span class="spellcast-lbl">Ability</span><span class="spellcast-val">@AbilityShort(castStat)</span></div>
+                    <div class="spellcast-chip"><span class="spellcast-lbl">Spell Save DC</span><span class="spellcast-val">@(8 + character.ProficiencyBonus + character.GetAbilityModifier(castStat))</span></div>
+                    <div class="spellcast-chip"><span class="spellcast-lbl">Spell Attack</span><span class="spellcast-val">@FormatMod(character.ProficiencyBonus + character.GetAbilityModifier(castStat))</span></div>
+                </div>
+            }
 
             @* Spell Slots *@
             @if (character.SpellSlots.Any())
@@ -206,11 +256,70 @@ else
             @* Spell List *@
             <div class="section-title" style="margin-top:20px">
                 Spell List
+                @if (SpellLibrary.ClassCanCast(character.CharacterClass))
+                {
+                    <button class="btn btn-sm btn-add" style="margin-left:12px" @onclick="() => showLibrary = !showLibrary">
+                        @(showLibrary ? "Hide Library" : "📚 Add from Library")
+                    </button>
+                }
                 @if (editMode)
                 {
-                    <button class="btn btn-sm btn-add" style="margin-left:12px" @onclick="AddSpell">+ Add Spell</button>
+                    <button class="btn btn-sm btn-add" style="margin-left:12px" @onclick="AddSpell">+ Custom Spell</button>
                 }
             </div>
+
+            @if (showLibrary)
+            {
+                var libMaxLvl = Math.Max(SpellLibrary.MaxSpellLevel(character.CharacterClass, character.CharacterLevel), 0);
+                <div class="library-panel">
+                    <div class="picker-controls">
+                        <input class="form-input" placeholder="Search spells…" value="@pickerQuery"
+                               @oninput="e => pickerQuery = e.Value?.ToString() ?? string.Empty" />
+                        <select class="form-input" @bind="pickerLevel">
+                            <option value="-1">All levels</option>
+                            @for (int lv = 0; lv <= libMaxLvl; lv++)
+                            {
+                                <option value="@lv">@(lv == 0 ? "Cantrips" : $"Level {lv}")</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="picker-list">
+                        @foreach (var ls in SpellLibrary.Search(pickerQuery, character.CharacterClass, libMaxLvl, pickerLevel < 0 ? null : pickerLevel))
+                        {
+                            var known = character.Spells.Any(s => s.Name.Equals(ls.Name, StringComparison.OrdinalIgnoreCase));
+                            <div class="picker-row @(pickerExpanded == ls.Name ? "picker-expanded" : "")">
+                                <div class="picker-row-main" @onclick="() => pickerExpanded = pickerExpanded == ls.Name ? null : ls.Name">
+                                    <span class="picker-spell-level">@(ls.Level == 0 ? "C" : ls.Level.ToString())</span>
+                                    <span class="spell-name">@ls.Name</span>
+                                    @if (ls.Concentration) { <span class="spell-tag conc-tag">C</span> }
+                                    @if (ls.Ritual)        { <span class="spell-tag ritual-tag">R</span> }
+                                    <span class="spell-school">@ls.School</span>
+                                    @if (known)
+                                    {
+                                        <span class="picker-known">✓ known</span>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-sm btn-add" @onclick="() => AddLibrarySpell(ls)" @onclick:stopPropagation="true">+ Add</button>
+                                    }
+                                </div>
+                                @if (pickerExpanded == ls.Name)
+                                {
+                                    <div class="spell-detail">
+                                        <div class="spell-meta">
+                                            <span><strong>Cast:</strong> @ls.CastingTime</span>
+                                            <span><strong>Range:</strong> @ls.Range</span>
+                                            <span><strong>Components:</strong> @ls.Components</span>
+                                            <span><strong>Duration:</strong> @ls.Duration</span>
+                                        </div>
+                                        <p class="spell-desc">@ls.Description</p>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
 
             @if (!character.Spells.Any())
             {
@@ -470,13 +579,18 @@ else
                 </div>
 
                 @* Step indicator *@
+                @{ var isCaster = SpellLibrary.ClassCanCast(character.CharacterClass); }
                 <div class="wizard-steps">
-                    <span class="wizard-step @(wizardStep == 1 ? "step-active" : wizardStep > 1 ? "step-done" : "")">1. Hit Points</span>
+                    <span class="wizard-step @(wizardStep == 1 ? "step-active" : "step-done")">Hit Points</span>
                     @if (isAsi)
                     {
-                        <span class="wizard-step @(wizardStep == 2 ? "step-active" : wizardStep > 2 ? "step-done" : "")">2. Ability Scores</span>
+                        <span class="wizard-step @(wizardStep == 2 ? "step-active" : wizardStep > 2 ? "step-done" : "")">Ability Scores</span>
                     }
-                    <span class="wizard-step @(wizardStep == 3 ? "step-active" : "")">@(isAsi ? "3" : "2"). Review &amp; Apply</span>
+                    @if (isCaster)
+                    {
+                        <span class="wizard-step @(wizardStep == 3 ? "step-active" : wizardStep > 3 ? "step-done" : "")">Spells</span>
+                    }
+                    <span class="wizard-step @(wizardStep == 4 ? "step-active" : "")">Review &amp; Apply</span>
                 </div>
 
                 @* ── Step 1: HP ── *@
@@ -500,7 +614,7 @@ else
                     </div>
                     <div class="modal-actions">
                         <button class="btn btn-reset" @onclick="CloseLevelUp">Cancel</button>
-                        <button class="btn btn-primary" @onclick="() => wizardStep = isAsi ? 2 : 3">Next →</button>
+                        <button class="btn btn-primary" @onclick="() => wizardStep = isAsi ? 2 : isCaster ? 3 : 4">Next →</button>
                     </div>
                 }
 
@@ -542,14 +656,89 @@ else
                     </div>
                     <div class="modal-actions">
                         <button class="btn btn-reset" @onclick="() => wizardStep = 1">← Back</button>
-                        <button class="btn btn-primary" @onclick="() => wizardStep = 3">Next →</button>
+                        <button class="btn btn-primary" @onclick="() => wizardStep = isCaster ? 3 : 4">Next →</button>
                     </div>
                 }
 
-                @* ── Step 3: Review ── *@
-                @if (wizardStep == 3)
+                @* ── Step 3: Spells (casters only) ── *@
+                @if (wizardStep == 3 && isCaster)
+                {
+                    var maxSpellLvl = SpellLibrary.MaxSpellLevel(character.CharacterClass, newLevel);
+                    var knownNames = character.Spells.Select(s => s.Name).Concat(pendingSpells.Select(s => s.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    <div class="wizard-body">
+                        <p>At level @newLevel you can cast spells up to <strong>level @maxSpellLvl</strong>.
+                           Pick new spells from the library — click a spell to read it, then <strong>+ Add</strong>.
+                           (How many you may learn depends on your class; your DM has the final say.)</p>
+
+                        @if (pendingSpells.Count > 0)
+                        {
+                            <div class="picker-pending">
+                                @foreach (var ps in pendingSpells)
+                                {
+                                    <span class="picker-pending-chip">@ps.Name <button class="btn-remove" @onclick="() => pendingSpells.Remove(ps)">✕</button></span>
+                                }
+                            </div>
+                        }
+
+                        <div class="picker-controls">
+                            <input class="form-input" placeholder="Search spells…" value="@pickerQuery"
+                                   @oninput="e => pickerQuery = e.Value?.ToString() ?? string.Empty" />
+                            <select class="form-input" @bind="pickerLevel">
+                                <option value="-1">All levels</option>
+                                @for (int lv = 0; lv <= maxSpellLvl; lv++)
+                                {
+                                    <option value="@lv">@(lv == 0 ? "Cantrips" : $"Level {lv}")</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="picker-list">
+                            @foreach (var ls in SpellLibrary.Search(pickerQuery, character.CharacterClass, maxSpellLvl, pickerLevel < 0 ? null : pickerLevel))
+                            {
+                                var known = knownNames.Contains(ls.Name);
+                                <div class="picker-row @(pickerExpanded == ls.Name ? "picker-expanded" : "")">
+                                    <div class="picker-row-main" @onclick="() => pickerExpanded = pickerExpanded == ls.Name ? null : ls.Name">
+                                        <span class="picker-spell-level">@(ls.Level == 0 ? "C" : ls.Level.ToString())</span>
+                                        <span class="spell-name">@ls.Name</span>
+                                        @if (ls.Concentration) { <span class="spell-tag conc-tag">C</span> }
+                                        @if (ls.Ritual)        { <span class="spell-tag ritual-tag">R</span> }
+                                        <span class="spell-school">@ls.School</span>
+                                        @if (known)
+                                        {
+                                            <span class="picker-known">✓ known</span>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn btn-sm btn-add" @onclick="() => pendingSpells.Add(SpellLibrary.ToSpell(ls, Id))" @onclick:stopPropagation="true">+ Add</button>
+                                        }
+                                    </div>
+                                    @if (pickerExpanded == ls.Name)
+                                    {
+                                        <div class="spell-detail">
+                                            <div class="spell-meta">
+                                                <span><strong>Cast:</strong> @ls.CastingTime</span>
+                                                <span><strong>Range:</strong> @ls.Range</span>
+                                                <span><strong>Components:</strong> @ls.Components</span>
+                                                <span><strong>Duration:</strong> @ls.Duration</span>
+                                            </div>
+                                            <p class="spell-desc">@ls.Description</p>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-reset" @onclick="() => wizardStep = isAsi ? 2 : 1">← Back</button>
+                        <button class="btn btn-primary" @onclick="() => wizardStep = 4">Next →</button>
+                    </div>
+                }
+
+                @* ── Step 4: Review ── *@
+                @if (wizardStep == 4)
                 {
                     var newSlots = LevelUpRules.SlotsForLevel(character.CharacterClass, newLevel);
+                    var grants = LevelUpRules.FeatureGrants(character.CharacterClass, newLevel);
                     <div class="wizard-body">
                         <div class="wizard-review-list">
                             <div class="wizard-review-row">✅ Level: @character.CharacterLevel → <strong>@newLevel</strong></div>
@@ -568,6 +757,14 @@ else
                                     @string.Join(", ", newSlots.Select(s => $"{s.Max}× level {s.Level}"))
                                 </div>
                             }
+                            @if (pendingSpells.Count > 0)
+                            {
+                                <div class="wizard-review-row">✅ New spells: @string.Join(", ", pendingSpells.Select(s => s.Name))</div>
+                            }
+                            @foreach (var g in grants)
+                            {
+                                <div class="wizard-review-row">✅ New feature: <strong>@g.Name</strong> — @g.Description</div>
+                            }
                         </div>
 
                         @{ var hints = LevelUpRules.FeatureHints(character.CharacterClass, newLevel); }
@@ -583,7 +780,7 @@ else
                         }
                     </div>
                     <div class="modal-actions">
-                        <button class="btn btn-reset" @onclick="() => wizardStep = isAsi ? 2 : 1">← Back</button>
+                        <button class="btn btn-reset" @onclick="() => wizardStep = isCaster ? 3 : isAsi ? 2 : 1">← Back</button>
                         <button class="btn btn-start" @onclick="ApplyLevelUp">🎉 Apply Level Up</button>
                     </div>
                 }
@@ -697,6 +894,18 @@ else
             </div>
         }
 
+        @* Features *@
+        @if (character.Features.Any())
+        {
+            <div class="ps-section-title" style="margin-top:10px">Features &amp; Traits</div>
+            <div class="ps-features">
+                @foreach (var feat in character.Features.OrderBy(f => f.LevelGained).ThenBy(f => f.Name))
+                {
+                    <div class="ps-feature-row"><strong>@feat.Name</strong>@(string.IsNullOrEmpty(feat.Source) ? "" : $" ({feat.Source})") — @feat.Description</div>
+                }
+            </div>
+        }
+
         @* Notes *@
         @if (!string.IsNullOrEmpty(character.Notes))
         {
@@ -756,6 +965,26 @@ else
     private void AddSpell()
     {
         character!.Spells.Add(new Spell { CharacterId = Id, Name = "New Spell", Level = 0 });
+    }
+
+    private bool showLibrary = false;
+
+    /// <summary>Adds a spell from the library and saves immediately (works outside edit mode).</summary>
+    private void AddLibrarySpell(LibrarySpell ls)
+    {
+        if (character == null) return;
+        if (character.Spells.Any(s => s.Name.Equals(ls.Name, StringComparison.OrdinalIgnoreCase))) return;
+        character.Spells.Add(SpellLibrary.ToSpell(ls, Id));
+        if (!editMode)
+        {
+            CharacterService.Update(character);
+            character = CharacterService.GetById(Id);
+        }
+    }
+
+    private void AddFeature()
+    {
+        character!.Features.Add(new CharacterFeature { CharacterId = Id, Name = "", LevelGained = character.CharacterLevel });
     }
 
     private void RemoveSpell(Spell spell)
@@ -848,6 +1077,15 @@ else
 
     private string FormatMod(int mod) => mod >= 0 ? $"+{mod}" : mod.ToString();
 
+    /// <summary>The class's spellcasting ability, or null for non-casters.</summary>
+    private AbilityScore? SpellcastingAbility() => character?.CharacterClass.Trim().ToLowerInvariant() switch
+    {
+        "bard" or "paladin" or "sorcerer" or "warlock" => AbilityScore.Charisma,
+        "cleric" or "druid" or "ranger"                => AbilityScore.Wisdom,
+        "wizard"                                       => AbilityScore.Intelligence,
+        _                                              => null,
+    };
+
     private string AbilityShort(AbilityScore a) => a switch
     {
         AbilityScore.Strength     => "STR",
@@ -882,12 +1120,22 @@ else
     private string asiFirst = "";
     private string asiSecond = "";
 
+    // Spell picker state (shared by the wizard and the Spells tab library)
+    private List<Spell> pendingSpells = new();
+    private string pickerQuery = "";
+    private int pickerLevel = -1;
+    private string? pickerExpanded = null;
+
     private void OpenLevelUp()
     {
         if (character == null || character.CharacterLevel >= 20) return;
         hpGain = LevelUpRules.AverageHpGain(character.CharacterClass, character.ConstitutionModifier);
         asiFirst = "";
         asiSecond = "";
+        pendingSpells.Clear();
+        pickerQuery = "";
+        pickerLevel = -1;
+        pickerExpanded = null;
         wizardStep = 1;
         showLevelUp = true;
     }
@@ -956,6 +1204,29 @@ else
                 existing.MaxSlots = Math.Max(existing.MaxSlots, max);
             else
                 character.SpellSlots.Add(new SpellSlot { CharacterId = Id, Level = slotLevel, MaxSlots = max });
+        }
+
+        // Add spells picked in the wizard
+        foreach (var spell in pendingSpells)
+        {
+            if (!character.Spells.Any(s => s.Name.Equals(spell.Name, StringComparison.OrdinalIgnoreCase)))
+                character.Spells.Add(spell);
+        }
+
+        // Auto-grant class features for the new level
+        foreach (var grant in LevelUpRules.FeatureGrants(character.CharacterClass, newLevel))
+        {
+            if (!character.Features.Any(f => f.Name.Equals(grant.Name, StringComparison.OrdinalIgnoreCase)))
+            {
+                character.Features.Add(new CharacterFeature
+                {
+                    CharacterId = Id,
+                    Name        = grant.Name,
+                    Description = grant.Description,
+                    Source      = $"{character.CharacterClass} {newLevel}",
+                    LevelGained = newLevel,
+                });
+            }
         }
 
         // Record the level-up in notes for table history

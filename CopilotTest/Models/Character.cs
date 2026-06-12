@@ -60,6 +60,7 @@ public class Character
     public List<InventoryItem> Inventory { get; set; } = new();
     public List<CharacterSkill> Skills { get; set; } = new();
     public List<SpellSlot> SpellSlots { get; set; } = new();
+    public List<CharacterFeature> Features { get; set; } = new();
 
     // Computed display helpers
     public string ClassDisplay => CharacterLevel > 0 && !string.IsNullOrEmpty(CharacterClass)
