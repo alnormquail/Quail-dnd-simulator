@@ -1830,7 +1830,7 @@ h3 {
    Mobile — character sheet responsive tweaks
    ============================================================ */
 @media (max-width: 600px) {
-    .app-nav { padding: 0 10px; }
+    .app-nav { padding: 0 10px; flex-wrap: wrap; }
     .nav-brand { font-size: 0.9rem; }
     .nav-link { padding: 5px 8px; font-size: 0.78rem; }
 
