@@ -1,0 +1,983 @@
+@page "/characters/{Id:guid}"
+@using CopilotTest.Models
+@using CopilotTest.Services
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+@rendermode InteractiveServer
+@inject CharacterService CharacterService
+@inject CombatEngineService Combat
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+@if (character == null)
+{
+    <div class="app-container"><p style="color:var(--text-dim);padding:40px">Character not found.</p></div>
+}
+else
+{
+<div class="app-container">
+
+    <div class="sheet-header">
+        <div class="sheet-title-block">
+            <h1 class="sheet-char-name">@character.Name</h1>
+            <div class="sheet-subtitle">
+                @if (!string.IsNullOrEmpty(character.Race)) { <span>@character.Race</span> }
+                @if (!string.IsNullOrEmpty(character.CharacterClass)) { <span>@character.CharacterClass @(character.CharacterLevel > 0 ? character.CharacterLevel : "")</span> }
+                @if (!string.IsNullOrEmpty(character.Subclass)) { <span>(@character.Subclass)</span> }
+                @if (!string.IsNullOrEmpty(character.Background)) { <span>· @character.Background</span> }
+            </div>
+        </div>
+        <div class="sheet-header-actions">
+            @if (editMode)
+            {
+                <button class="btn btn-start" @onclick="Save">💾 Save</button>
+                <button class="btn btn-reset" @onclick="CancelEdit">Cancel</button>
+            }
+            else
+            {
+                <button class="btn btn-action" @onclick="() => editMode = true">✏️ Edit</button>
+                @if (character.CharacterLevel < 20)
+                {
+                    <button class="btn btn-levelup no-print" @onclick="OpenLevelUp">⬆️ Level Up</button>
+                }
+                <button class="btn btn-print no-print" @onclick="PrintSheet">🖨️ Print</button>
+                <a class="btn btn-round" href="/">⚔️ Combat</a>
+            }
+        </div>
+    </div>
+
+    @* ── Top stat strip ── *@
+    <div class="sheet-stat-strip">
+        <div class="strip-stat"><span class="strip-val">@character.MaxHitPoints</span><span class="strip-lbl">Max HP</span></div>
+        <div class="strip-stat"><span class="strip-val">@character.ArmorClass</span><span class="strip-lbl">AC</span></div>
+        <div class="strip-stat"><span class="strip-val">@character.Speed</span><span class="strip-lbl">Speed</span></div>
+        <div class="strip-stat"><span class="strip-val">+@character.ProficiencyBonus</span><span class="strip-lbl">Prof</span></div>
+        <div class="strip-stat"><span class="strip-val">@(character.DexterityModifier >= 0 ? "+" : "")@character.DexterityModifier</span><span class="strip-lbl">Initiative</span></div>
+        <div class="strip-stat"><span class="strip-val">@character.PassivePerception</span><span class="strip-lbl">Pass. Perc.</span></div>
+    </div>
+
+    @* ── Tabs ── *@
+    <div class="sheet-tabs">
+        <button class="sheet-tab @(activeTab == "stats" ? "active" : "")" @onclick='() => activeTab = "stats"'>Stats</button>
+        <button class="sheet-tab @(activeTab == "spells" ? "active" : "")" @onclick='() => activeTab = "spells"'>Spells</button>
+        <button class="sheet-tab @(activeTab == "inventory" ? "active" : "")" @onclick='() => activeTab = "inventory"'>Inventory</button>
+        <button class="sheet-tab @(activeTab == "profile" ? "active" : "")" @onclick='() => activeTab = "profile"'>Profile</button>
+    </div>
+
+    @* ══════════════════════════ STATS TAB ══════════════════════════ *@
+    @if (activeTab == "stats")
+    {
+        <div class="sheet-tab-content">
+
+            @* Ability Scores *@
+            <div class="section-title">Ability Scores</div>
+            <div class="ability-grid">
+                @foreach (var (score, label, get, set) in AbilityScoreFields())
+                {
+                    <div class="ability-block">
+                        <div class="ability-label">@label</div>
+                        <div class="ability-modifier">@FormatMod(Character.GetModifier(get()))</div>
+                        @if (editMode)
+                        {
+                            <input type="number" class="ability-input" value="@get()" min="1" max="30"
+                                   @onchange="e => { set(int.TryParse(e.Value?.ToString(), out var v) ? v : get()); }" />
+                        }
+                        else
+                        {
+                            <div class="ability-score">@get()</div>
+                        }
+                    </div>
+                }
+            </div>
+
+            @* Saving Throws *@
+            <div class="section-title" style="margin-top:20px">Saving Throws</div>
+            <div class="save-throw-list">
+                @foreach (AbilityScore ability in Enum.GetValues<AbilityScore>())
+                {
+                    var prof = character.GetSaveProficiency(ability);
+                    var bonus = character.GetSaveBonus(ability);
+                    <div class="save-row">
+                        @if (editMode)
+                        {
+                            <input type="checkbox" checked="@prof"
+                                   @onchange="e => { character.SetSaveProficiency(ability, (bool)(e.Value ?? false)); }" />
+                        }
+                        else
+                        {
+                            <span class="prof-dot @(prof ? "prof-dot-on" : "")"></span>
+                        }
+                        <span class="save-bonus">@FormatMod(bonus)</span>
+                        <span class="save-name">@ability</span>
+                    </div>
+                }
+            </div>
+
+            @* Skills *@
+            <div class="section-title" style="margin-top:20px">Skills</div>
+            <div class="skill-list">
+                @foreach (Skill skill in Enum.GetValues<Skill>())
+                {
+                    var prof = character.GetSkillProficiency(skill);
+                    var bonus = character.GetSkillBonus(skill);
+                    var ability = SkillAbilityMap.Map[skill];
+                    <div class="skill-row">
+                        @if (editMode)
+                        {
+                            <select class="skill-prof-select"
+                                    value="@prof"
+                                    @onchange='e => SetSkillProficiency(skill, Enum.Parse<ProficiencyLevel>(e.Value?.ToString() ?? "None"))'>
+                                <option value="None">—</option>
+                                <option value="Proficient">Prof</option>
+                                <option value="Expertise">Exp</option>
+                            </select>
+                        }
+                        else
+                        {
+                            <span class="skill-prof-indicator @ProfClass(prof)">@ProfIndicator(prof)</span>
+                        }
+                        <span class="skill-bonus">@FormatMod(bonus)</span>
+                        <span class="skill-name">@SkillAbilityMap.DisplayName(skill)</span>
+                        <span class="skill-ability">(@AbilityShort(ability))</span>
+                    </div>
+                }
+            </div>
+
+            @* Combat Stats edit *@
+            @if (editMode)
+            {
+                <div class="section-title" style="margin-top:20px">Combat Stats</div>
+                <div class="stat-grid">
+                    <div class="form-field"><label>Max HP</label>
+                        <input type="number" class="form-input" @bind="character.MaxHitPoints" min="1" /></div>
+                    <div class="form-field"><label>Armor Class</label>
+                        <input type="number" class="form-input" @bind="character.ArmorClass" min="1" /></div>
+                    <div class="form-field"><label>Speed</label>
+                        <input type="number" class="form-input" @bind="character.Speed" min="0" /></div>
+                    <div class="form-field"><label>Prof. Bonus</label>
+                        <input type="number" class="form-input" @bind="character.ProficiencyBonus" min="2" /></div>
+                </div>
+            }
+
+        </div>
+    }
+
+    @* ══════════════════════════ SPELLS TAB ══════════════════════════ *@
+    @if (activeTab == "spells")
+    {
+        <div class="sheet-tab-content">
+
+            @* Spell Slots *@
+            @if (character.SpellSlots.Any())
+            {
+                <div class="section-title">Spell Slots</div>
+                <div class="spell-slot-grid">
+                    @foreach (var slot in character.SpellSlots.OrderBy(s => s.Level))
+                    {
+                        <div class="slot-level-block">
+                            <div class="slot-level-label">Level @slot.Level</div>
+                            <div class="slot-pips">
+                                @for (int i = 1; i <= slot.MaxSlots; i++)
+                                {
+                                    var idx = i;
+                                    var used = idx <= slot.UsedSlots;
+                                    <button class="slot-pip @(used ? "slot-used" : "slot-free")"
+                                            @onclick="() => ToggleSlot(slot, idx)"
+                                            title="@(used ? "Restore slot" : "Expend slot")">
+                                    </button>
+                                }
+                            </div>
+                            <div class="slot-count">@slot.RemainingSlots / @slot.MaxSlots</div>
+                        </div>
+                    }
+                </div>
+                @if (editMode)
+                {
+                    <div style="margin-top:8px">
+                        <button class="btn btn-sm btn-add" @onclick="AddSpellSlotLevel">+ Add Slot Level</button>
+                    </div>
+                }
+            }
+            else if (editMode)
+            {
+                <div class="section-title">Spell Slots</div>
+                <button class="btn btn-sm btn-add" @onclick="AddSpellSlotLevel">+ Add Slot Level</button>
+            }
+
+            @* Spell List *@
+            <div class="section-title" style="margin-top:20px">
+                Spell List
+                @if (editMode)
+                {
+                    <button class="btn btn-sm btn-add" style="margin-left:12px" @onclick="AddSpell">+ Add Spell</button>
+                }
+            </div>
+
+            @if (!character.Spells.Any())
+            {
+                <div style="color:var(--text-dim);padding:12px 0">No spells recorded yet.</div>
+            }
+            else
+            {
+                @foreach (var levelGroup in character.Spells.GroupBy(s => s.Level).OrderBy(g => g.Key))
+                {
+                    <div class="spell-level-header">@(levelGroup.Key == 0 ? "Cantrips" : $"Level {levelGroup.Key}")</div>
+                    @foreach (var spell in levelGroup)
+                    {
+                        <div class="spell-row @(expandedSpell == spell.Id ? "spell-expanded" : "")">
+                            <div class="spell-row-main" @onclick="() => ToggleSpell(spell.Id)">
+                                @if (editMode)
+                                {
+                                    <input type="checkbox" checked="@spell.IsPrepared"
+                                           @onchange="e => spell.IsPrepared = (bool)(e.Value ?? true)"
+                                           @onclick:stopPropagation="true" />
+                                }
+                                else
+                                {
+                                    <span class="spell-prepared @(spell.IsPrepared ? "prepared-on" : "")">@(spell.IsPrepared ? "◉" : "○")</span>
+                                }
+                                <span class="spell-name">@spell.Name</span>
+                                @if (spell.Concentration) { <span class="spell-tag conc-tag">C</span> }
+                                @if (spell.IsRitual)       { <span class="spell-tag ritual-tag">R</span> }
+                                @if (!string.IsNullOrEmpty(spell.School)) { <span class="spell-school">@spell.School</span> }
+                                <span class="spell-expand-icon">@(expandedSpell == spell.Id ? "▲" : "▼")</span>
+                                @if (editMode)
+                                {
+                                    <button class="btn-remove" @onclick="() => RemoveSpell(spell)" @onclick:stopPropagation="true">✕</button>
+                                }
+                            </div>
+                            @if (expandedSpell == spell.Id)
+                            {
+                                <div class="spell-detail">
+                                    @if (editMode)
+                                    {
+                                        <div class="spell-edit-grid">
+                                            <div class="form-field"><label>Name</label><input class="form-input" @bind="spell.Name" /></div>
+                                            <div class="form-field"><label>Level</label><input type="number" class="form-input small" @bind="spell.Level" min="0" max="9" /></div>
+                                            <div class="form-field"><label>School</label><input class="form-input" @bind="spell.School" placeholder="Evocation..." /></div>
+                                            <div class="form-field"><label>Cast Time</label><input class="form-input" @bind="spell.CastingTime" /></div>
+                                            <div class="form-field"><label>Range</label><input class="form-input" @bind="spell.Range" /></div>
+                                            <div class="form-field"><label>Components</label><input class="form-input" @bind="spell.Components" placeholder="V, S, M" /></div>
+                                            <div class="form-field"><label>Duration</label><input class="form-input" @bind="spell.Duration" /></div>
+                                            <div class="form-field checkbox-field">
+                                                <label><input type="checkbox" @bind="spell.Concentration" /> Concentration</label>
+                                                <label><input type="checkbox" @bind="spell.IsRitual" /> Ritual</label>
+                                            </div>
+                                        </div>
+                                        <div class="form-field" style="margin-top:8px">
+                                            <label>Description</label>
+                                            <textarea class="form-input" rows="4" @bind="spell.Description"></textarea>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="spell-meta">
+                                            @if (!string.IsNullOrEmpty(spell.CastingTime)) { <span><strong>Cast:</strong> @spell.CastingTime</span> }
+                                            @if (!string.IsNullOrEmpty(spell.Range))       { <span><strong>Range:</strong> @spell.Range</span> }
+                                            @if (!string.IsNullOrEmpty(spell.Components))  { <span><strong>Components:</strong> @spell.Components</span> }
+                                            @if (!string.IsNullOrEmpty(spell.Duration))    { <span><strong>Duration:</strong> @spell.Duration</span> }
+                                        </div>
+                                        @if (!string.IsNullOrEmpty(spell.Description))
+                                        {
+                                            <p class="spell-desc">@spell.Description</p>
+                                        }
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+            }
+        </div>
+    }
+
+    @* ══════════════════════════ INVENTORY TAB ══════════════════════════ *@
+    @if (activeTab == "inventory")
+    {
+        <div class="sheet-tab-content">
+
+            @* Currency *@
+            <div class="section-title">Currency</div>
+            <div class="currency-grid">
+                <div class="currency-block cp">
+                    <span class="currency-label">CP</span>
+                    @if (editMode) { <input type="number" class="currency-input" @bind="character.CopperPieces" min="0" /> }
+                    else { <span class="currency-val">@character.CopperPieces</span> }
+                </div>
+                <div class="currency-block sp">
+                    <span class="currency-label">SP</span>
+                    @if (editMode) { <input type="number" class="currency-input" @bind="character.SilverPieces" min="0" /> }
+                    else { <span class="currency-val">@character.SilverPieces</span> }
+                </div>
+                <div class="currency-block ep">
+                    <span class="currency-label">EP</span>
+                    @if (editMode) { <input type="number" class="currency-input" @bind="character.ElectrumPieces" min="0" /> }
+                    else { <span class="currency-val">@character.ElectrumPieces</span> }
+                </div>
+                <div class="currency-block gp">
+                    <span class="currency-label">GP</span>
+                    @if (editMode) { <input type="number" class="currency-input" @bind="character.GoldPieces" min="0" /> }
+                    else { <span class="currency-val">@character.GoldPieces</span> }
+                </div>
+                <div class="currency-block pp">
+                    <span class="currency-label">PP</span>
+                    @if (editMode) { <input type="number" class="currency-input" @bind="character.PlatinumPieces" min="0" /> }
+                    else { <span class="currency-val">@character.PlatinumPieces</span> }
+                </div>
+            </div>
+
+            @* Items *@
+            <div class="section-title" style="margin-top:20px">
+                Items
+                @if (editMode)
+                {
+                    <button class="btn btn-sm btn-add" style="margin-left:12px" @onclick="AddItem">+ Add Item</button>
+                }
+                else
+                {
+                    <button class="btn btn-sm btn-add" style="margin-left:12px" @onclick="() => quickAddOpen = !quickAddOpen">+ Quick Add</button>
+                }
+            </div>
+
+            @if (quickAddOpen && !editMode)
+            {
+                <div class="quick-add-row">
+                    <input class="form-input item-name-input" @bind="quickAddName" placeholder="Item name (e.g. Healing Potion)" />
+                    <input type="number" class="form-input item-qty-input" @bind="quickAddQty" min="1" title="Quantity" />
+                    <select class="form-input item-cat-select" @bind="quickAddCategory">
+                        @foreach (ItemCategory cat in Enum.GetValues<ItemCategory>())
+                        {
+                            <option value="@cat">@cat</option>
+                        }
+                    </select>
+                    <button class="btn btn-sm btn-primary" @onclick="QuickAddItem" disabled="@string.IsNullOrWhiteSpace(quickAddName)">Add</button>
+                </div>
+            }
+
+            @if (!character.Inventory.Any())
+            {
+                <div style="color:var(--text-dim);padding:12px 0">No items recorded.</div>
+            }
+            else
+            {
+                <div class="inventory-list">
+                    @foreach (var item in character.Inventory.OrderBy(i => i.Category).ThenBy(i => i.Name))
+                    {
+                        <div class="inventory-row @(item.IsEquipped ? "item-equipped" : "")">
+                            @if (editMode)
+                            {
+                                <input type="checkbox" title="Equipped" checked="@item.IsEquipped"
+                                       @onchange="e => item.IsEquipped = (bool)(e.Value ?? false)" />
+                            }
+                            else
+                            {
+                                <button class="item-equip-dot @(item.IsEquipped ? "equip-dot-on" : "")"
+                                        title="@(item.IsEquipped ? "Unequip" : "Equip")"
+                                        @onclick="() => ToggleEquipped(item)"></button>
+                            }
+                            <span class="item-cat-icon">@ItemCatIcon(item.Category)</span>
+                            @if (editMode)
+                            {
+                                <input class="form-input item-name-input" @bind="item.Name" placeholder="Item name" />
+                                <input type="number" class="form-input item-qty-input" @bind="item.Quantity" min="1" title="Quantity" />
+                                <input class="form-input item-wt-input" @bind="item.Weight" placeholder="Weight" />
+                                <select class="form-input item-cat-select" @bind="item.Category">
+                                    @foreach (ItemCategory cat in Enum.GetValues<ItemCategory>())
+                                    {
+                                        <option value="@cat">@cat</option>
+                                    }
+                                </select>
+                                <button class="btn-remove" @onclick="() => RemoveItem(item)">✕</button>
+                            }
+                            else
+                            {
+                                <span class="item-name">@item.Name</span>
+                                <span class="item-qty-controls">
+                                    <button class="qty-btn" title="Decrease (removes item at 0)" @onclick="() => AdjustQuantity(item, -1)">−</button>
+                                    <span class="item-qty">×@item.Quantity</span>
+                                    <button class="qty-btn" title="Increase" @onclick="() => AdjustQuantity(item, 1)">+</button>
+                                </span>
+                                @if (!string.IsNullOrEmpty(item.Weight)) { <span class="item-wt">@item.Weight lb</span> }
+                            }
+                            @if (!editMode && !string.IsNullOrEmpty(item.Description))
+                            {
+                                <span class="item-desc">@item.Description</span>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    @* ══════════════════════════ PROFILE TAB ══════════════════════════ *@
+    @if (activeTab == "profile")
+    {
+        <div class="sheet-tab-content">
+
+            @if (editMode)
+            {
+                <div class="stat-grid" style="margin-bottom:20px">
+                    <div class="form-field"><label>Race</label><input class="form-input" @bind="character.Race" placeholder="Human, Elf..." /></div>
+                    <div class="form-field"><label>Background</label><input class="form-input" @bind="character.Background" placeholder="Acolyte, Criminal..." /></div>
+                    <div class="form-field"><label>Subclass</label><input class="form-input" @bind="character.Subclass" placeholder="School of Evocation..." /></div>
+                </div>
+            }
+
+            <div class="profile-section">
+                <div class="profile-field">
+                    <div class="section-title">Personality Traits</div>
+                    @if (editMode) { <textarea class="form-input profile-textarea" @bind="character.PersonalityTraits" rows="3" placeholder="What's your character like?"></textarea> }
+                    else { <div class="profile-text">@(string.IsNullOrEmpty(character.PersonalityTraits) ? "—" : character.PersonalityTraits)</div> }
+                </div>
+                <div class="profile-field">
+                    <div class="section-title">Ideals</div>
+                    @if (editMode) { <textarea class="form-input profile-textarea" @bind="character.Ideals" rows="3" placeholder="What drives your character?"></textarea> }
+                    else { <div class="profile-text">@(string.IsNullOrEmpty(character.Ideals) ? "—" : character.Ideals)</div> }
+                </div>
+                <div class="profile-field">
+                    <div class="section-title">Bonds</div>
+                    @if (editMode) { <textarea class="form-input profile-textarea" @bind="character.Bonds" rows="3" placeholder="What connects your character to the world?"></textarea> }
+                    else { <div class="profile-text">@(string.IsNullOrEmpty(character.Bonds) ? "—" : character.Bonds)</div> }
+                </div>
+                <div class="profile-field">
+                    <div class="section-title">Flaws</div>
+                    @if (editMode) { <textarea class="form-input profile-textarea" @bind="character.Flaws" rows="3" placeholder="What are your character's weaknesses?"></textarea> }
+                    else { <div class="profile-text">@(string.IsNullOrEmpty(character.Flaws) ? "—" : character.Flaws)</div> }
+                </div>
+                <div class="profile-field profile-field-full">
+                    <div class="section-title">Notes</div>
+                    @if (editMode) { <textarea class="form-input profile-textarea" @bind="character.Notes" rows="8" placeholder="Session notes, backstory, reminders..."></textarea> }
+                    else { <div class="profile-text notes-text">@(string.IsNullOrEmpty(character.Notes) ? "—" : character.Notes)</div> }
+                </div>
+            </div>
+        </div>
+    }
+
+    @* ══════════════════════════ LEVEL UP WIZARD ══════════════════════════ *@
+    @if (showLevelUp)
+    {
+        var newLevel = character.CharacterLevel + 1;
+        var newProf = LevelUpRules.ProficiencyForLevel(newLevel);
+        var isAsi = LevelUpRules.IsAsiLevel(character.CharacterClass, newLevel);
+
+        <div class="modal-overlay" @onclick="CloseLevelUp">
+            <div class="modal-box" @onclick:stopPropagation="true">
+
+                <div class="modal-header">
+                    <h2>⬆️ Level Up: @character.Name</h2>
+                    <div class="modal-sub">@character.CharacterClass @character.CharacterLevel → <strong>@newLevel</strong></div>
+                    <button class="modal-close" @onclick="CloseLevelUp">✕</button>
+                </div>
+
+                @* Step indicator *@
+                <div class="wizard-steps">
+                    <span class="wizard-step @(wizardStep == 1 ? "step-active" : wizardStep > 1 ? "step-done" : "")">1. Hit Points</span>
+                    @if (isAsi)
+                    {
+                        <span class="wizard-step @(wizardStep == 2 ? "step-active" : wizardStep > 2 ? "step-done" : "")">2. Ability Scores</span>
+                    }
+                    <span class="wizard-step @(wizardStep == 3 ? "step-active" : "")">@(isAsi ? "3" : "2"). Review &amp; Apply</span>
+                </div>
+
+                @* ── Step 1: HP ── *@
+                @if (wizardStep == 1)
+                {
+                    <div class="wizard-body">
+                        <p>Your class (<strong>@character.CharacterClass</strong>) uses a <strong>d@(LevelUpRules.GetHitDie(character.CharacterClass))</strong> hit die.
+                           Taking the standard average: <strong>@(LevelUpRules.GetHitDie(character.CharacterClass) / 2 + 1)</strong>
+                           + CON modifier (<strong>@FormatMod(character.ConstitutionModifier)</strong>)
+                           = <strong>@LevelUpRules.AverageHpGain(character.CharacterClass, character.ConstitutionModifier) HP</strong>.</p>
+
+                        <div class="wizard-hp-row">
+                            <label>HP gained this level:</label>
+                            <input type="number" class="form-input small" @bind="hpGain" min="1" />
+                            <span class="wizard-hint">(adjust if your DM rolled or uses house rules)</span>
+                        </div>
+
+                        <div class="wizard-hp-preview">
+                            Max HP: @character.MaxHitPoints → <strong>@(character.MaxHitPoints + hpGain)</strong>
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-reset" @onclick="CloseLevelUp">Cancel</button>
+                        <button class="btn btn-primary" @onclick="() => wizardStep = isAsi ? 2 : 3">Next →</button>
+                    </div>
+                }
+
+                @* ── Step 2: ASI ── *@
+                @if (wizardStep == 2 && isAsi)
+                {
+                    <div class="wizard-body">
+                        <p><strong>Level @newLevel grants an Ability Score Improvement!</strong>
+                           Add +2 to one ability, or +1 to two different abilities (max 20).
+                           If your character takes a <em>feat</em> instead, choose "No change" and note the feat in the review step.</p>
+
+                        <div class="wizard-asi-grid">
+                            <div class="form-field">
+                                <label>First +1</label>
+                                <select class="form-input" @bind="asiFirst">
+                                    <option value="">— No change —</option>
+                                    @foreach (var (name, score) in AsiOptions())
+                                    {
+                                        <option value="@name" disabled="@(score >= 20)">@name (@score@(score >= 20 ? " — max" : ""))</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="form-field">
+                                <label>Second +1 <span class="wizard-hint">(same ability = +2 total)</span></label>
+                                <select class="form-input" @bind="asiSecond">
+                                    <option value="">— No change —</option>
+                                    @foreach (var (name, score) in AsiOptions())
+                                    {
+                                        <option value="@name" disabled="@(score >= 20)">@name (@score@(score >= 20 ? " — max" : ""))</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(AsiSummary()))
+                        {
+                            <div class="wizard-hp-preview">@AsiSummary()</div>
+                        }
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-reset" @onclick="() => wizardStep = 1">← Back</button>
+                        <button class="btn btn-primary" @onclick="() => wizardStep = 3">Next →</button>
+                    </div>
+                }
+
+                @* ── Step 3: Review ── *@
+                @if (wizardStep == 3)
+                {
+                    var newSlots = LevelUpRules.SlotsForLevel(character.CharacterClass, newLevel);
+                    <div class="wizard-body">
+                        <div class="wizard-review-list">
+                            <div class="wizard-review-row">✅ Level: @character.CharacterLevel → <strong>@newLevel</strong></div>
+                            <div class="wizard-review-row">✅ Max HP: @character.MaxHitPoints → <strong>@(character.MaxHitPoints + hpGain)</strong></div>
+                            @if (newProf != character.ProficiencyBonus)
+                            {
+                                <div class="wizard-review-row">✅ Proficiency bonus: +@character.ProficiencyBonus → <strong>+@newProf</strong> (all proficient skills, saves &amp; attacks improve!)</div>
+                            }
+                            @if (!string.IsNullOrEmpty(AsiSummary()))
+                            {
+                                <div class="wizard-review-row">✅ @AsiSummary()</div>
+                            }
+                            @if (newSlots.Count > 0)
+                            {
+                                <div class="wizard-review-row">✅ Spell slots:
+                                    @string.Join(", ", newSlots.Select(s => $"{s.Max}× level {s.Level}"))
+                                </div>
+                            }
+                        </div>
+
+                        @{ var hints = LevelUpRules.FeatureHints(character.CharacterClass, newLevel); }
+                        @if (hints.Length > 0)
+                        {
+                            <div class="wizard-hints-box">
+                                <div class="wizard-hints-title">📋 Don't forget — at @character.CharacterClass level @newLevel you may gain:</div>
+                                <ul>
+                                    @foreach (var h in hints) { <li>@h</li> }
+                                </ul>
+                                <div class="wizard-hint">Add new attacks/spells from the sheet's Edit mode after applying.</div>
+                            </div>
+                        }
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-reset" @onclick="() => wizardStep = isAsi ? 2 : 1">← Back</button>
+                        <button class="btn btn-start" @onclick="ApplyLevelUp">🎉 Apply Level Up</button>
+                    </div>
+                }
+
+            </div>
+        </div>
+    }
+
+    @* ══════════════ PRINT LAYOUT (hidden on screen, shown when printing) ══════════════ *@
+    <div class="print-sheet print-only">
+
+        <div class="ps-header">
+            <div class="ps-name">@character.Name</div>
+            <div class="ps-meta">
+                @if (!string.IsNullOrEmpty(character.Race)) { <span>@character.Race</span> }
+                @if (!string.IsNullOrEmpty(character.CharacterClass)) { <span>@character.CharacterClass @(character.CharacterLevel > 0 ? character.CharacterLevel : "")</span> }
+                @if (!string.IsNullOrEmpty(character.Subclass)) { <span>(@character.Subclass)</span> }
+                @if (!string.IsNullOrEmpty(character.Background)) { <span>· @character.Background</span> }
+            </div>
+        </div>
+
+        @* Top stat bar *@
+        <div class="ps-stat-bar">
+            <div class="ps-stat"><span class="ps-stat-val">@character.MaxHitPoints</span><span class="ps-stat-lbl">Max HP</span></div>
+            <div class="ps-stat"><span class="ps-stat-val">@character.ArmorClass</span><span class="ps-stat-lbl">AC</span></div>
+            <div class="ps-stat"><span class="ps-stat-val">@character.Speed</span><span class="ps-stat-lbl">Speed</span></div>
+            <div class="ps-stat"><span class="ps-stat-val">+@character.ProficiencyBonus</span><span class="ps-stat-lbl">Prof Bonus</span></div>
+            <div class="ps-stat"><span class="ps-stat-val">@(character.DexterityModifier >= 0 ? "+" : "")@character.DexterityModifier</span><span class="ps-stat-lbl">Initiative</span></div>
+            <div class="ps-stat"><span class="ps-stat-val">@character.PassivePerception</span><span class="ps-stat-lbl">Pass. Perc.</span></div>
+        </div>
+
+        @* Ability scores *@
+        <div class="ps-section-title">Ability Scores</div>
+        <div class="ps-ability-row">
+            @foreach (var (label, score, mod) in new[] {
+                ("STR", character.Strength,     character.StrengthModifier),
+                ("DEX", character.Dexterity,    character.DexterityModifier),
+                ("CON", character.Constitution, character.ConstitutionModifier),
+                ("INT", character.Intelligence, character.IntelligenceModifier),
+                ("WIS", character.Wisdom,       character.WisdomModifier),
+                ("CHA", character.Charisma,     character.CharismaModifier),
+            })
+            {
+                <div class="ps-ability">
+                    <div class="ps-ability-lbl">@label</div>
+                    <div class="ps-ability-mod">@FormatMod(mod)</div>
+                    <div class="ps-ability-score">@score</div>
+                </div>
+            }
+        </div>
+
+        <div class="ps-two-col">
+
+            @* Saving Throws *@
+            <div>
+                <div class="ps-section-title">Saving Throws</div>
+                @foreach (AbilityScore ability in Enum.GetValues<AbilityScore>())
+                {
+                    var prof = character.GetSaveProficiency(ability);
+                    var bonus = character.GetSaveBonus(ability);
+                    <div class="ps-skill-row">
+                        <span class="ps-dot @(prof ? "ps-dot-on" : "")"></span>
+                        <span class="ps-bonus">@FormatMod(bonus)</span>
+                        <span>@ability</span>
+                    </div>
+                }
+
+                @if (character.Actions.Any())
+                {
+                    <div class="ps-section-title" style="margin-top:10px">Actions</div>
+                    @foreach (var action in character.Actions)
+                    {
+                        <div class="ps-action-row">
+                            <strong>@action.Name</strong>
+                            @if (action.AttackBonus != 0) { <span>  @FormatMod(action.AttackBonus) to hit</span> }
+                            @if (!string.IsNullOrEmpty(action.DamageDice)) { <span>  @action.DamageDice@(action.DamageBonus != 0 ? $" {FormatMod(action.DamageBonus)}" : "")</span> }
+                        </div>
+                    }
+                }
+            </div>
+
+            @* Skills *@
+            <div>
+                <div class="ps-section-title">Skills</div>
+                <div class="ps-skill-two-col">
+                    @foreach (Skill skill in Enum.GetValues<Skill>())
+                    {
+                        var prof = character.GetSkillProficiency(skill);
+                        var bonus = character.GetSkillBonus(skill);
+                        var ability = SkillAbilityMap.Map[skill];
+                        <div class="ps-skill-row">
+                            <span class="ps-dot @(prof != ProficiencyLevel.None ? "ps-dot-on" : "") @(prof == ProficiencyLevel.Expertise ? "ps-dot-exp" : "")"></span>
+                            <span class="ps-bonus">@FormatMod(bonus)</span>
+                            <span>@SkillAbilityMap.DisplayName(skill) <span class="ps-ability-tag">(@AbilityShort(ability))</span></span>
+                        </div>
+                    }
+                </div>
+            </div>
+
+        </div>
+
+        @* Spell slots summary *@
+        @if (character.SpellSlots.Any())
+        {
+            <div class="ps-section-title" style="margin-top:10px">Spell Slots</div>
+            <div class="ps-slots">
+                @foreach (var slot in character.SpellSlots.OrderBy(s => s.Level))
+                {
+                    <span class="ps-slot-chip">Lvl @slot.Level: @slot.MaxSlots slots</span>
+                }
+            </div>
+        }
+
+        @* Notes *@
+        @if (!string.IsNullOrEmpty(character.Notes))
+        {
+            <div class="ps-section-title" style="margin-top:10px">Notes</div>
+            <div class="ps-notes">@character.Notes</div>
+        }
+
+        <div class="ps-footer">Quail D&D Simulator · @character.Name · Printed @DateTime.Now.ToString("MM/dd/yyyy")</div>
+    </div>
+
+</div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private Character? character;
+    private string activeTab = "stats";
+    private bool editMode = false;
+    private Guid? expandedSpell = null;
+
+    protected override void OnParametersSet()
+    {
+        character = CharacterService.GetById(Id);
+        editMode = false;
+    }
+
+    private void Save()
+    {
+        if (character == null) return;
+        CharacterService.Update(character);
+        // Refresh combat roster so changes take effect in next encounter
+        Combat.RefreshRosterFromDb();
+        editMode = false;
+        // Reload from DB to get fresh IDs for any new items
+        character = CharacterService.GetById(Id);
+    }
+
+    private void CancelEdit()
+    {
+        editMode = false;
+        character = CharacterService.GetById(Id);
+    }
+
+    private void ToggleSlot(SpellSlot slot, int pipIndex)
+    {
+        if (slot.UsedSlots >= pipIndex)
+            slot.UsedSlots = pipIndex - 1;
+        else
+            slot.UsedSlots = pipIndex;
+        CharacterService.SaveSpellSlots(Id, character!.SpellSlots);
+    }
+
+    private void ToggleSpell(Guid spellId)
+        => expandedSpell = expandedSpell == spellId ? null : spellId;
+
+    private void AddSpell()
+    {
+        character!.Spells.Add(new Spell { CharacterId = Id, Name = "New Spell", Level = 0 });
+    }
+
+    private void RemoveSpell(Spell spell)
+    {
+        character!.Spells.Remove(spell);
+        if (expandedSpell == spell.Id) expandedSpell = null;
+    }
+
+    private void AddItem()
+    {
+        character!.Inventory.Add(new InventoryItem { CharacterId = Id, Name = "", Quantity = 1 });
+    }
+
+    private void RemoveItem(InventoryItem item)
+    {
+        character!.Inventory.Remove(item);
+    }
+
+    // ── Quick inventory controls (no edit mode required) ─────────────────────
+    private bool quickAddOpen = false;
+    private string quickAddName = "";
+    private int quickAddQty = 1;
+    private ItemCategory quickAddCategory = ItemCategory.Other;
+
+    private void QuickAddItem()
+    {
+        if (character == null || string.IsNullOrWhiteSpace(quickAddName)) return;
+        character.Inventory.Add(new InventoryItem
+        {
+            CharacterId = Id,
+            Name        = quickAddName.Trim(),
+            Quantity    = Math.Max(1, quickAddQty),
+            Category    = quickAddCategory
+        });
+        SaveInventoryQuietly();
+        quickAddName = "";
+        quickAddQty = 1;
+        quickAddOpen = false;
+    }
+
+    private void ToggleEquipped(InventoryItem item)
+    {
+        item.IsEquipped = !item.IsEquipped;
+        SaveInventoryQuietly();
+    }
+
+    private void AdjustQuantity(InventoryItem item, int delta)
+    {
+        item.Quantity += delta;
+        if (item.Quantity <= 0) character!.Inventory.Remove(item);
+        SaveInventoryQuietly();
+    }
+
+    /// <summary>Persist inventory changes immediately and reload (used by quick controls outside edit mode).</summary>
+    private void SaveInventoryQuietly()
+    {
+        if (character == null) return;
+        CharacterService.Update(character);
+        character = CharacterService.GetById(Id);
+    }
+
+    private void AddSpellSlotLevel()
+    {
+        var nextLevel = character!.SpellSlots.Count > 0
+            ? character.SpellSlots.Max(s => s.Level) + 1
+            : 1;
+        if (nextLevel > 9) return;
+        character.SpellSlots.Add(new SpellSlot { CharacterId = Id, Level = nextLevel, MaxSlots = 1 });
+    }
+
+    private void SetSkillProficiency(Skill skill, ProficiencyLevel level)
+    {
+        var existing = character!.Skills.FirstOrDefault(s => s.Skill == skill);
+        if (existing != null)
+            existing.Proficiency = level;
+        else
+            character.Skills.Add(new CharacterSkill { CharacterId = Id, Skill = skill, Proficiency = level });
+    }
+
+    // Ability score field descriptors for the edit grid
+    private IEnumerable<(int score, string label, Func<int> get, Action<int> set)> AbilityScoreFields()
+    {
+        yield return (character!.Strength,     "STR", () => character.Strength,     v => character.Strength     = v);
+        yield return (character.Dexterity,     "DEX", () => character.Dexterity,    v => character.Dexterity    = v);
+        yield return (character.Constitution,  "CON", () => character.Constitution, v => character.Constitution = v);
+        yield return (character.Intelligence,  "INT", () => character.Intelligence, v => character.Intelligence = v);
+        yield return (character.Wisdom,        "WIS", () => character.Wisdom,       v => character.Wisdom       = v);
+        yield return (character.Charisma,      "CHA", () => character.Charisma,     v => character.Charisma     = v);
+    }
+
+    private string FormatMod(int mod) => mod >= 0 ? $"+{mod}" : mod.ToString();
+
+    private string AbilityShort(AbilityScore a) => a switch
+    {
+        AbilityScore.Strength     => "STR",
+        AbilityScore.Dexterity    => "DEX",
+        AbilityScore.Constitution => "CON",
+        AbilityScore.Intelligence => "INT",
+        AbilityScore.Wisdom       => "WIS",
+        AbilityScore.Charisma     => "CHA",
+        _                         => ""
+    };
+
+    private string ProfClass(ProficiencyLevel p) => p switch
+    {
+        ProficiencyLevel.Proficient => "prof-pip",
+        ProficiencyLevel.Expertise  => "exp-pip",
+        _                           => ""
+    };
+
+    private string ProfIndicator(ProficiencyLevel p) => p switch
+    {
+        ProficiencyLevel.Proficient => "●",
+        ProficiencyLevel.Expertise  => "◆",
+        _                           => "○"
+    };
+
+    private async Task PrintSheet() => await JS.InvokeVoidAsync("window.print");
+
+    // ── Level Up Wizard ──────────────────────────────────────────────────────
+    private bool showLevelUp = false;
+    private int wizardStep = 1;
+    private int hpGain = 0;
+    private string asiFirst = "";
+    private string asiSecond = "";
+
+    private void OpenLevelUp()
+    {
+        if (character == null || character.CharacterLevel >= 20) return;
+        hpGain = LevelUpRules.AverageHpGain(character.CharacterClass, character.ConstitutionModifier);
+        asiFirst = "";
+        asiSecond = "";
+        wizardStep = 1;
+        showLevelUp = true;
+    }
+
+    private void CloseLevelUp() => showLevelUp = false;
+
+    private IEnumerable<(string Name, int Score)> AsiOptions()
+    {
+        yield return ("Strength",     character!.Strength);
+        yield return ("Dexterity",    character.Dexterity);
+        yield return ("Constitution", character.Constitution);
+        yield return ("Intelligence", character.Intelligence);
+        yield return ("Wisdom",       character.Wisdom);
+        yield return ("Charisma",     character.Charisma);
+    }
+
+    private string AsiSummary()
+    {
+        if (string.IsNullOrEmpty(asiFirst) && string.IsNullOrEmpty(asiSecond)) return "";
+        if (asiFirst == asiSecond && !string.IsNullOrEmpty(asiFirst)) return $"{asiFirst} +2";
+        var parts = new List<string>();
+        if (!string.IsNullOrEmpty(asiFirst))  parts.Add($"{asiFirst} +1");
+        if (!string.IsNullOrEmpty(asiSecond)) parts.Add($"{asiSecond} +1");
+        return string.Join(", ", parts);
+    }
+
+    private void ApplyAsiPoint(string ability)
+    {
+        if (character == null || string.IsNullOrEmpty(ability)) return;
+        switch (ability)
+        {
+            case "Strength":     character.Strength     = Math.Min(20, character.Strength + 1);     break;
+            case "Dexterity":    character.Dexterity    = Math.Min(20, character.Dexterity + 1);    break;
+            case "Constitution": character.Constitution = Math.Min(20, character.Constitution + 1); break;
+            case "Intelligence": character.Intelligence = Math.Min(20, character.Intelligence + 1); break;
+            case "Wisdom":       character.Wisdom       = Math.Min(20, character.Wisdom + 1);       break;
+            case "Charisma":     character.Charisma     = Math.Min(20, character.Charisma + 1);     break;
+        }
+    }
+
+    private void ApplyLevelUp()
+    {
+        if (character == null) return;
+
+        var oldConMod = character.ConstitutionModifier;
+        var newLevel = character.CharacterLevel + 1;
+
+        ApplyAsiPoint(asiFirst);
+        ApplyAsiPoint(asiSecond);
+
+        character.CharacterLevel = newLevel;
+        character.MaxHitPoints += hpGain;
+        character.ProficiencyBonus = LevelUpRules.ProficiencyForLevel(newLevel);
+
+        // If CON modifier rose from the ASI, retroactively add +1 HP per level
+        var conIncrease = character.ConstitutionModifier - oldConMod;
+        if (conIncrease > 0)
+            character.MaxHitPoints += conIncrease * newLevel;
+
+        // Update spell slots to the class table for the new level (preserving used counts)
+        var newSlots = LevelUpRules.SlotsForLevel(character.CharacterClass, newLevel);
+        foreach (var (slotLevel, max) in newSlots)
+        {
+            var existing = character.SpellSlots.FirstOrDefault(s => s.Level == slotLevel);
+            if (existing != null)
+                existing.MaxSlots = Math.Max(existing.MaxSlots, max);
+            else
+                character.SpellSlots.Add(new SpellSlot { CharacterId = Id, Level = slotLevel, MaxSlots = max });
+        }
+
+        // Record the level-up in notes for table history
+        var asiNote = string.IsNullOrEmpty(AsiSummary()) ? "" : $", ASI: {AsiSummary()}";
+        character.Notes = (string.IsNullOrEmpty(character.Notes) ? "" : character.Notes + "\n")
+            + $"[{DateTime.Now:MM/dd/yyyy}] Leveled up to {character.CharacterClass} {newLevel} (+{hpGain} HP{asiNote}).";
+
+        CharacterService.Update(character);
+        Combat.RefreshRosterFromDb();
+        showLevelUp = false;
+        character = CharacterService.GetById(Id);
+    }
+
+    private IEnumerable<CombatAction> Actions => character?.Actions ?? Enumerable.Empty<CombatAction>();
+
+    private string ItemCatIcon(ItemCategory cat) => cat switch
+    {
+        ItemCategory.Weapon    => "⚔️",
+        ItemCategory.Armor     => "🛡️",
+        ItemCategory.Consumable=> "🧪",
+        ItemCategory.Tool      => "🔧",
+        ItemCategory.Treasure  => "💎",
+        _                      => "📦"
+    };
+}

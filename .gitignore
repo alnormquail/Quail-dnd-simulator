@@ -44,3 +44,9 @@ secrets.json
 appsettings.*.json
 !appsettings.json
 !appsettings.Development.json
+# Local SQLite database (each player's data stays local)
+*.db
+*.db-shm
+*.db-wal
+# Local Claude Code settings
+.claude/

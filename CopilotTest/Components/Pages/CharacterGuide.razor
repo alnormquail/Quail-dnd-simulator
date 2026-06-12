@@ -357,9 +357,9 @@
 </div>
 
 @code {
-    private Combatant? Selected { get; set; }
+    private Character? Selected { get; set; }
 
-    private void Select(Combatant c)
+    private void Select(Character c)
     {
         var newChar = Selected?.Id == c.Id ? null : c;
         Selected = newChar;
@@ -371,7 +371,7 @@
     private HashSet<string> UsedSlots { get; set; } = new();
     private HashSet<int>    SpentSp   { get; set; } = new();
 
-    private void ResetTracker(Combatant c)
+    private void ResetTracker(Character c)
     {
         CurrentHp = c.MaxHitPoints;
         UsedSlots.Clear();
@@ -402,7 +402,7 @@
 
     private static string FormatBonus(int n) => n >= 0 ? $"+{n}" : $"{n}";
 
-    private static bool HasSpells(Combatant c) =>
+    private static bool HasSpells(Character c) =>
         c.Actions.Any(a => a.ActionType is ActionType.Spell or ActionType.SpellAttack);
 
     private static string GetClassEmoji(string cls) => cls switch
@@ -428,13 +428,18 @@
         [new Guid("a1000000-0000-0000-0000-000000000002")] = "Dwarf",
         [new Guid("a1000000-0000-0000-0000-000000000003")] = "Halfling",
         [new Guid("a1000000-0000-0000-0000-000000000004")] = "High Elf",
+        [new Guid("a1000000-0000-0000-0000-000000000005")] = "Gnome",
+        [new Guid("a1000000-0000-0000-0000-000000000006")] = "Gnome",
+        [new Guid("a1000000-0000-0000-0000-000000000007")] = "Half-Elf",
+        [new Guid("a1000000-0000-0000-0000-000000000008")] = "Human",
+        [new Guid("a1000000-0000-0000-0000-000000000009")] = "Forest Gnome",
     };
 
     private string GetRace(Guid id) => RaceMap.TryGetValue(id, out var r) ? r : "—";
 
     private record AbilityInfo(string Label, int Score, int Mod);
 
-    private static List<AbilityInfo> GetAbilities(Combatant c) =>
+    private static List<AbilityInfo> GetAbilities(Character c) =>
     [
         new("STR", c.Strength,     c.StrengthModifier),
         new("DEX", c.Dexterity,    c.DexterityModifier),
@@ -525,12 +530,12 @@
                 Metamagic:
                 [
                     new("Subtle Spell", "1", "Cast a spell without Verbal or Somatic components — undetectable by enemies. No one can tell you cast it. Great for social situations or when silenced."),
-                    new("Heightened Spell", "3", "One target of your spell has Disadvantage on their first saving throw against it. Spend this on Hold Person for maximum effect on a key enemy.")
+                    new("Twinned Spell", "1 per spell level", "Target a second creature with a single-target spell. Costs 1 SP × spell level (e.g. 2 SP for a 2nd-level spell). Great for Hold Person on two enemies at once!")
                 ],
                 CheatSheet:
                 [
                     new("Running low on 2nd-level slots",        "Spend 3 SP → create a temporary 2nd-level slot (Bonus Action)"),
-                    new("Boss needs to fail Hold Person",        "Spend 3 SP → Heightened Spell (boss rolls DEX save at Disadvantage)"),
+                    new("Want to Hold Person on TWO enemies",    "Spend 2 SP → Twinned Spell (both targets must save vs DC 15)"),
                     new("Need to cast undetected",               "Spend 1 SP → Subtle Spell (no V/S components required)"),
                     new("Have spare 1st-level slots, need SP",   "Expend a 1st-level slot → gain 1 SP (Bonus Action)"),
                     new("Have spare 2nd-level slots, need SP",   "Expend a 2nd-level slot → gain 2 SP (Bonus Action)"),
@@ -564,6 +569,187 @@
                 ],
                 PlayTip: "Surges are unpredictable but not all bad. If your DM uses them, lean into Tides of Chaos — using it intentionally lets you control when a surge is most likely, and the advantage it grants is always worth the risk."
             )
+        ),
+        // ── Kennyth the Paladin ───────────────────────────────────────────────
+        [new Guid("a1000000-0000-0000-0000-000000000005")] = new(
+            Race: "Gnome",
+            Background: "Custom",
+            SavingThrows: ["Wisdom +4", "Charisma +3"],
+            ProficientSkills: ["Athletics +3", "Medicine +4"],
+            Defenses:
+            [
+                "Gnome Cunning: Advantage on INT, WIS, and CHA saving throws against magic",
+                "Aura of Protection: You and allies within 10 ft add CHA modifier to saving throws"
+            ],
+            ClassFeatures:
+            [
+                "Lay on Hands (25 HP pool/long rest): Restore any amount of HP from your pool to a touched creature, or spend 5 HP to cure one disease or poison.",
+                "Divine Smite (after a melee hit): Expend a spell slot — 1st = +2d8 Radiant, 2nd = +3d8. Add +1d8 vs Undead/Fiends. Triggers a Wild Magic roll!",
+                "Channel Divinity: Sacred Weapon — Add CHA modifier to attack rolls with one weapon for 1 minute (Bonus Action).",
+                "Extra Attack: Make 2 attacks whenever you take the Attack action.",
+                "Spellcasting (CHA-based): Spell Save DC 11, Spell Attack +3. Slots: 4 × 1st, 2 × 2nd."
+            ],
+            PlayTips:
+            [
+                "Open with Shield of Faith on yourself (Bonus Action) for a free +2 AC before your first attack.",
+                "Divine Smite is your burst damage — save it for when you land a hit on a dangerous enemy, especially on a crit (double the dice!).",
+                "On a critical hit + Divine Smite with a 2nd-level slot vs Undead/Fiend: 4d6 (sword) + 6d8 (smite) + 2d8 (undead) — potentially massive.",
+                "Lay on Hands is flexible — use it to stabilize a downed ally (1 HP) or pre-emptively top someone off before a big fight.",
+                "Aid before combat is a free 5 HP for up to 3 people — cast it when you know a fight is coming.",
+                "Protection from Evil and Good shuts down Fiend/Undead attacks — huge in the right encounters.",
+                "Gnome Cunning means you almost never fail magical INT/WIS/CHA saves — you're surprisingly resistant to mind control."
+            ],
+            SorceryPoints: null,
+            SpellSlots:
+            [
+                new("1st Level", 4),
+                new("2nd Level", 2),
+            ],
+            WildMagicInfo: null
+        ),
+        // ── Boan Strickler the Fighter ──────────────────────────────────────
+        [new Guid("a1000000-0000-0000-0000-000000000006")] = new(
+            Race: "Gnome",
+            Background: "Folk Hero",
+            SavingThrows: ["Strength +6", "Constitution +4"],
+            ProficientSkills: ["Acrobatics +5", "Animal Handling +4", "Nature +2", "Survival +4"],
+            Defenses:
+            [
+                "Gnome Cunning: Advantage on INT, WIS, and CHA saving throws against magic",
+                "Darkvision 60 ft."
+            ],
+            ClassFeatures:
+            [
+                "Extra Attack: Make 2 attacks whenever you take the Attack action.",
+                "Action Surge (1/short rest): Take one additional Action on your turn — great for 4 attacks in one round.",
+                "Second Wind (1/short rest): Bonus Action — heal 1d10 + 5 HP.",
+                "Fighting Style: Choose based on your weapon setup (Dueling, Archery, etc.).",
+                "Indomitable (1/long rest): Reroll a failed saving throw — use it on a scary save like being paralyzed."
+            ],
+            PlayTips:
+            [
+                "You are the party's front-line fighter — your job is to hit things hard and stay alive.",
+                "Action Surge is your big button. Save it for when you need 4 attacks in one turn or to take down a tough enemy quickly.",
+                "Second Wind is a free bonus action heal every short rest — use it when you drop below half HP.",
+                "With STR 17 (+3), you hit hard in melee. Lead with your Scimitar or Shortsword in tight spaces.",
+                "Longbow gives you a solid 150 ft. ranged option (+5 to hit, 1d8+2) — useful when you can't close in safely.",
+                "Gnome Cunning makes you surprisingly resistant to spells targeting INT/WIS/CHA — you won't be mind-controlled easily.",
+                "Indomitable is a lifesaver — save it for a devastating failed save like paralysis or being turned."
+            ]
+        ),
+        // ── Gideon Silverspoon the Bard ──────────────────────────────────────
+        [new Guid("a1000000-0000-0000-0000-000000000007")] = new(
+            Race: "Half-Elf",
+            Background: "Criminal",
+            SavingThrows: ["Dexterity +5", "Charisma +6"],
+            ProficientSkills: ["Acrobatics +5", "Deception +6", "History +5", "Perception +2", "Performance +9 (Expertise)", "Persuasion +9 (Expertise)", "Stealth +5"],
+            Defenses:
+            [
+                "Fey Ancestry: Advantage on saving throws against the charmed condition",
+                "Immunity to magical sleep effects",
+                "Darkvision 60 ft."
+            ],
+            ClassFeatures:
+            [
+                "Bardic Inspiration (d8, 3/short rest): Bonus Action — give an ally a d8 to add to one attack roll, ability check, or saving throw within 10 minutes.",
+                "Cutting Words (Reaction): When an enemy within 60 ft. makes an attack, ability check, or damage roll, expend a Bardic Inspiration die to subtract the roll from their result.",
+                "College of Lore: Gain 3 extra skill proficiencies from any class at level 3.",
+                "Jack of All Trades: Add half proficiency bonus (+1) to any ability check you're not proficient in.",
+                "Song of Rest: During a short rest, allies heal an extra 1d6 HP.",
+                "Expertise: Performance and Persuasion both add double proficiency (+6) for +9 total."
+            ],
+            PlayTips:
+            [
+                "Bardic Inspiration is your most important resource — hand it out to allies at the start of every fight.",
+                "Give Inspiration to whoever needs to land the next hit most: the Paladin about to Smite, or an ally trying to escape a grapple.",
+                "Cutting Words is a Reaction — use it to make a dangerous enemy miss an attack on a downed ally or crit them.",
+                "Hypnotic Pattern is devastating: every creature in a 30 ft. cube that fails a WIS save is incapacitated. Drop it on a cluster of enemies.",
+                "Shatter deals 3d8 thunder damage in a 10 ft. radius — great against groups, and it ignores nonmagical object resistance.",
+                "Vicious Mockery (cantrip) deals 2d4 psychic and gives the target Disadvantage on its next attack — free action economy with real impact.",
+                "Your AC is only 12 — stay behind the front line and support from a distance.",
+                "Expertise in Persuasion (+9) makes you the party face — lean into social encounters."
+            ],
+            SpellSlots:
+            [
+                new("1st Level", 4),
+                new("2nd Level", 3),
+                new("3rd Level", 2),
+            ]
+        ),
+        // ── Job Goodhammer the Paladin ───────────────────────────────────────
+        [new Guid("a1000000-0000-0000-0000-000000000008")] = new(
+            Race: "Human",
+            Background: "Acolyte",
+            SavingThrows: ["Wisdom +3", "Charisma +4"],
+            ProficientSkills: ["Insight +3", "Intimidation +4", "Religion +4", "Survival +3"],
+            Defenses:
+            [
+                "Aura of Protection: You and allies within 10 ft. add your CHA modifier (+1) to saving throws",
+                "Resourceful (Human): Gain Heroic Inspiration once per long rest"
+            ],
+            ClassFeatures:
+            [
+                "Lay on Hands (25 HP pool/long rest): Bonus Action — restore any amount of HP from the pool to a touched creature, or spend 5 HP to cure one disease or poison.",
+                "Divine Smite (after a melee hit): Expend a spell slot to add radiant damage — 1st slot = +2d8, 2nd slot = +3d8. Add +1d8 vs Undead/Fiends.",
+                "Extra Attack: Make 2 attacks whenever you take the Attack action.",
+                "Channel Divinity: Faithful Steed — Always have Find Steed prepared, cast once per long rest for free.",
+                "Sacred Weapon (Channel Divinity): Add CHA modifier (+1) to attack rolls with one weapon for 1 minute (Bonus Action).",
+                "Spellcasting (CHA-based): Spell Save DC 12, Spell Attack +4. Slots: 4 × 1st, 2 × 2nd."
+            ],
+            PlayTips:
+            [
+                "Shield of Faith is a Bonus Action that gives +2 AC — cast it before your first attack for free AC all fight.",
+                "Divine Smite is your burst damage. Save spell slots for crits: on a critical hit, all smite dice are doubled!",
+                "Sacred Flame (cantrip) uses DEX save DC 12 — use it when you can't close in or need a free ranged option.",
+                "Aid before combat is a free +5 HP for up to 3 allies — cast it when you know a fight is coming.",
+                "Lay on Hands can stabilize a downed ally for just 1 HP — a lifesaver at any point in the fight.",
+                "Aura of Protection gives every nearby ally your CHA modifier on saves — stay close to the party.",
+                "Heroic Inspiration (Human feature): Once per long rest, reroll any die roll — save it for a critical failed save."
+            ],
+            SpellSlots:
+            [
+                new("1st Level", 4),
+                new("2nd Level", 2),
+            ]
+        ),
+        // ── Bren Gunning the Druid ───────────────────────────────────────────
+        [new Guid("a1000000-0000-0000-0000-000000000009")] = new(
+            Race: "Forest Gnome",
+            Background: "Custom",
+            SavingThrows: ["Intelligence +5", "Wisdom +5"],
+            ProficientSkills: ["Nature +7", "Perception +5", "Sleight of Hand +4", "Stealth +4"],
+            Defenses:
+            [
+                "Gnome Cunning: Advantage on INT, WIS, and CHA saving throws against magic",
+                "Darkvision 60 ft.",
+                "Wild Shape grants 5 temporary HP each time you transform"
+            ],
+            ClassFeatures:
+            [
+                "Wild Shape (2/long rest, regain 1 on short rest): Bonus Action to transform into a Beast form (max CR 1/2, no fly) for 2 hours. Gain 5 temp HP; can't cast spells while shifted.",
+                "Spellcasting (WIS-based): Spell Save DC 13, Spell Attack +5. You prepare from the entire Druid list — slots: 4 × 1st, 3 × 2nd, 2 × 3rd.",
+                "Circle of the Land — Land's Aid (expend Wild Shape): 10 ft. sphere within 60 ft., each enemy makes a DC 13 CON save for 2d6 necrotic; one ally heals 2d6.",
+                "Wild Resurgence: Spend a spell slot to regain a Wild Shape use, or once per long rest expend Wild Shape for a 1st-level slot.",
+                "Wild Companion: Expend a spell slot or Wild Shape use to cast Find Familiar.",
+                "Druidic: You always have Speak with Animals prepared and can leave hidden Druidic messages."
+            ],
+            PlayTips:
+            [
+                "Your CON is only 9 (−1) and HP is 23 — you are fragile. Stay at range and let the front line tank.",
+                "Poison Spray is your best cantrip: a ranged spell attack (+5) for 2d12 poison — huge cantrip damage at 30 ft.",
+                "Moonbeam is your bread-and-butter 2nd-level spell: move the beam each turn (Bonus Action) to hit enemies for 2d10 radiant on a CON save.",
+                "Call Lightning (3rd) lets you blast 3d10 for free every turn for 10 minutes — set it up early in a long fight.",
+                "Thunderwave pushes enemies away on a failed CON DC 13 save — great panic button if something closes on you.",
+                "Healing Word is a Bonus Action heal at 60 ft. — use it to pick up a downed ally without losing your action.",
+                "Wild Shape is an escape hatch: transform for 5 temp HP and a fresh stat block when things go bad, then drop it to resume casting.",
+                "Concentration matters — Moonbeam, Call Lightning, and Faerie Fire all need it, so you can only run one at a time. Protect your Concentration."
+            ],
+            SpellSlots:
+            [
+                new("1st Level", 4),
+                new("2nd Level", 3),
+                new("3rd Level", 2),
+            ]
         ),
     };
 }

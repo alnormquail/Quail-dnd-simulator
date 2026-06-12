@@ -20,6 +20,7 @@ public enum AbilityScore { Strength, Dexterity, Constitution, Intelligence, Wisd
 public class CombatAction
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid? CharacterId { get; set; }
     public string Name { get; set; } = "Attack";
     public ActionType ActionType { get; set; } = ActionType.Attack;
 

@@ -103,6 +103,7 @@
                         <span class="roster-stats">❤️ @r.MaxHitPoints &nbsp;🛡️ @r.ArmorClass</span>
                     </div>
                     <div class="roster-actions">
+                        <a class="btn btn-sm btn-sheet" href="/characters/@r.Id" title="View character sheet">📚</a>
                         @if (!alreadyIn)
                         {
                             <button class="btn btn-sm btn-add" @onclick="() => Combat.AddFromRoster(r.Id)" title="Add to current encounter">+ Add</button>

@@ -1,4 +1,15 @@
 @inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Routing
+
+<nav class="app-nav">
+    <div class="nav-brand">⚔️ Quail Party Hub</div>
+    <div class="nav-links">
+        <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">⚔️ Combat</NavLink>
+        <NavLink class="nav-link" href="/characters">📚 Characters</NavLink>
+        <NavLink class="nav-link" href="/character-guide">📖 Guide</NavLink>
+        <NavLink class="nav-link" href="/phone-preview">📱 Phone</NavLink>
+    </div>
+</nav>
 
 <div class="layout-wrapper">
     @Body

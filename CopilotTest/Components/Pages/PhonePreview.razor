@@ -1,0 +1,67 @@
+@page "/phone-preview"
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+@rendermode InteractiveServer
+@inject CharacterService CharacterService
+
+<PageTitle>Phone Preview</PageTitle>
+
+<div class="app-container">
+    <header class="app-header">
+        <h1>📱 Phone Preview</h1>
+        <p class="subtitle">See how any page looks on an iPhone — the frame below is a live, interactive view</p>
+    </header>
+
+    <div class="phone-toolbar">
+        <div class="form-field">
+            <label>Page</label>
+            <select class="form-input" @bind="selectedUrl">
+                <option value="/">⚔️ Combat</option>
+                <option value="/characters">📚 Party Hub</option>
+                <option value="/character-guide">📖 Character Guide</option>
+                @foreach (var c in characters)
+                {
+                    <option value="@($"/characters/{c.Id}")">📄 @c.Name's Sheet</option>
+                }
+            </select>
+        </div>
+        <div class="form-field">
+            <label>Device</label>
+            <select class="form-input" @bind="selectedDevice">
+                <option value="se">iPhone SE (375×667)</option>
+                <option value="15">iPhone 15 (393×852)</option>
+                <option value="promax">iPhone 15 Pro Max (430×932)</option>
+            </select>
+        </div>
+        <button class="btn btn-action" @onclick="Reload">↻ Reload</button>
+    </div>
+
+    <div class="phone-stage">
+        <div class="phone-frame" style="width:@(Width + 24)px">
+            <div class="phone-notch"></div>
+            <iframe class="phone-screen"
+                    src="@($"{selectedUrl}?v={reloadToken}")"
+                    style="width:@(Width)px; height:@(Height)px"
+                    title="iPhone preview"></iframe>
+            <div class="phone-home-bar"></div>
+        </div>
+    </div>
+
+    <p class="phone-tip">💡 Everything inside the frame is the real app — you can tap, scroll, and use the trackers just like on a phone.</p>
+</div>
+
+@code {
+    private List<Character> characters = new();
+    private string selectedUrl = "/character-guide";
+    private string selectedDevice = "15";
+    private int reloadToken = 0;
+
+    private int Width => selectedDevice switch { "se" => 375, "promax" => 430, _ => 393 };
+    private int Height => selectedDevice switch { "se" => 667, "promax" => 932, _ => 852 };
+
+    protected override void OnInitialized()
+    {
+        characters = CharacterService.GetPCs();
+    }
+
+    private void Reload() => reloadToken++;
+}

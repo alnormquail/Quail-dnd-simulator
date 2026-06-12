@@ -1,0 +1,157 @@
+@page "/characters"
+@using CopilotTest.Models
+@using CopilotTest.Services
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+@rendermode InteractiveServer
+@inject CharacterService CharacterService
+@inject NavigationManager Nav
+
+<div class="app-container">
+    <header class="app-header">
+        <h1>📚 Party Hub</h1>
+        <p class="subtitle">Character sheets, spells, inventory &amp; notes</p>
+    </header>
+
+    <div class="hub-toolbar">
+        <button class="btn btn-primary" @onclick="ShowNewCharacterForm">+ New Character</button>
+    </div>
+
+    @if (showNewForm)
+    {
+        <div class="card new-char-form">
+            <h3>New Character</h3>
+            <div class="form-row">
+                <label>Name *</label>
+                <input class="form-input" @bind="newName" placeholder="Character name" />
+            </div>
+            <div class="form-row">
+                <label>Class</label>
+                <input class="form-input" @bind="newClass" placeholder="Fighter, Wizard..." />
+            </div>
+            <div class="form-row">
+                <label>Level</label>
+                <input type="number" class="form-input small" @bind="newLevel" min="1" max="20" />
+            </div>
+            <div class="form-row">
+                <label>Race</label>
+                <input class="form-input" @bind="newRace" placeholder="Human, Elf..." />
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-primary" @onclick="CreateCharacter" disabled="@string.IsNullOrWhiteSpace(newName)">Create</button>
+                <button class="btn btn-reset" @onclick="() => showNewForm = false">Cancel</button>
+            </div>
+        </div>
+    }
+
+    @if (characters.Count == 0)
+    {
+        <div class="empty-state" style="margin-top: 40px; text-align: center; color: var(--text-dim);">
+            No characters yet. Create one or check the Combat page to load the party roster.
+        </div>
+    }
+    else
+    {
+        <div class="character-grid">
+            @foreach (var c in characters)
+            {
+                <div class="character-card" @onclick='() => Nav.NavigateTo($"/characters/{c.Id}")'>
+                    <div class="char-card-header">
+                        <span class="char-card-icon">@TypeIcon(c.Type)</span>
+                        <div>
+                            <div class="char-card-name">@c.Name</div>
+                            @if (!string.IsNullOrEmpty(c.ClassDisplay))
+                            {
+                                <div class="char-card-class">@c.ClassDisplay</div>
+                            }
+                            @if (!string.IsNullOrEmpty(c.Race))
+                            {
+                                <div class="char-card-race">@c.Race</div>
+                            }
+                        </div>
+                    </div>
+                    <div class="char-card-stats">
+                        <div class="char-stat-box" title="Max HP">
+                            <span class="char-stat-val">@c.MaxHitPoints</span>
+                            <span class="char-stat-lbl">HP</span>
+                        </div>
+                        <div class="char-stat-box" title="Armor Class">
+                            <span class="char-stat-val">@c.ArmorClass</span>
+                            <span class="char-stat-lbl">AC</span>
+                        </div>
+                        <div class="char-stat-box" title="Speed">
+                            <span class="char-stat-val">@c.Speed</span>
+                            <span class="char-stat-lbl">Spd</span>
+                        </div>
+                        <div class="char-stat-box" title="Passive Perception">
+                            <span class="char-stat-val">@c.PassivePerception</span>
+                            <span class="char-stat-lbl">PP</span>
+                        </div>
+                    </div>
+                    <div class="char-card-footer">
+                        @if (c.SpellSlots.Any())
+                        {
+                            <span class="char-tag">✨ Caster</span>
+                        }
+                        @if (c.IsBarbarianClass)
+                        {
+                            <span class="char-tag">🔥 Rage ×@c.RageUsesPerDay</span>
+                        }
+                        <span class="char-tag-link">View Sheet →</span>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<Character> characters = new();
+    private bool showNewForm = false;
+    private string newName = "";
+    private string newClass = "";
+    private int newLevel = 1;
+    private string newRace = "";
+
+    protected override void OnInitialized()
+    {
+        LoadCharacters();
+    }
+
+    private void LoadCharacters() => characters = CharacterService.GetAll();
+
+    private void ShowNewCharacterForm()
+    {
+        newName = "";
+        newClass = "";
+        newLevel = 1;
+        newRace = "";
+        showNewForm = true;
+    }
+
+    private void CreateCharacter()
+    {
+        if (string.IsNullOrWhiteSpace(newName)) return;
+        var c = new Character
+        {
+            Name             = newName.Trim(),
+            CharacterClass   = newClass.Trim(),
+            CharacterLevel   = newLevel,
+            Race             = newRace.Trim(),
+            Type             = CombatantType.PC,
+            MaxHitPoints     = 10,
+            ArmorClass       = 10,
+            ProficiencyBonus = newLevel switch { <= 4 => 2, <= 8 => 3, <= 12 => 4, <= 16 => 5, _ => 6 }
+        };
+        CharacterService.Create(c);
+        showNewForm = false;
+        Nav.NavigateTo($"/characters/{c.Id}");
+    }
+
+    private string TypeIcon(CombatantType t) => t switch
+    {
+        CombatantType.PC      => "⚔️",
+        CombatantType.NPC     => "🧙",
+        CombatantType.Monster => "👹",
+        _                     => "?"
+    };
+}

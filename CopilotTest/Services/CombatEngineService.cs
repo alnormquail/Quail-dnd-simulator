@@ -5,7 +5,9 @@ namespace CopilotTest.Services;
 public class CombatEngineService
 {
     private readonly Random _random = new();
+    private readonly CharacterService _characterService;
     private List<Combatant> _lastEncounterMonsters = new();
+
     public List<Combatant> Combatants { get; private set; } = new();
     public List<CombatLog> Log { get; private set; } = new();
     public CombatState State { get; private set; } = CombatState.Setup;
@@ -17,19 +19,23 @@ public class CombatEngineService
         Combatants.Where(c => !c.IsDead && !(c.Type != CombatantType.PC && c.CurrentHitPoints <= 0)).ToList();
 
     /// <summary>
-    /// Persisted roster of PC/NPC characters that survive across encounter resets.
-    /// Each entry is a snapshot (template) — a fresh copy is made each encounter.
+    /// Persistent roster of PC/NPC characters, loaded from the database.
+    /// Each entry is a Character (template) — ToCombatant() is called to create encounter copies.
     /// </summary>
-    public List<Combatant> SavedRoster { get; private set; } = new();
+    public List<Character> SavedRoster { get; private set; } = new();
 
-    public CombatEngineService()
+    public CombatEngineService(CharacterService characterService)
     {
-        // Pre-seed the roster with the known player characters
-        foreach (var c in PreloadedCharacters.All)
-            SavedRoster.Add(CloneFresh(c));
+        _characterService = characterService;
+        RefreshRosterFromDb();
     }
 
-    // Events for UI refresh
+    public void RefreshRosterFromDb()
+    {
+        SavedRoster = _characterService.GetPCs();
+        OnStateChanged?.Invoke();
+    }
+
     public event Action? OnStateChanged;
 
     public void AddCombatant(Combatant combatant)
@@ -44,49 +50,39 @@ public class CombatEngineService
         OnStateChanged?.Invoke();
     }
 
-    /// <summary>
-    /// Save a PC or NPC to the persistent roster (stored as a template clone).
-    /// </summary>
     public void SaveToRoster(Combatant combatant)
     {
         if (combatant.Type == CombatantType.Monster) return;
         if (SavedRoster.Any(r => r.Id == combatant.Id)) return;
-        SavedRoster.Add(CloneFresh(combatant));
-        OnStateChanged?.Invoke();
+        var character = Character.FromCombatant(combatant);
+        _characterService.Create(character);
+        RefreshRosterFromDb();
     }
 
-    /// <summary>
-    /// Remove a character from the persistent roster by their original ID.
-    /// </summary>
     public void RemoveFromRoster(Guid id)
     {
-        SavedRoster.RemoveAll(r => r.Id == id);
-        OnStateChanged?.Invoke();
+        _characterService.Delete(id);
+        Combatants.RemoveAll(c => c.Id == id);
+        RefreshRosterFromDb();
     }
 
     public bool IsInRoster(Guid id) => SavedRoster.Any(r => r.Id == id);
 
-    /// <summary>
-    /// Add a fresh copy of a saved roster character into the current encounter
-    /// (restores full HP, clears conditions, keeps the same original Id so IsInRoster still matches).
-    /// </summary>
     public void AddFromRoster(Guid rosterId)
     {
         var template = SavedRoster.FirstOrDefault(r => r.Id == rosterId);
         if (template == null) return;
-        if (Combatants.Any(c => c.Id == rosterId)) return; // already present
-        Combatants.Add(CloneFresh(template));
+        if (Combatants.Any(c => c.Id == rosterId)) return;
+        Combatants.Add(template.ToCombatant());
         OnStateChanged?.Invoke();
     }
 
-    /// <summary>
-    /// Start a new encounter: keep the saved roster (restored to full HP), clear monsters and log.
-    /// </summary>
     public void NewEncounter()
     {
+        RefreshRosterFromDb();
         Combatants.Clear();
         foreach (var template in SavedRoster)
-            Combatants.Add(CloneFresh(template));
+            Combatants.Add(template.ToCombatant());
         Log.Clear();
         State = CombatState.Setup;
         CurrentRound = 0;
@@ -94,17 +90,13 @@ public class CombatEngineService
         OnStateChanged?.Invoke();
     }
 
-    /// <summary>
-    /// Retry the last encounter: restore the roster PCs to full HP and replay
-    /// the same monsters, then immediately start combat.
-    /// </summary>
     public void RetryCombat()
     {
         if (_lastEncounterMonsters.Count == 0) return;
 
         Combatants.Clear();
         foreach (var template in SavedRoster)
-            Combatants.Add(CloneFresh(template));
+            Combatants.Add(template.ToCombatant());
         foreach (var monsterTemplate in _lastEncounterMonsters)
             Combatants.Add(CloneFresh(monsterTemplate));
         Log.Clear();
@@ -115,11 +107,6 @@ public class CombatEngineService
         StartCombat();
     }
 
-    /// <summary>
-    /// Activate Barbarian Rage for a combatant: costs one rage use, applies the
-    /// rage damage bonus and grants resistance to Slashing/Piercing/Bludgeoning
-    /// damage (handled in ApplyDamage).  Must be called on the combatant's turn.
-    /// </summary>
     public void EnterRage(Combatant combatant)
     {
         if (!combatant.IsBarbarianClass) return;
@@ -136,7 +123,6 @@ public class CombatEngineService
         OnStateChanged?.Invoke();
     }
 
-    /// <summary>End all active rages (called at combat end).</summary>
     private void EndAllRages()
     {
         foreach (var c in Combatants.Where(c => c.IsRaging))
@@ -146,9 +132,6 @@ public class CombatEngineService
         }
     }
 
-    /// <summary>
-    /// Deep-clone a combatant, resetting combat state (HP restored, conditions cleared, new Guid preserved from original).
-    /// </summary>
     private static Combatant CloneFresh(Combatant src) => new()
     {
         Id = src.Id,
@@ -159,7 +142,7 @@ public class CombatEngineService
         Strength = src.Strength, Dexterity = src.Dexterity, Constitution = src.Constitution,
         Intelligence = src.Intelligence, Wisdom = src.Wisdom, Charisma = src.Charisma,
         MaxHitPoints = src.MaxHitPoints,
-        CurrentHitPoints = src.MaxHitPoints, // restore full HP
+        CurrentHitPoints = src.MaxHitPoints,
         TemporaryHitPoints = 0,
         ArmorClass = src.ArmorClass,
         Speed = src.Speed,
@@ -170,8 +153,8 @@ public class CombatEngineService
         IsBarbarianClass = src.IsBarbarianClass,
         RageBonus = src.RageBonus,
         RageUsesPerDay = src.RageUsesPerDay,
-        RageUsesRemaining = src.RageUsesPerDay, // refresh uses
-        IsRaging = false,                        // never start raging
+        RageUsesRemaining = src.RageUsesPerDay,
+        IsRaging = false,
         Actions = src.Actions.Select(a => new CombatAction
         {
             Id = a.Id,
@@ -179,7 +162,7 @@ public class CombatEngineService
             DamageDice = a.DamageDice, DamageBonus = a.DamageBonus, DamageType = a.DamageType,
             SaveDC = a.SaveDC, SaveAbility = a.SaveAbility, SpellLevel = a.SpellLevel,
             Range = a.Range, Description = a.Description,
-            UsesPerDay = a.UsesPerDay, UsesRemaining = a.UsesPerDay  // refresh uses
+            UsesPerDay = a.UsesPerDay, UsesRemaining = a.UsesPerDay
         }).ToList()
     };
 
@@ -192,13 +175,11 @@ public class CombatEngineService
         CurrentRound = 1;
         CurrentTurnIndex = 0;
 
-        // Snapshot current monsters so RetryCombat() can replay them
         _lastEncounterMonsters = Combatants
             .Where(c => c.Type == CombatantType.Monster)
             .Select(c => CloneFresh(c))
             .ToList();
 
-        // Roll initiative for all combatants
         foreach (var c in Combatants)
         {
             var roll = RollD20();
@@ -206,11 +187,10 @@ public class CombatEngineService
             c.Initiative = roll + c.DexterityModifier;
         }
 
-        // Sort by initiative descending (ties broken by dex modifier)
         Combatants = Combatants
             .OrderByDescending(c => c.Initiative)
             .ThenByDescending(c => c.DexterityModifier)
-            .ThenBy(_ => Guid.NewGuid()) // random tiebreaker
+            .ThenBy(_ => Guid.NewGuid())
             .ToList();
 
         Log.Clear();
@@ -234,9 +214,6 @@ public class CombatEngineService
         OnStateChanged?.Invoke();
     }
 
-    /// <summary>
-    /// Simulate one full round of combat (all combatants take a turn).
-    /// </summary>
     public void SimulateRound()
     {
         if (State != CombatState.Active) return;
@@ -246,14 +223,13 @@ public class CombatEngineService
 
         AddLog(CurrentRound, "Combat", $"━━━ Round {CurrentRound} ━━━", LogEntryType.RoundStart);
 
-        foreach (var attacker in active.ToList()) // snapshot to avoid mutation issues
+        foreach (var attacker in active.ToList())
         {
             if (attacker.IsDead || (attacker.Type != CombatantType.PC && attacker.CurrentHitPoints <= 0))
                 continue;
 
             if (attacker.Type == CombatantType.PC && attacker.IsUnconscious)
             {
-                // Death saving throw
                 PerformDeathSave(attacker);
                 continue;
             }
@@ -267,7 +243,6 @@ public class CombatEngineService
                 continue;
             }
 
-            // Pick a target: enemies of this combatant
             var target = PickTarget(attacker);
             if (target == null)
             {
@@ -278,7 +253,6 @@ public class CombatEngineService
             PerformAttack(attacker, target);
         }
 
-        // Check for end condition
         if (CheckCombatEnd())
         {
             EndAllRages();
@@ -295,9 +269,6 @@ public class CombatEngineService
         OnStateChanged?.Invoke();
     }
 
-    /// <summary>
-    /// Simulate a single combatant's turn.
-    /// </summary>
     public void SimulateTurn()
     {
         if (State != CombatState.Active) return;
@@ -326,15 +297,10 @@ public class CombatEngineService
             AddLog(CurrentRound, attacker.Name, $"is incapacitated and skips their turn.", LogEntryType.Condition);
         }
 
-        // Advance turn
         AdvanceTurn(active);
-
         OnStateChanged?.Invoke();
     }
 
-    /// <summary>
-    /// Manually execute a specific action for the current combatant, then advance the turn.
-    /// </summary>
     public void ExecuteActionForCurrent(CombatAction action)
     {
         if (State != CombatState.Active) return;
@@ -349,7 +315,6 @@ public class CombatEngineService
         }
         else
         {
-            // Consume limited use
             if (action.IsLimited)
                 action.UsesRemaining = Math.Max(0, action.UsesRemaining - 1);
 
@@ -372,9 +337,6 @@ public class CombatEngineService
         OnStateChanged?.Invoke();
     }
 
-    /// <summary>
-    /// Returns the valid targets the current combatant can attack (for UI display).
-    /// </summary>
     public List<Combatant> GetCurrentTargets()
     {
         var active = ActiveCombatants;
@@ -385,9 +347,6 @@ public class CombatEngineService
         return Combatants.Where(c => c.Type == CombatantType.Monster && !c.IsDead && c.CurrentHitPoints > 0).ToList();
     }
 
-    /// <summary>
-    /// Manually execute a specific action against a specific target, then advance the turn.
-    /// </summary>
     public void ExecuteActionAgainstTarget(CombatAction action, Combatant target)
     {
         if (State != CombatState.Active) return;
@@ -396,7 +355,6 @@ public class CombatEngineService
 
         var attacker = active[CurrentTurnIndex % active.Count];
 
-        // Consume limited use
         if (action.IsLimited)
             action.UsesRemaining = Math.Max(0, action.UsesRemaining - 1);
 
@@ -418,9 +376,6 @@ public class CombatEngineService
         OnStateChanged?.Invoke();
     }
 
-    /// <summary>
-    /// Shared turn-advance logic: increment index, check end of round / end of combat.
-    /// </summary>
     private void AdvanceTurn(List<Combatant> active)
     {
         CurrentTurnIndex++;
@@ -446,14 +401,12 @@ public class CombatEngineService
     private void PerformAttack(Combatant attacker, Combatant target)
     {
         var action = ChooseAction(attacker, target);
-
         if (action == null)
         {
             AddLog(CurrentRound, attacker.Name, "has no available actions!", LogEntryType.Info);
             return;
         }
 
-        // Consume limited use
         if (action.IsLimited)
             action.UsesRemaining = Math.Max(0, action.UsesRemaining - 1);
 
@@ -472,25 +425,16 @@ public class CombatEngineService
         }
     }
 
-    /// <summary>
-    /// Strategic action selection:
-    /// - Finishing blow: use highest-damage available action on a near-dead target
-    /// - Wounded caster: conserve spell slots when badly hurt, use cantrips instead
-    /// - Spell efficiency: prefer higher-level limited spells unless HP is low
-    /// - Cantrips freely; basic attacks as fallback
-    /// - Randomize slightly among near-equal options to add variety
-    /// </summary>
     private CombatAction? ChooseAction(Combatant attacker, Combatant target)
     {
         var usable = attacker.Actions.Where(a => a.CanUse).ToList();
         if (usable.Count == 0) return null;
 
-        double hpPct      = attacker.MaxHitPoints > 0 ? (double)attacker.CurrentHitPoints / attacker.MaxHitPoints : 1.0;
+        double hpPct       = attacker.MaxHitPoints > 0 ? (double)attacker.CurrentHitPoints / attacker.MaxHitPoints : 1.0;
         double targetHpPct = target.MaxHitPoints > 0 ? (double)target.CurrentHitPoints / target.MaxHitPoints : 1.0;
         bool attIsHurt     = hpPct < 0.4;
         bool targetIsLow   = targetHpPct < 0.25;
 
-        // Estimate expected damage for an action (avg dice roll + bonus)
         double ExpectedDmg(CombatAction a)
         {
             var m = System.Text.RegularExpressions.Regex.Match(a.DamageDice, @"(\d+)d(\d+)");
@@ -499,14 +443,9 @@ public class CombatEngineService
             return avg + a.DamageBonus;
         }
 
-        // 1. Finishing blow — if target is nearly dead, pick the highest-damage usable action
         if (targetIsLow)
-        {
-            var finisher = usable.OrderByDescending(ExpectedDmg).First();
-            return finisher;
-        }
+            return usable.OrderByDescending(ExpectedDmg).First();
 
-        // 2. If attacker is badly hurt, conserve limited resources — use cantrips/basic attacks
         if (attIsHurt)
         {
             var free = usable.Where(a => !a.IsLimited).ToList();
@@ -514,36 +453,24 @@ public class CombatEngineService
                 return free.OrderByDescending(ExpectedDmg).First();
         }
 
-        // 3. Prefer highest-level limited-use spell, but add some randomness to avoid repetition
         var limitedSpells = usable.Where(a => a.IsLimited && a.SpellLevel > 0).ToList();
-        if (limitedSpells.Count > 0)
+        if (limitedSpells.Count > 0 && _random.NextDouble() < 0.70)
         {
-            // 70% chance to use a limited spell; 30% chance to use a free action for variety
-            if (_random.NextDouble() < 0.70)
-            {
-                var maxLevel = limitedSpells.Max(a => a.SpellLevel);
-                // Among top-level spells, pick randomly
-                var topSpells = limitedSpells.Where(a => a.SpellLevel == maxLevel).ToList();
-                return topSpells[_random.Next(topSpells.Count)];
-            }
+            var maxLevel = limitedSpells.Max(a => a.SpellLevel);
+            var topSpells = limitedSpells.Where(a => a.SpellLevel == maxLevel).ToList();
+            return topSpells[_random.Next(topSpells.Count)];
         }
 
-        // 4. Among free actions (cantrips, basic attacks), pick by expected damage with some variance
         var freeActions = usable.Where(a => !a.IsLimited).OrderByDescending(ExpectedDmg).ToList();
         if (freeActions.Count > 1)
-        {
-            // Pick from top 2 options randomly to add variety
             return freeActions[_random.Next(Math.Min(2, freeActions.Count))];
-        }
         if (freeActions.Count == 1) return freeActions[0];
 
-        // 5. Final fallback: any usable action
         return usable.OrderByDescending(ExpectedDmg).First();
     }
 
     private void PerformAttackRoll(Combatant attacker, Combatant target, CombatAction action)
     {
-        // Apply rage damage bonus to melee weapon attacks
         int rageDmgBonus = (attacker.IsRaging && attacker.RageBonus > 0
                             && action.ActionType == ActionType.Attack) ? attacker.RageBonus : 0;
 
@@ -584,7 +511,6 @@ public class CombatEngineService
         AddLog(CurrentRound, attacker.Name,
             $"casts {action.DisplayName} ({spellDesc}) — DC {action.SaveDC} {action.SaveAbility} save: {target.Name} rolled {saveRoll}+{saveBonus}={totalSave} → {(saved ? "Saved! Half damage" : "Failed save!")}",
             LogEntryType.Hit);
-
         AddLog(CurrentRound, target.Name,
             $"takes {actualDamage}{dmgType} damage from {action.Name} ({diceDesc}{(saved ? ", halved" : "")})",
             LogEntryType.Damage);
@@ -631,7 +557,6 @@ public class CombatEngineService
         return result;
     }
 
-    // Legacy overload for backwards compat
     public AttackResult ResolveAttack(Combatant attacker, Combatant target)
     {
         if (attacker.PrimaryAction != null)
@@ -641,14 +566,12 @@ public class CombatEngineService
 
     private void ApplyDamage(Combatant target, int damage, DamageType damageType = DamageType.None)
     {
-        // Rage grants resistance to Slashing, Piercing, Bludgeoning damage
         if (target.IsRaging && damageType is DamageType.Slashing or DamageType.Piercing or DamageType.Bludgeoning)
         {
             damage = Math.Max(1, damage / 2);
             AddLog(CurrentRound, target.Name, $"🔥 Rage resistance halves physical damage → {damage}", LogEntryType.Info);
         }
 
-        // First consume temporary HP
         if (target.TemporaryHitPoints > 0)
         {
             var absorbed = Math.Min(target.TemporaryHitPoints, damage);
@@ -662,13 +585,10 @@ public class CombatEngineService
             $"takes {damage} damage — {target.HpDisplay} HP remaining. {target.StatusDisplay}",
             LogEntryType.Damage);
 
-        // Check for death/unconscious
         if (target.CurrentHitPoints <= 0)
         {
             if (target.Type == CombatantType.PC)
-            {
                 AddLog(CurrentRound, target.Name, $"😵 falls unconscious and must make death saving throws!", LogEntryType.Kill);
-            }
             else
             {
                 target.IsDead = true;
@@ -730,13 +650,10 @@ public class CombatEngineService
         if (candidates.Count == 0) return null;
         if (candidates.Count == 1) return candidates[0];
 
-        // Priority 1: finish off anyone below 25% HP (don't let them attack again)
         var nearDead = candidates.Where(c => c.MaxHitPoints > 0 && (double)c.CurrentHitPoints / c.MaxHitPoints < 0.25).ToList();
         if (nearDead.Count > 0)
             return nearDead.OrderBy(c => c.CurrentHitPoints).First();
 
-        // Priority 2: focus the most dangerous target — highest primary attack bonus
-        // With a 50% chance to add some tactical variance and spread damage
         if (_random.NextDouble() < 0.50)
         {
             return candidates
@@ -745,7 +662,6 @@ public class CombatEngineService
                 .First();
         }
 
-        // 50% of the time pick the lowest-HP target for the focus-fire feeling
         return candidates.OrderBy(c => c.CurrentHitPoints).First();
     }
 
@@ -760,14 +676,12 @@ public class CombatEngineService
 
     private (int total, string desc) RollDice(string diceExpr, bool doubled = false)
     {
-        // Parse expressions like "2d6+3", "1d8", "3d6"
         try
         {
             diceExpr = diceExpr.Trim().ToLower();
             int total = 0;
             var rolls = new List<int>();
 
-            // Handle compound expressions like "2d6+1d4"
             var parts = diceExpr.Split('+');
             foreach (var part in parts)
             {
@@ -815,24 +729,24 @@ public class CombatEngineService
 
     public string GetEntryIcon(LogEntryType type) => type switch
     {
-        LogEntryType.Hit => "⚔️",
-        LogEntryType.Miss => "🛡️",
-        LogEntryType.Damage => "🩸",
-        LogEntryType.Kill => "💀",
+        LogEntryType.Hit       => "⚔️",
+        LogEntryType.Miss      => "🛡️",
+        LogEntryType.Damage    => "🩸",
+        LogEntryType.Kill      => "💀",
         LogEntryType.DeathSave => "🎲",
         LogEntryType.Condition => "⚠️",
-        LogEntryType.RoundStart => "📜",
-        _ => "ℹ️"
+        LogEntryType.RoundStart=> "📜",
+        _                      => "ℹ️"
     };
 
     public string GetEntryClass(LogEntryType type) => type switch
     {
-        LogEntryType.Hit => "log-hit",
-        LogEntryType.Miss => "log-miss",
-        LogEntryType.Damage => "log-damage",
-        LogEntryType.Kill => "log-kill",
+        LogEntryType.Hit       => "log-hit",
+        LogEntryType.Miss      => "log-miss",
+        LogEntryType.Damage    => "log-damage",
+        LogEntryType.Kill      => "log-kill",
         LogEntryType.DeathSave => "log-death-save",
-        LogEntryType.RoundStart => "log-round",
-        _ => "log-info"
+        LogEntryType.RoundStart=> "log-round",
+        _                      => "log-info"
     };
 }
