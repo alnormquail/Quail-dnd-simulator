@@ -2597,3 +2597,8 @@ button.item-equip-dot { cursor: pointer; }
 .btn-play-card { text-decoration: none; display: inline-flex; align-items: center; }
 a.char-tag-link { text-decoration: none; }
 a.char-tag-link:hover { color: var(--gold); }
+
+.spellcast-chip.over-limit { border-color: var(--red); }
+.spellcast-chip.over-limit .spellcast-val { color: var(--red); }
+.spell-limit-line { display: flex; gap: 18px; margin-bottom: 10px; font-size: 13px; }
+.spell-limit-line .over-limit { color: var(--red); }

@@ -218,10 +218,21 @@ else
             @* Spellcasting summary *@
             @if (SpellcastingAbility() is { } castStat)
             {
+                var limits = Spellcasting.GetLimits(character.CharacterClass, character.CharacterLevel);
+                var cantripCount = character.Spells.Count(s => s.Level == 0);
+                var spellCount = character.Spells.Count(s => s.Level > 0);
                 <div class="spellcast-summary">
                     <div class="spellcast-chip"><span class="spellcast-lbl">Ability</span><span class="spellcast-val">@AbilityShort(castStat)</span></div>
                     <div class="spellcast-chip"><span class="spellcast-lbl">Spell Save DC</span><span class="spellcast-val">@(8 + character.ProficiencyBonus + character.GetAbilityModifier(castStat))</span></div>
                     <div class="spellcast-chip"><span class="spellcast-lbl">Spell Attack</span><span class="spellcast-val">@FormatMod(character.ProficiencyBonus + character.GetAbilityModifier(castStat))</span></div>
+                    @if (limits.Cantrips > 0)
+                    {
+                        <div class="spellcast-chip @(cantripCount > limits.Cantrips ? "over-limit" : "")"><span class="spellcast-lbl">Cantrips Known</span><span class="spellcast-val">@cantripCount / @limits.Cantrips</span></div>
+                    }
+                    @if (limits.Prepared > 0)
+                    {
+                        <div class="spellcast-chip @(spellCount > limits.Prepared ? "over-limit" : "")"><span class="spellcast-lbl">Spells Prepared</span><span class="spellcast-val">@spellCount / @limits.Prepared</span></div>
+                    }
                 </div>
             }
 
@@ -281,6 +292,7 @@ else
             {
                 var libMaxLvl = Math.Max(SpellLibrary.MaxSpellLevel(character.CharacterClass, character.CharacterLevel), 0);
                 <div class="library-panel">
+                    <div class="field-hint" style="margin-bottom:8px">Showing the <strong>@character.CharacterClass</strong> spell list, up to level @libMaxLvl.</div>
                     <div class="picker-controls">
                         <input class="form-input" placeholder="Search spells…" value="@pickerQuery"
                                @oninput="e => pickerQuery = e.Value?.ToString() ?? string.Empty" />
@@ -852,10 +864,19 @@ else
                 {
                     var maxSpellLvl = SpellLibrary.MaxSpellLevel(character.CharacterClass, newLevel);
                     var knownNames = character.Spells.Select(s => s.Name).Concat(pendingSpells.Select(s => s.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    var newLimits = Spellcasting.GetLimits(character.CharacterClass, newLevel);
+                    var totalCantrips = character.Spells.Count(s => s.Level == 0) + pendingSpells.Count(s => s.Level == 0);
+                    var totalSpells = character.Spells.Count(s => s.Level > 0) + pendingSpells.Count(s => s.Level > 0);
                     <div class="wizard-body">
                         <p>At level @newLevel you can cast spells up to <strong>level @maxSpellLvl</strong>.
-                           Pick new spells from the library — click a spell to read it, then <strong>+ Add</strong>.
-                           (How many you may learn depends on your class; your DM has the final say.)</p>
+                           Pick new spells from your class list below.</p>
+                        @if (newLimits.IsCaster)
+                        {
+                            <div class="spell-limit-line">
+                                @if (newLimits.Cantrips > 0) { <span class="@(totalCantrips > newLimits.Cantrips ? "over-limit" : "")">Cantrips: <strong>@totalCantrips / @newLimits.Cantrips</strong></span> }
+                                @if (newLimits.Prepared > 0) { <span class="@(totalSpells > newLimits.Prepared ? "over-limit" : "")">Spells prepared: <strong>@totalSpells / @newLimits.Prepared</strong></span> }
+                            </div>
+                        }
 
                         @if (pendingSpells.Count > 0)
                         {
