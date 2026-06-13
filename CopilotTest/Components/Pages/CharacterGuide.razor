@@ -55,6 +55,54 @@
                 }
             </div>
 
+            <!-- On Your Turn (action economy) -->
+            <div class="guide-section">
+                <h3>⏱️ On Your Turn</h3>
+                <div class="turn-grid">
+                    <div class="turn-col turn-action">
+                        <div class="turn-col-head">⚔️ Action <span class="turn-col-sub">one per turn</span></div>
+                        @foreach (var t in TurnItemsFor(Selected, guide, "Action"))
+                        {
+                            <div class="turn-item @(t.Highlight ? "feat" : "")"><span class="turn-name">@t.Name</span><span class="turn-detail">@t.Detail</span></div>
+                        }
+                        <div class="turn-item muted"><span class="turn-name">Standard</span><span class="turn-detail">Dash · Disengage · Dodge · Help · Hide · Ready · Search · Shove · Grapple</span></div>
+                    </div>
+                    <div class="turn-col turn-bonus">
+                        <div class="turn-col-head">⚡ Bonus Action <span class="turn-col-sub">one per turn</span></div>
+                        @{ var bonus = TurnItemsFor(Selected, guide, "Bonus Action"); }
+                        @if (bonus.Any())
+                        {
+                            @foreach (var t in bonus)
+                            {
+                                <div class="turn-item @(t.Highlight ? "feat" : "")"><span class="turn-name">@t.Name</span><span class="turn-detail">@t.Detail</span></div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="turn-item muted"><span class="turn-detail">Nothing special — see class features.</span></div>
+                        }
+                    </div>
+                    <div class="turn-col turn-reaction">
+                        <div class="turn-col-head">🛡️ Reaction <span class="turn-col-sub">one per round</span></div>
+                        @foreach (var t in TurnItemsFor(Selected, guide, "Reaction"))
+                        {
+                            <div class="turn-item @(t.Highlight ? "feat" : "")"><span class="turn-name">@t.Name</span><span class="turn-detail">@t.Detail</span></div>
+                        }
+                        <div class="turn-item muted"><span class="turn-name">Opportunity Attack</span><span class="turn-detail">when an enemy leaves your reach</span></div>
+                    </div>
+                    <div class="turn-col turn-move">
+                        <div class="turn-col-head">🦶 Movement &amp; Free <span class="turn-col-sub">@Selected.Speed ft</span></div>
+                        <div class="turn-item muted"><span class="turn-detail">Move up to @Selected.Speed ft (split around your action).</span></div>
+                        <div class="turn-item muted"><span class="turn-detail">Free: drop an item, speak, 1 free object interaction.</span></div>
+                        @{ var other = TurnItemsFor(Selected, guide, "Other"); }
+                        @foreach (var t in other)
+                        {
+                            <div class="turn-item @(t.Highlight ? "feat" : "")"><span class="turn-name">@t.Name</span><span class="turn-detail">@t.Detail</span></div>
+                        }
+                    </div>
+                </div>
+            </div>
+
             <!-- Session Tracker -->
             <div class="guide-section tracker-section">
                 <h3>🎲 Session Tracker</h3>
@@ -440,6 +488,58 @@
         _                               => c.CharismaModifier,   // bard, paladin, sorcerer, warlock
     };
 
+    // ── "On Your Turn" action-economy breakdown ──────────────────────────────
+    private record TurnItem(string Name, string Detail, bool Highlight = false);
+
+    /// <summary>Map a spell's casting time to an action-economy bucket.</summary>
+    private static string CastingBucket(string castingTime)
+    {
+        var ct = castingTime.ToLowerInvariant();
+        if (ct.Contains("bonus")) return "Bonus Action";
+        if (ct.Contains("reaction")) return "Reaction";
+        if (ct.Contains("action")) return "Action";
+        return "Other";
+    }
+
+    /// <summary>Build the per-bucket turn breakdown from weapons, spells, and class features.</summary>
+    private List<TurnItem> TurnItemsFor(Character c, CharacterGuideEntry guide, string bucket)
+    {
+        var items = new List<TurnItem>();
+
+        // Weapon attacks are the Attack action.
+        if (bucket == "Action")
+        {
+            foreach (var a in c.Actions.Where(a => a.ActionType == ActionType.Attack))
+            {
+                var dmg = string.IsNullOrEmpty(a.DamageDice) ? "" :
+                    $"{a.DamageDice}{(a.DamageBonus != 0 ? FormatBonus(a.DamageBonus) : "")} {a.DamageType}";
+                items.Add(new($"⚔ {a.DisplayName}", $"{FormatBonus(a.AttackBonus)} to hit · {dmg}".Trim(' ', '·')));
+            }
+        }
+
+        // Spells, bucketed by casting time. Enrich with save/attack from a matching action.
+        foreach (var s in c.Spells.Where(s => CastingBucket(s.CastingTime) == bucket).OrderBy(s => s.Level).ThenBy(s => s.Name))
+        {
+            var match = c.Actions.FirstOrDefault(a => a.Name == s.Name);
+            var lvl = s.Level == 0 ? "Cantrip" : $"L{s.Level}";
+            string detail;
+            if (match != null && match.SaveDC > 0)
+                detail = $"{lvl} · DC {match.SaveDC} {match.SaveAbility} · {match.DamageDice} {match.DamageType}".TrimEnd(' ', '·');
+            else if (match != null && match.AttackBonus != 0)
+                detail = $"{lvl} · {FormatBonus(match.AttackBonus)} · {match.DamageDice} {match.DamageType}".TrimEnd(' ', '·');
+            else
+                detail = $"{lvl} · {s.Range}".TrimEnd(' ', '·');
+            items.Add(new($"✦ {s.Name}", detail));
+        }
+
+        // Curated class-feature options.
+        if (guide.TurnExtras != null)
+            foreach (var t in guide.TurnExtras.Where(t => t.Category == bucket))
+                items.Add(new($"★ {t.Name}", t.Detail, Highlight: true));
+
+        return items;
+    }
+
     private static bool HasSpells(Character c) =>
         c.Actions.Any(a => a.ActionType is ActionType.Spell or ActionType.SpellAttack);
 
@@ -519,6 +619,9 @@
     private record SpellSlotTier(string Label, int Total);
     private record WildMagicData(string Intro, string[] Triggers, string[] SurgeExamples, string PlayTip);
 
+    /// <summary>A class-feature option on a character's turn (Category = Action / Bonus Action / Reaction).</summary>
+    private record TurnExtra(string Category, string Name, string Detail);
+
     private record CharacterGuideEntry(
         string Race,
         string Background,
@@ -529,13 +632,19 @@
         string[] PlayTips,
         SorceryPointsData? SorceryPoints = null,
         SpellSlotTier[]? SpellSlots = null,
-        WildMagicData? WildMagicInfo = null
+        WildMagicData? WildMagicInfo = null,
+        TurnExtra[]? TurnExtras = null
     );
 
     private static readonly Dictionary<Guid, CharacterGuideEntry> GuideData = new()
     {
         // ── Winnie Vale the Sorcerer ───────────────────────────────────────
         [new Guid("a1000000-0000-0000-0000-000000000004")] = new(
+            TurnExtras:
+            [
+                new("Bonus Action", "Innate Sorcery", "1-min buff, 2/long rest — +1 spell save DC & advantage on spell attacks"),
+                new("Bonus Action", "Font of Magic", "Convert Sorcery Points ↔ spell slots (5 SP/long rest)"),
+            ],
             Race: "High Elf",
             Background: "Noble",
             SavingThrows: ["Constitution +5", "Charisma +7"],
@@ -611,6 +720,11 @@
         ),
         // ── Kennyth the Paladin ───────────────────────────────────────────────
         [new Guid("a1000000-0000-0000-0000-000000000005")] = new(
+            TurnExtras:
+            [
+                new("Bonus Action", "Lay on Hands", "Heal from a 25 HP/long-rest pool (touch)"),
+                new("Action", "Channel Divinity: Sacred Weapon", "+CHA to weapon attacks & emit light, 1 min (2/long rest)"),
+            ],
             Race: "Gnome",
             Background: "Custom",
             SavingThrows: ["Wisdom +4", "Charisma +3"],
@@ -648,6 +762,11 @@
         ),
         // ── Boan Strickler the Fighter ──────────────────────────────────────
         [new Guid("a1000000-0000-0000-0000-000000000006")] = new(
+            TurnExtras:
+            [
+                new("Bonus Action", "Second Wind", "Heal 1d10+5 (3/long rest)"),
+                new("Action", "Action Surge", "Take one extra action this turn (1/short rest)"),
+            ],
             Race: "Gnome",
             Background: "Folk Hero",
             SavingThrows: ["Strength +6", "Constitution +4"],
@@ -678,6 +797,11 @@
         ),
         // ── Gideon Silverspoon the Bard ──────────────────────────────────────
         [new Guid("a1000000-0000-0000-0000-000000000007")] = new(
+            TurnExtras:
+            [
+                new("Bonus Action", "Bardic Inspiration", "Give an ally a d8 to add to a roll (3/short rest)"),
+                new("Reaction", "Cutting Words", "Subtract a Bardic Inspiration die from an enemy's attack, check, or damage"),
+            ],
             Race: "Half-Elf",
             Background: "Criminal",
             SavingThrows: ["Dexterity +5", "Charisma +6"],
@@ -717,6 +841,11 @@
         ),
         // ── Job Goodhammer the Paladin ───────────────────────────────────────
         [new Guid("a1000000-0000-0000-0000-000000000008")] = new(
+            TurnExtras:
+            [
+                new("Bonus Action", "Lay on Hands", "Heal from a 25 HP/long-rest pool (touch)"),
+                new("Bonus Action", "Channel Divinity: Fury of the Tides", "On a hit, push the target 10 ft for bonus damage (2/long rest)"),
+            ],
             Race: "Human",
             Background: "Acolyte",
             SavingThrows: ["Wisdom +3", "Charisma +4"],
@@ -753,6 +882,11 @@
         ),
         // ── Bren Gunning the Druid ───────────────────────────────────────────
         [new Guid("a1000000-0000-0000-0000-000000000009")] = new(
+            TurnExtras:
+            [
+                new("Bonus Action", "Wild Shape", "Transform into a Beast for 2 hrs, +5 temp HP (2/long rest)"),
+                new("Action", "Land's Aid", "Expend Wild Shape: 10-ft sphere, DC 13 CON, 2d6 necrotic; heal one ally 2d6"),
+            ],
             Race: "Forest Gnome",
             Background: "Custom",
             SavingThrows: ["Intelligence +5", "Wisdom +5"],
@@ -792,6 +926,11 @@
         ),
         // ── Korran Vale the Barbarian ────────────────────────────────────────
         [new Guid("a1000000-0000-0000-0000-00000000000a")] = new(
+            TurnExtras:
+            [
+                new("Bonus Action", "Rage", "Resistance to B/P/S, +2 melee damage, advantage on STR (3/long rest)"),
+                new("Action", "Reckless Attack", "Attack with advantage — but enemies get advantage vs you until your next turn"),
+            ],
             Race: "Half-Orc",
             Background: "Custom",
             SavingThrows: [],

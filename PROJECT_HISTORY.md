@@ -175,6 +175,18 @@ Belqorel, and Wally appear in the Party Hub but not the Guide.
 - Character Guide quick-reference with a session tracker (HP, spell-slot pips,
   sorcery points) and Wild Magic info for Winnie; Kennyth panel added.
 
+### Session 2026-06-12 (part 14) — Guide: "On Your Turn" action-economy
+
+- New **⏱️ On Your Turn** section on the combat guide, splitting what a character
+  can do into **Action / Bonus Action / Reaction / Movement & Free** columns.
+- Auto-derived: weapon attacks (with to-hit/damage) go under Action; spells are
+  bucketed by their casting time (`CastingBucket`) and enriched with save DC /
+  attack / damage from a matching combat action. Universal reminders included
+  (Opportunity Attack reaction, the standard actions, movement).
+- Curated `TurnExtras` per character for class features with an action cost
+  (Rage, Bardic Inspiration, Cutting Words, Lay on Hands, Second Wind/Action
+  Surge, Wild Shape/Land's Aid, Innate Sorcery/Font of Magic, etc.).
+
 ### Session 2026-06-12 (part 13) — Add Korran Vale (Barbarian)
 
 - The real Korran was finally located (the "Korran.pdf" in both order folders is

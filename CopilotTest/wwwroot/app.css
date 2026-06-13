@@ -2650,3 +2650,33 @@ a.char-tag-link:hover { color: var(--gold); }
     .guide-save-grid { grid-template-columns: repeat(2, 1fr); }
     .guide-skill-grid { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   Combat Guide — "On Your Turn" action-economy grid
+   ============================================================ */
+.turn-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.turn-col {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px; border-top: 3px solid var(--border);
+}
+.turn-action   { border-top-color: var(--red); }
+.turn-bonus    { border-top-color: var(--gold); }
+.turn-reaction { border-top-color: var(--green); }
+.turn-move     { border-top-color: var(--text-dim); }
+
+.turn-col-head { font-weight: 700; margin-bottom: 8px; display: flex; align-items: baseline; gap: 8px; }
+.turn-col-sub { font-size: 0.7rem; color: var(--text-dim); font-weight: 400; text-transform: uppercase; letter-spacing: 0.5px; }
+
+.turn-item {
+    display: flex; flex-direction: column; gap: 1px;
+    padding: 6px 8px; border-radius: 6px; margin-bottom: 4px;
+    background: var(--bg-panel);
+}
+.turn-item.feat { background: rgba(255,163,0,0.10); border-left: 2px solid var(--gold); }
+.turn-item.muted { background: transparent; }
+.turn-name { font-weight: 600; font-size: 0.9rem; }
+.turn-detail { font-size: 0.78rem; color: var(--text-dim); line-height: 1.35; }
+
+@media (max-width: 600px) {
+    .turn-grid { grid-template-columns: 1fr; }
+}
