@@ -174,6 +174,18 @@ Belqorel, and Wally appear in the Party Hub but not the Guide.
 - Character Guide quick-reference with a session tracker (HP, spell-slot pips,
   sorcery points) and Wild Magic info for Winnie; Kennyth panel added.
 
+### Session 2026-06-12 (part 12) — Combat guide QoL: live skills/saves
+
+- Replaced the guide's hand-typed "proficient skills/saves" tag strings with
+  **computed** sections driven by the live character: full **Skills** list (all
+  18, alphabetical, live modifiers, ●/◆ proficiency indicators, ability tags),
+  all six **Saving Throws**, and **Passive Senses** (Perception/Investigation/
+  Insight). Always accurate as characters change.
+- Fixed the guide's Spell Save DC / attack to use the correct casting ability
+  (was hardcoded to CHA — wrong for Bren the WIS-based Druid).
+- (GuideData's old SavingThrows/ProficientSkills fields are now unused but left
+  in place; harmless.)
+
 ### Session 2026-06-12 (part 11) — Load party inventory from the PDFs
 
 - Extracted each PDF sheet's equipment list and added it to the templates

@@ -2608,3 +2608,45 @@ a.char-tag-link:hover { color: var(--gold); }
     background: var(--bg-panel); border: 1px solid var(--purple); color: var(--purple);
     white-space: nowrap;
 }
+
+/* ============================================================
+   Character Guide — computed saves / passives / skills
+   ============================================================ */
+.guide-save-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.guide-statline {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); font-size: 0.9rem;
+}
+.guide-statline.is-prof { border-color: var(--gold); }
+.gsl-dot { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--text-dim); flex: none; }
+.gsl-dot.on { background: var(--gold); border-color: var(--gold); }
+.gsl-bonus { font-weight: 700; min-width: 30px; color: var(--text); }
+.gsl-name { color: var(--text-dim); }
+
+.guide-passive-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.guide-passive {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+}
+.gp-val { font-size: 1.3rem; font-weight: 800; color: var(--gold); }
+.gp-lbl { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+
+.guide-skill-legend { font-size: 0.7rem; font-weight: 400; color: var(--text-dim); margin-left: 8px; }
+.guide-skill-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px; }
+.guide-skill {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 10px; border-radius: var(--radius); border: 1px solid transparent;
+}
+.guide-skill.is-prof { background: rgba(255,163,0,0.07); border-color: var(--border); }
+.guide-skill.is-expertise { background: rgba(255,163,0,0.14); border-color: var(--gold); }
+.gsk-ind { width: 14px; color: var(--gold); text-align: center; flex: none; }
+.guide-skill:not(.is-prof):not(.is-expertise) .gsk-ind { color: var(--text-dim); }
+.gsk-bonus { font-weight: 700; min-width: 30px; }
+.gsk-name { flex: 1; }
+.gsk-ability { font-size: 0.7rem; color: var(--text-dim); }
+
+@media (max-width: 600px) {
+    .guide-save-grid { grid-template-columns: repeat(2, 1fr); }
+    .guide-skill-grid { grid-template-columns: 1fr; }
+}

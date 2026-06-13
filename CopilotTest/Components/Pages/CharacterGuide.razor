@@ -44,8 +44,9 @@
                 <div class="guide-stat"><span class="stat-label">Proficiency</span><span class="stat-value">@FormatBonus(Selected.ProficiencyBonus)</span></div>
                 @if (HasSpells(Selected))
                 {
-                    <div class="guide-stat"><span class="stat-label">Spell Save DC</span><span class="stat-value">@(8 + Selected.ProficiencyBonus + Selected.CharismaModifier)</span></div>
-                    <div class="guide-stat"><span class="stat-label">Spell Attack</span><span class="stat-value">@FormatBonus(Selected.ProficiencyBonus + Selected.CharismaModifier)</span></div>
+                    var castMod = SpellAbilityMod(Selected);
+                    <div class="guide-stat"><span class="stat-label">Spell Save DC</span><span class="stat-value">@(8 + Selected.ProficiencyBonus + castMod)</span></div>
+                    <div class="guide-stat"><span class="stat-label">Spell Attack</span><span class="stat-value">@FormatBonus(Selected.ProficiencyBonus + castMod)</span></div>
                 }
                 @if (Selected.IsBarbarianClass)
                 {
@@ -137,25 +138,47 @@
                 </div>
             </div>
 
-            <!-- Saving Throws & Proficient Skills -->
+            <!-- Saving Throws & Passive Senses -->
             <div class="guide-two-col">
                 <div class="guide-section">
-                    <h3>Saving Throws (Proficient)</h3>
-                    <div class="guide-tags">
-                        @foreach (var st in guide.SavingThrows)
+                    <h3>Saving Throws</h3>
+                    <div class="guide-save-grid">
+                        @foreach (AbilityScore ab in Enum.GetValues<AbilityScore>())
                         {
-                            <span class="guide-tag proficient">✦ @st</span>
+                            var prof = Selected.GetSaveProficiency(ab);
+                            <div class="guide-statline @(prof ? "is-prof" : "")">
+                                <span class="gsl-dot @(prof ? "on" : "")"></span>
+                                <span class="gsl-bonus">@FormatBonus(Selected.GetSaveBonus(ab))</span>
+                                <span class="gsl-name">@AbilityShort(ab)</span>
+                            </div>
                         }
                     </div>
                 </div>
                 <div class="guide-section">
-                    <h3>Proficient Skills</h3>
-                    <div class="guide-tags">
-                        @foreach (var sk in guide.ProficientSkills)
-                        {
-                            <span class="guide-tag proficient">✦ @sk</span>
-                        }
+                    <h3>Passive Senses</h3>
+                    <div class="guide-passive-grid">
+                        <div class="guide-passive"><span class="gp-val">@(10 + Selected.GetSkillBonus(Skill.Perception))</span><span class="gp-lbl">Perception</span></div>
+                        <div class="guide-passive"><span class="gp-val">@(10 + Selected.GetSkillBonus(Skill.Investigation))</span><span class="gp-lbl">Investigation</span></div>
+                        <div class="guide-passive"><span class="gp-val">@(10 + Selected.GetSkillBonus(Skill.Insight))</span><span class="gp-lbl">Insight</span></div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Skills (full, live, alphabetical) -->
+            <div class="guide-section">
+                <h3>Skills <span class="guide-skill-legend">● proficient · ◆ expertise</span></h3>
+                <div class="guide-skill-grid">
+                    @foreach (var skill in Enum.GetValues<Skill>().OrderBy(s => SkillAbilityMap.DisplayName(s)))
+                    {
+                        var prof = Selected.GetSkillProficiency(skill);
+                        var cls = prof == ProficiencyLevel.Expertise ? "is-expertise" : prof == ProficiencyLevel.Proficient ? "is-prof" : "";
+                        <div class="guide-skill @cls">
+                            <span class="gsk-ind">@(prof == ProficiencyLevel.Expertise ? "◆" : prof == ProficiencyLevel.Proficient ? "●" : "○")</span>
+                            <span class="gsk-bonus">@FormatBonus(Selected.GetSkillBonus(skill))</span>
+                            <span class="gsk-name">@SkillAbilityMap.DisplayName(skill)</span>
+                            <span class="gsk-ability">@AbilityShort(SkillAbilityMap.Map[skill])</span>
+                        </div>
+                    }
                 </div>
             </div>
 
@@ -401,6 +424,21 @@
     // ── Helpers ─────────────────────────────────────────────────────────────
 
     private static string FormatBonus(int n) => n >= 0 ? $"+{n}" : $"{n}";
+
+    private static string AbilityShort(AbilityScore a) => a switch
+    {
+        AbilityScore.Strength => "STR", AbilityScore.Dexterity => "DEX",
+        AbilityScore.Constitution => "CON", AbilityScore.Intelligence => "INT",
+        AbilityScore.Wisdom => "WIS", AbilityScore.Charisma => "CHA", _ => "?"
+    };
+
+    /// <summary>The modifier for a character's spellcasting ability (by class).</summary>
+    private static int SpellAbilityMod(Character c) => c.CharacterClass.Trim().ToLowerInvariant() switch
+    {
+        "cleric" or "druid" or "ranger" => c.WisdomModifier,
+        "wizard"                        => c.IntelligenceModifier,
+        _                               => c.CharismaModifier,   // bard, paladin, sorcerer, warlock
+    };
 
     private static bool HasSpells(Character c) =>
         c.Actions.Any(a => a.ActionType is ActionType.Spell or ActionType.SpellAttack);
