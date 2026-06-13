@@ -19,8 +19,9 @@
 ### Character builder roadmap (phased)
 1. **Engine + species** ✅ (Phase 1, done 2026-06-12) — content data model,
    provenance auto-apply, species picker.
-2. **Backgrounds + Feats** — same pattern; backgrounds carry the 2024 ability
-   bonuses + Origin feat.
+2. **Backgrounds + Feats** ✅ (Phase 2, done 2026-06-12) — backgrounds with
+   ability-score allocation + Origin feat; standalone feat picker; reversible
+   ability-score grants.
 3. **Class/subclass deepening** — subclass features into the level-up wizard.
 4. **Creation wizard** — from-scratch flow (Species → Class → Background →
    Abilities → Equipment) built on phases 1–3.
@@ -167,6 +168,44 @@ Belqorel, and Wally appear in the Party Hub but not the Guide.
 - Party Hub + character sheets (stats / spells / inventory / profile tabs, edit mode).
 - Character Guide quick-reference with a session tracker (HP, spell-slot pips,
   sorcery points) and Wild Magic info for Winnie; Kennyth panel added.
+
+### Session 2026-06-12 (part 3) — Character builder Phase 2 (Backgrounds + Feats)
+
+**Content** (`Models/Content/`)
+- `BackgroundData` (16 2024 PHB backgrounds): three ability options the player
+  allocates +2/+1 or +1/+1/+1, two skills, a tool, and an Origin feat.
+- `FeatData` + `FeatCategory`: all 12 Origin feats plus popular General feats
+  (Great Weapon Master, Sharpshooter, War Caster, Sentinel, Mobile, Resilient).
+  Feats carry traits and optional fixed ability bumps; choice-based bumps
+  (Tavern Brawler, Resilient) are described, not auto-applied, to avoid guessing.
+
+**Reversible ability bonuses** (`Models/AbilityGrant.cs`)
+- New `AbilityGrant` entity (Ability, Amount, Source) — a "receipt" for each
+  bonus baked into a score, tagged by source so swapping a background/feat
+  removes exactly its bonuses. New `AbilityGrants` table + `BackgroundKey`
+  column installed via the existing safe-migration helpers in `Program.cs`.
+- Wired through `CharacterService` (include + replace-collection).
+
+**Engine** (`Services/ContentService.cs`)
+- `ApplyBackground(character, key, abilityChoice)` — applies ability bonuses
+  (per allocation), skill + tool proficiencies, and the granted Origin feat;
+  reverses the previous background first (features, ability grants, skills all
+  tagged by background name).
+- `ApplyFeat` / `RemoveFeat` for standalone feats (tagged `"Feat: {name}"`),
+  so removing a feat also removes its ability bonus.
+
+**UI** (`CharacterSheet.razor`, Profile + Stats tabs, edit mode)
+- Background dropdown + live ability-allocation controls (+2/+1 or +1/+1/+1,
+  with ability pickers), showing granted skills/tool/feat.
+- Standalone feat picker (Origin + General, grouped), with a removable chip
+  list of current feats.
+- Stats tab shows an "✨ Bonuses applied" provenance line listing each ability
+  grant and its source.
+
+> Known edge (documented): ability scores are stored as the live total (base +
+> grants baked in). Manually editing a raw score while a grant is applied can
+> desync removal math — acceptable at this scale; a true base/effective split
+> can come later if needed.
 
 ### Session 2026-06-12 (part 2) — Character builder Phase 1
 

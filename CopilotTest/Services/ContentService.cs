@@ -66,6 +66,147 @@ public class ContentService
         }
     }
 
+    // ── Backgrounds ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Set (or clear) a character's background, applying its ability bonuses
+    /// (per the player's allocation), skill/tool proficiencies, and granted
+    /// Origin feat. Reverses the previous background's contributions first.
+    /// </summary>
+    public void ApplyBackground(Character character, string? backgroundKey, IReadOnlyList<AbilityBonus> abilityChoice)
+    {
+        var previous = ContentLibrary.GetBackground(NullIfEmpty(character.BackgroundKey));
+        if (previous != null)
+            RemoveBackgroundContributions(character, previous);
+
+        var next = ContentLibrary.GetBackground(NullIfEmpty(backgroundKey));
+        if (next == null)
+        {
+            character.BackgroundKey = string.Empty;
+            return;
+        }
+
+        character.BackgroundKey = next.Key;
+        character.Background     = next.Name;
+
+        // Ability score bonuses (tagged by background name for clean reversal).
+        foreach (var bonus in abilityChoice)
+            AddAbilityBonus(character, bonus.Ability, bonus.Amount, next.Name);
+
+        // Skill proficiencies.
+        foreach (var skill in next.SkillProficiencies)
+            AddSkillIfMissing(character, skill);
+
+        // Tool proficiency shown as a trait for visibility.
+        if (!string.IsNullOrEmpty(next.ToolProficiency))
+            character.Features.Add(new CharacterFeature
+            {
+                CharacterId = character.Id,
+                Name        = $"Tool Proficiency: {next.ToolProficiency}",
+                Description = $"Granted by the {next.Name} background.",
+                Source      = next.Name,
+                LevelGained = 1,
+            });
+
+        // Granted Origin feat — tag its features with the background's name so
+        // they're removed together when the background is swapped.
+        var feat = ContentLibrary.GetFeat(next.OriginFeatKey);
+        if (feat != null)
+            ApplyFeatTraits(character, feat, source: next.Name, prefix: $"Origin Feat: {feat.Name} — ");
+    }
+
+    private void RemoveBackgroundContributions(Character character, BackgroundData background)
+    {
+        character.Features.RemoveAll(f => f.Source == background.Name);
+        character.AbilityGrants.RemoveAll(g => g.Source == background.Name);
+        foreach (var skill in background.SkillProficiencies)
+        {
+            var match = character.Skills.FirstOrDefault(
+                s => s.Skill == skill && s.Proficiency == ProficiencyLevel.Proficient);
+            if (match != null) character.Skills.Remove(match);
+        }
+    }
+
+    // ── Standalone feats ───────────────────────────────────────────────────────
+
+    /// <summary>Add a feat the player picked directly (not via a background).</summary>
+    public void ApplyFeat(Character character, string featKey)
+    {
+        var feat = ContentLibrary.GetFeat(featKey);
+        if (feat == null) return;
+        var source = FeatSource(feat.Name);
+        if (character.Features.Any(f => f.Source == source)) return; // already has it
+
+        ApplyFeatTraits(character, feat, source, prefix: "");
+        foreach (var bonus in feat.AbilityBonuses)
+            AddAbilityBonus(character, bonus.Ability, bonus.Amount, source);
+    }
+
+    public void RemoveFeat(Character character, string featName)
+    {
+        var source = FeatSource(featName);
+        character.Features.RemoveAll(f => f.Source == source);
+        character.AbilityGrants.RemoveAll(g => g.Source == source);
+    }
+
+    private static string FeatSource(string featName) => $"Feat: {featName}";
+
+    /// <summary>Adds a feat's traits as features under the given source tag.</summary>
+    private static void ApplyFeatTraits(Character character, FeatData feat, string source, string prefix)
+    {
+        foreach (var trait in feat.Traits)
+        {
+            character.Features.Add(new CharacterFeature
+            {
+                CharacterId = character.Id,
+                Name        = prefix.Length > 0 && trait == feat.Traits[0] ? prefix + trait.Name : trait.Name,
+                Description = trait.Description,
+                Source      = source,
+                LevelGained = 1,
+            });
+        }
+    }
+
+    // ── Shared helpers ─────────────────────────────────────────────────────────
+
+    private static void AddAbilityBonus(Character character, AbilityScore ability, int amount, string source)
+    {
+        character.AbilityGrants.Add(new AbilityGrant
+        {
+            CharacterId = character.Id, Ability = ability, Amount = amount, Source = source,
+        });
+        SetAbility(character, ability, GetAbility(character, ability) + amount);
+    }
+
+    private static void AddSkillIfMissing(Character character, Skill skill)
+    {
+        if (character.Skills.Any(s => s.Skill == skill)) return;
+        character.Skills.Add(new CharacterSkill
+        {
+            CharacterId = character.Id, Skill = skill, Proficiency = ProficiencyLevel.Proficient,
+        });
+    }
+
+    private static int GetAbility(Character c, AbilityScore a) => a switch
+    {
+        AbilityScore.Strength => c.Strength, AbilityScore.Dexterity => c.Dexterity,
+        AbilityScore.Constitution => c.Constitution, AbilityScore.Intelligence => c.Intelligence,
+        AbilityScore.Wisdom => c.Wisdom, AbilityScore.Charisma => c.Charisma, _ => 10,
+    };
+
+    private static void SetAbility(Character c, AbilityScore a, int v)
+    {
+        switch (a)
+        {
+            case AbilityScore.Strength: c.Strength = v; break;
+            case AbilityScore.Dexterity: c.Dexterity = v; break;
+            case AbilityScore.Constitution: c.Constitution = v; break;
+            case AbilityScore.Intelligence: c.Intelligence = v; break;
+            case AbilityScore.Wisdom: c.Wisdom = v; break;
+            case AbilityScore.Charisma: c.Charisma = v; break;
+        }
+    }
+
     private static void RemoveSpeciesContributions(Character character, SpeciesData species)
     {
         // Remove features sourced from this species.

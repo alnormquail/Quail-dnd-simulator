@@ -14,6 +14,7 @@ public class DndDbContext : DbContext
     public DbSet<CharacterSkill> CharacterSkills => Set<CharacterSkill>();
     public DbSet<SpellSlot> SpellSlots => Set<SpellSlot>();
     public DbSet<CharacterFeature> CharacterFeatures => Set<CharacterFeature>();
+    public DbSet<AbilityGrant> AbilityGrants => Set<AbilityGrant>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -45,7 +46,15 @@ public class DndDbContext : DbContext
              .WithOne()
              .HasForeignKey(f => f.CharacterId)
              .OnDelete(DeleteBehavior.Cascade);
+            b.HasMany(c => c.AbilityGrants)
+             .WithOne()
+             .HasForeignKey(g => g.CharacterId)
+             .OnDelete(DeleteBehavior.Cascade);
         });
+
+        modelBuilder.Entity<AbilityGrant>()
+            .Property(g => g.Ability)
+            .HasConversion<string>();
 
         // Enums stored as strings for readability
         modelBuilder.Entity<CharacterSkill>()

@@ -45,11 +45,23 @@ using (var scope = app.Services.CreateScope())
                 FOREIGN KEY ("CharacterId") REFERENCES "Characters" ("Id") ON DELETE CASCADE
         );
         CREATE INDEX IF NOT EXISTS "IX_CharacterFeatures_CharacterId" ON "CharacterFeatures" ("CharacterId");
+
+        CREATE TABLE IF NOT EXISTS "AbilityGrants" (
+            "Id" TEXT NOT NULL CONSTRAINT "PK_AbilityGrants" PRIMARY KEY,
+            "CharacterId" TEXT NOT NULL,
+            "Ability" TEXT NOT NULL,
+            "Amount" INTEGER NOT NULL,
+            "Source" TEXT NOT NULL,
+            CONSTRAINT "FK_AbilityGrants_Characters_CharacterId"
+                FOREIGN KEY ("CharacterId") REFERENCES "Characters" ("Id") ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS "IX_AbilityGrants_CharacterId" ON "AbilityGrants" ("CharacterId");
         """);
 
     // Add columns introduced after first release (SQLite has no ADD COLUMN IF NOT
     // EXISTS, so check the table schema first).
     AddColumnIfMissing(db, "Characters", "SpeciesKey", "TEXT NOT NULL DEFAULT ''");
+    AddColumnIfMissing(db, "Characters", "BackgroundKey", "TEXT NOT NULL DEFAULT ''");
 
     var chars = scope.ServiceProvider.GetRequiredService<CharacterService>();
     chars.SeedIfEmpty();

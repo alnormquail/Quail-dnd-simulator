@@ -21,6 +21,7 @@ public class CharacterService
            .Include(c => c.Skills)
            .Include(c => c.SpellSlots)
            .Include(c => c.Features)
+           .Include(c => c.AbilityGrants)
            .OrderBy(c => c.Name)
            .ToList();
 
@@ -32,6 +33,7 @@ public class CharacterService
            .Include(c => c.Skills)
            .Include(c => c.SpellSlots)
            .Include(c => c.Features)
+           .Include(c => c.AbilityGrants)
            .Where(c => c.Type != CombatantType.Monster)
            .OrderBy(c => c.Name)
            .ToList();
@@ -44,6 +46,7 @@ public class CharacterService
            .Include(c => c.Skills)
            .Include(c => c.SpellSlots)
            .Include(c => c.Features)
+           .Include(c => c.AbilityGrants)
            .FirstOrDefault(c => c.Id == id);
 
     public Character Create(Character character)
@@ -62,6 +65,7 @@ public class CharacterService
             .Include(c => c.Skills)
             .Include(c => c.SpellSlots)
             .Include(c => c.Features)
+            .Include(c => c.AbilityGrants)
             .FirstOrDefault(c => c.Id == character.Id);
 
         if (existing == null) return;
@@ -76,6 +80,7 @@ public class CharacterService
         ReplaceCollection(_db.CharacterSkills, existing.Skills, character.Skills, s => { s.CharacterId = character.Id; });
         ReplaceCollection(_db.SpellSlots, existing.SpellSlots, character.SpellSlots, s => { s.CharacterId = character.Id; });
         ReplaceCollection(_db.CharacterFeatures, existing.Features, character.Features, f => { f.CharacterId = character.Id; });
+        ReplaceCollection(_db.AbilityGrants, existing.AbilityGrants, character.AbilityGrants, g => { g.CharacterId = character.Id; });
 
         _db.SaveChanges();
     }

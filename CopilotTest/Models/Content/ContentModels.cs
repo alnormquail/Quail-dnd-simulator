@@ -44,10 +44,65 @@ public record SpeciesData
     }
 
     private static string Fmt(int n) => n >= 0 ? $"+{n}" : n.ToString();
-    private static string Short(AbilityScore a) => a switch
+    private static string Short(AbilityScore a) => AbilityNames.Short(a);
+}
+
+/// <summary>Shared ability-name helpers.</summary>
+public static class AbilityNames
+{
+    public static string Short(AbilityScore a) => a switch
     {
         AbilityScore.Strength => "STR", AbilityScore.Dexterity => "DEX",
         AbilityScore.Constitution => "CON", AbilityScore.Intelligence => "INT",
         AbilityScore.Wisdom => "WIS", AbilityScore.Charisma => "CHA", _ => "?"
+    };
+}
+
+public enum FeatCategory { Origin, General, FightingStyle, EpicBoon }
+
+/// <summary>
+/// A 2024 background: ability bonuses are allocated by the player among three
+/// listed abilities (+2/+1 or +1/+1/+1), plus skills, a tool, and an Origin feat.
+/// </summary>
+public record BackgroundData
+{
+    public string Key { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string Source { get; init; } = "PHB 2024";
+    public RulesEdition Edition { get; init; } = RulesEdition.Edition2024;
+
+    /// <summary>The three abilities a player may boost (choose +2/+1 or +1/+1/+1).</summary>
+    public IReadOnlyList<AbilityScore> AbilityOptions { get; init; } = [];
+    public IReadOnlyList<Skill> SkillProficiencies { get; init; } = [];
+    public string ToolProficiency { get; init; } = "";
+    public string OriginFeatKey { get; init; } = "";
+    public string Equipment { get; init; } = "";
+    public string Description { get; init; } = "";
+
+    public string AbilitySummary =>
+        string.Join("/", AbilityOptions.Select(AbilityNames.Short));
+}
+
+/// <summary>A feat (Origin or General). Effects are shown as traits; some carry fixed ability bumps.</summary>
+public record FeatData
+{
+    public string Key { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string Source { get; init; } = "PHB 2024";
+    public RulesEdition Edition { get; init; } = RulesEdition.Edition2024;
+
+    public FeatCategory Category { get; init; } = FeatCategory.Origin;
+    public string Prerequisite { get; init; } = "";
+    /// <summary>Fixed ability increases auto-applied (choice-based bumps are described instead).</summary>
+    public IReadOnlyList<AbilityBonus> AbilityBonuses { get; init; } = [];
+    public IReadOnlyList<ContentTrait> Traits { get; init; } = [];
+
+    public string CategoryLabel => Category switch
+    {
+        FeatCategory.Origin => "Origin Feat",
+        FeatCategory.General => "General Feat",
+        FeatCategory.FightingStyle => "Fighting Style",
+        FeatCategory.EpicBoon => "Epic Boon",
+        _ => "Feat"
     };
 }

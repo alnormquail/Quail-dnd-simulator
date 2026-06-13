@@ -15,6 +15,8 @@ public class Character
 
     /// <summary>Content-library key of the chosen species (e.g. "high-elf"), if picked from the library.</summary>
     public string SpeciesKey { get; set; } = string.Empty;
+    /// <summary>Content-library key of the chosen background, if picked from the library.</summary>
+    public string BackgroundKey { get; set; } = string.Empty;
 
     // Ability scores
     public int Strength { get; set; } = 10;
@@ -64,6 +66,7 @@ public class Character
     public List<CharacterSkill> Skills { get; set; } = new();
     public List<SpellSlot> SpellSlots { get; set; } = new();
     public List<CharacterFeature> Features { get; set; } = new();
+    public List<AbilityGrant> AbilityGrants { get; set; } = new();
 
     // Computed display helpers
     public string ClassDisplay => CharacterLevel > 0 && !string.IsNullOrEmpty(CharacterClass)

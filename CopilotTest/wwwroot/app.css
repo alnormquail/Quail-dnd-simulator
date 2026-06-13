@@ -2509,3 +2509,33 @@ button.item-equip-dot { cursor: pointer; }
 }
 
 .field-hint { font-size: 12px; color: var(--gold); margin-top: 4px; line-height: 1.4; }
+
+/* ============================================================
+   Background allocation & feat picker (builder Phase 2)
+   ============================================================ */
+.bg-alloc-box {
+    border: 1px solid var(--gold); border-radius: var(--radius);
+    background: rgba(255,163,0,0.05); padding: 12px 14px; margin-bottom: 14px;
+}
+.bg-alloc-title { font-weight: 700; color: var(--gold); margin-bottom: 4px; }
+.bg-alloc-desc { font-size: 13px; color: var(--text); margin-bottom: 10px; }
+.bg-alloc-controls { display: flex; gap: 18px; margin-bottom: 10px; }
+.bg-alloc-radio { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.bg-alloc-picks { display: flex; gap: 16px; margin-bottom: 8px; }
+.bg-alloc-picks .form-field { min-width: 110px; }
+
+.feat-picker-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.feat-picker-row select { flex: 1; min-width: 200px; }
+
+.current-feats { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.feat-chip {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 20px; padding: 4px 12px; font-size: 13px;
+    display: inline-flex; align-items: center; gap: 8px;
+}
+
+.ability-grants-note {
+    margin-top: 10px; padding: 8px 12px;
+    background: rgba(255,163,0,0.08); border: 1px solid var(--gold);
+    border-radius: var(--radius); font-size: 13px; color: var(--gold);
+}
