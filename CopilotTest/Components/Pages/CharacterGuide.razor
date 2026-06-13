@@ -293,6 +293,45 @@
                 </table>
             </div>
 
+            <!-- Spell Descriptions -->
+            @if (Selected.Spells.Any())
+            {
+                <div class="guide-section">
+                    <h3>📖 Spells <span class="guide-skill-legend">tap a spell to read it</span></h3>
+                    @foreach (var levelGroup in Selected.Spells.GroupBy(s => s.Level).OrderBy(g => g.Key))
+                    {
+                        <div class="spell-level-header">@(levelGroup.Key == 0 ? "Cantrips" : $"Level {levelGroup.Key}")</div>
+                        @foreach (var spell in levelGroup.OrderBy(s => s.Name))
+                        {
+                            <div class="spell-row @(OpenSpells.Contains(spell.Id) ? "spell-expanded" : "")">
+                                <div class="spell-row-main" @onclick="() => ToggleGuideSpell(spell.Id)">
+                                    <span class="spell-name">@spell.Name</span>
+                                    @if (spell.Concentration) { <span class="spell-tag conc-tag" title="Concentration">C</span> }
+                                    @if (spell.IsRitual)       { <span class="spell-tag ritual-tag" title="Ritual">R</span> }
+                                    @if (!string.IsNullOrEmpty(spell.School)) { <span class="spell-school">@spell.School</span> }
+                                    <span class="spell-expand-icon">@(OpenSpells.Contains(spell.Id) ? "▲" : "▼")</span>
+                                </div>
+                                @if (OpenSpells.Contains(spell.Id))
+                                {
+                                    <div class="spell-detail">
+                                        <div class="spell-meta">
+                                            @if (!string.IsNullOrEmpty(spell.CastingTime)) { <span><strong>Cast:</strong> @spell.CastingTime</span> }
+                                            @if (!string.IsNullOrEmpty(spell.Range))       { <span><strong>Range:</strong> @spell.Range</span> }
+                                            @if (!string.IsNullOrEmpty(spell.Components))  { <span><strong>Components:</strong> @spell.Components</span> }
+                                            @if (!string.IsNullOrEmpty(spell.Duration))    { <span><strong>Duration:</strong> @spell.Duration</span> }
+                                        </div>
+                                        @if (!string.IsNullOrEmpty(spell.Description))
+                                        {
+                                            <p class="spell-desc">@spell.Description</p>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+            }
+
             <!-- Key Class Features -->
             @if (guide.ClassFeatures.Length > 0)
             {
@@ -441,12 +480,19 @@
     private int CurrentHp { get; set; }
     private HashSet<string> UsedSlots { get; set; } = new();
     private HashSet<int>    SpentSp   { get; set; } = new();
+    private HashSet<Guid>   OpenSpells { get; set; } = new();
+
+    private void ToggleGuideSpell(Guid id)
+    {
+        if (!OpenSpells.Remove(id)) OpenSpells.Add(id);
+    }
 
     private void ResetTracker(Character c)
     {
         CurrentHp = c.MaxHitPoints;
         UsedSlots.Clear();
         SpentSp.Clear();
+        OpenSpells.Clear();
     }
 
     private void AdjustHp(int delta)

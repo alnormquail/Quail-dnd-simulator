@@ -175,6 +175,13 @@ Belqorel, and Wally appear in the Party Hub but not the Guide.
 - Character Guide quick-reference with a session tracker (HP, spell-slot pips,
   sorcery points) and Wild Magic info for Winnie; Kennyth panel added.
 
+### Session 2026-06-12 (part 15) — Guide: spell descriptions
+
+- New **📖 Spells** section on the combat guide: the character's spells grouped
+  by level, each tap-to-expand to show full description + meta (cast time, range,
+  components, duration) and Concentration/Ritual tags. Reuses the sheet's
+  spell-row styles; open state resets when switching characters.
+
 ### Session 2026-06-12 (part 14) — Guide: "On Your Turn" action-economy
 
 - New **⏱️ On Your Turn** section on the combat guide, splitting what a character
