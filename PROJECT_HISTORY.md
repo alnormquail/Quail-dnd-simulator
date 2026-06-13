@@ -174,6 +174,16 @@ Belqorel, and Wally appear in the Party Hub but not the Guide.
 - Character Guide quick-reference with a session tracker (HP, spell-slot pips,
   sorcery points) and Wild Magic info for Winnie; Kennyth panel added.
 
+### Session 2026-06-12 (part 8) — Populate preloaded casters' spell lists
+
+- Each preloaded caster (Winnie, Kennyth, Gideon, Job, Bren; Spurt already had
+  spells) now gets a `Spells` list built from the shared library by name via a
+  new `PreloadedCharacters.SpellsFor(...)` helper — so descriptions stay DRY.
+- `CharacterService.BackfillPreloadedSpells()` populates these into **existing**
+  databases on startup (idempotent: only casters with an empty spell list, and
+  it inserts Spell rows directly by FK to avoid the parent-row concurrency
+  update that crashed the first attempt).
+
 ### Session 2026-06-12 (part 7) — Source-tagged spells from the party sheets
 
 - Added a `Source` field to `LibrarySpell` (defaults to "PHB 2024", so all

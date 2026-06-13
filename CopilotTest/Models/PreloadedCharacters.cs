@@ -8,6 +8,13 @@ public static class PreloadedCharacters
 {
     public static IReadOnlyList<Character> All => [Spurt, Belqorel, Wally, Winnie, Kennyth, Boan, Gideon, Job, Bren];
 
+    /// <summary>Builds Spell entries from the shared library by name (skips unknowns).</summary>
+    private static List<Spell> SpellsFor(params string[] names) =>
+        names.Select(n => SpellLibrary.All.FirstOrDefault(s => s.Name == n))
+             .Where(s => s != null)
+             .Select(s => SpellLibrary.ToSpell(s!, Guid.Empty))
+             .ToList();
+
     public static Character Spurt => new()
     {
         Id             = new Guid("a1000000-0000-0000-0000-000000000001"),
@@ -211,6 +218,11 @@ public static class PreloadedCharacters
             new() { Skill = Skill.Persuasion,   Proficiency = ProficiencyLevel.Proficient },
         },
 
+        Spells = SpellsFor(
+            "Fire Bolt", "Chill Touch", "Mage Hand",
+            "Shield", "Thunderwave", "Sleep",
+            "Hold Person", "Aganazzar's Scorcher"),
+
         PersonalityTraits = "Winnie Vale — Wild Magic Sorcerer 5, High Elf Noble.",
         GoldPieces = 50,
     };
@@ -255,6 +267,10 @@ public static class PreloadedCharacters
             new() { Skill = Skill.Athletics, Proficiency = ProficiencyLevel.Proficient },
             new() { Skill = Skill.Medicine,  Proficiency = ProficiencyLevel.Proficient },
         },
+
+        Spells = SpellsFor(
+            "Shield of Faith", "Protection from Evil and Good", "Cure Wounds",
+            "Aid", "Zone of Truth"),
 
         PersonalityTraits = "Kennyth — Paladin 5, Gnome. Lay on Hands pool: 25 HP. Gnome Cunning: Advantage on INT/WIS/CHA saves vs magic.",
         GoldPieces = 30,
@@ -348,6 +364,12 @@ public static class PreloadedCharacters
             new() { Skill = Skill.Stealth,     Proficiency = ProficiencyLevel.Proficient },
         },
 
+        Spells = SpellsFor(
+            "Vicious Mockery", "Mage Hand",
+            "Healing Word", "Faerie Fire", "Charm Person",
+            "Shatter", "Invisibility",
+            "Hypnotic Pattern"),
+
         PersonalityTraits = "Gideon Silverspoon — Bard 5, Half-Elf Criminal. Bardic Inspiration d8, 3/short rest. College of Lore: Cutting Words reaction.",
     };
 
@@ -393,6 +415,11 @@ public static class PreloadedCharacters
             new() { Skill = Skill.Religion,     Proficiency = ProficiencyLevel.Proficient },
             new() { Skill = Skill.Survival,     Proficiency = ProficiencyLevel.Proficient },
         },
+
+        Spells = SpellsFor(
+            "Sacred Flame",
+            "Shield of Faith", "Bless", "Cure Wounds",
+            "Aid", "Magic Weapon"),
 
         PersonalityTraits = "Job Goodhammer — Paladin 5, Human Acolyte. Lay on Hands pool: 25 HP. Oath of the Open Sea.",
     };
@@ -444,6 +471,12 @@ public static class PreloadedCharacters
             new() { Skill = Skill.SleightOfHand,Proficiency = ProficiencyLevel.Proficient },
             new() { Skill = Skill.Stealth,      Proficiency = ProficiencyLevel.Proficient },
         },
+
+        Spells = SpellsFor(
+            "Poison Spray", "Shocking Grasp", "Druidcraft",
+            "Thunderwave", "Healing Word", "Faerie Fire", "Cure Wounds",
+            "Moonbeam", "Flaming Sphere",
+            "Call Lightning"),
 
         PersonalityTraits = "Bren Gunning — Druid 5, Forest Gnome. Circle of the Land. Wild Shape 2/long rest (5 temp HP). Gnome Cunning: Advantage on INT/WIS/CHA saves vs magic.",
     };

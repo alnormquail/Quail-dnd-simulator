@@ -131,6 +131,47 @@ public class CharacterService
         }
 
         _db.SaveChanges();
+
+        BackfillPreloadedSpells();
+    }
+
+    /// <summary>
+    /// One-time backfill: preloaded casters that exist in the DB but have an
+    /// empty spell list get their template spells copied in. Safe to run every
+    /// startup — it only touches casters whose Spells collection is empty.
+    /// </summary>
+    private void BackfillPreloadedSpells()
+    {
+        var changed = false;
+        foreach (var template in PreloadedCharacters.All.Where(t => t.Spells.Count > 0))
+        {
+            // Insert spell rows directly by FK — never load/modify the parent
+            // Character (avoids spurious concurrency updates on startup).
+            var exists = _db.Characters.Any(c => c.Id == template.Id);
+            var alreadyHasSpells = _db.Spells.Any(s => s.CharacterId == template.Id);
+            if (!exists || alreadyHasSpells) continue;
+
+            foreach (var s in template.Spells)
+            {
+                _db.Spells.Add(new Spell
+                {
+                    CharacterId   = template.Id,
+                    Name          = s.Name,
+                    Level         = s.Level,
+                    School        = s.School,
+                    CastingTime   = s.CastingTime,
+                    Range         = s.Range,
+                    Components    = s.Components,
+                    Duration      = s.Duration,
+                    Concentration = s.Concentration,
+                    IsRitual      = s.IsRitual,
+                    IsPrepared    = s.IsPrepared,
+                    Description   = s.Description,
+                });
+            }
+            changed = true;
+        }
+        if (changed) _db.SaveChanges();
     }
 
     private static void ReplaceCollection<T>(DbSet<T> dbSet, ICollection<T> existing, ICollection<T> incoming, Action<T> setFk)
