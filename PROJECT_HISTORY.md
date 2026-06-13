@@ -73,6 +73,18 @@ dotnet run --urls "http://localhost:5179"
 Then open http://localhost:5179. The SQLite DB and `.claude/` are **git-ignored**
 — each player keeps their own local data.
 
+### Running it for the table (same-wifi LAN access)
+```bash
+cd CopilotTest
+dotnet run --launch-profile lan      # binds http://0.0.0.0:5179 (all interfaces)
+```
+Players on the same wifi open **http://&lt;host-Mac-IP&gt;:5179** (e.g.
+http://10.0.0.248:5179 — find the current IP in System Settings → Wi-Fi, or
+`ipconfig getifaddr en0`). First connection may trigger a macOS firewall prompt —
+click **Allow**. Everyone hits the *same* server, so they all see the same live
+data (this is the closest thing to shared state without real hosting). The Mac
+must stay awake and running the app.
+
 ---
 
 ## 3. Project structure (key files)
@@ -174,6 +186,16 @@ Belqorel, and Wally appear in the Party Hub but not the Guide.
 - Party Hub + character sheets (stats / spells / inventory / profile tabs, edit mode).
 - Character Guide quick-reference with a session tracker (HP, spell-slot pips,
   sorcery points) and Wild Magic info for Winnie; Kennyth panel added.
+
+### Session 2026-06-12 (part 17) — LAN access for phones
+
+- Added a **`lan`** launch profile (`Properties/launchSettings.json`) that binds
+  `http://0.0.0.0:5179` so players on the same wifi can reach the app from their
+  phones at `http://<host-IP>:5179`. Verified reachable on the Mac's LAN IP.
+- Everyone connecting hits the same server/DB → effectively shared live data at
+  the table (no real hosting). Caveats: Mac must stay awake & running; macOS
+  firewall may prompt to Allow on first external connection; the app is exposed
+  to anyone on that wifi while running. See "Running it for the table" above.
 
 ### Session 2026-06-12 (part 16) — Guide: mobile polish
 
