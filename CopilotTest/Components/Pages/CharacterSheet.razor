@@ -315,6 +315,7 @@ else
                                     @if (ls.Concentration) { <span class="spell-tag conc-tag">C</span> }
                                     @if (ls.Ritual)        { <span class="spell-tag ritual-tag">R</span> }
                                     <span class="spell-school">@ls.School</span>
+                                    @if (ls.Source != "PHB 2024") { <span class="spell-source-tag" title="@ls.Source">@ls.Source</span> }
                                     @if (known)
                                     {
                                         <span class="picker-known">✓ known</span>
@@ -911,6 +912,7 @@ else
                                         @if (ls.Concentration) { <span class="spell-tag conc-tag">C</span> }
                                         @if (ls.Ritual)        { <span class="spell-tag ritual-tag">R</span> }
                                         <span class="spell-school">@ls.School</span>
+                                    @if (ls.Source != "PHB 2024") { <span class="spell-source-tag" title="@ls.Source">@ls.Source</span> }
                                         @if (known)
                                         {
                                             <span class="picker-known">✓ known</span>

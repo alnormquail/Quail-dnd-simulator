@@ -2602,3 +2602,9 @@ a.char-tag-link:hover { color: var(--gold); }
 .spellcast-chip.over-limit .spellcast-val { color: var(--red); }
 .spell-limit-line { display: flex; gap: 18px; margin-bottom: 10px; font-size: 13px; }
 .spell-limit-line .over-limit { color: var(--red); }
+
+.spell-source-tag {
+    font-size: 10px; padding: 1px 6px; border-radius: 10px;
+    background: var(--bg-panel); border: 1px solid var(--purple); color: var(--purple);
+    white-space: nowrap;
+}

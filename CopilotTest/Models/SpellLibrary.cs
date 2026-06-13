@@ -1,6 +1,6 @@
 namespace CopilotTest.Models;
 
-/// <summary>One spell in the built-in SRD library.</summary>
+/// <summary>One spell in the built-in spell library.</summary>
 public record LibrarySpell(
     string Name,
     int Level,
@@ -12,7 +12,8 @@ public record LibrarySpell(
     string Duration,
     bool Concentration,
     bool Ritual,
-    string Description
+    string Description,
+    string Source = "PHB 2024"
 );
 
 /// <summary>
@@ -424,5 +425,16 @@ public static class SpellLibrary
             "Move a creature (STR contest) or 1,000 lb object 30 ft with your mind each turn."),
         new("Wall of Stone", 5, "Transmutation", ["druid", "sorcerer", "wizard"], "1 action", "120 ft", "V, S, M", "10 min", true, false,
             "Create a stone wall of ten 10-ft panels. Concentrate the full duration and it becomes permanent."),
+
+        // ── From the party's PDF sheets (source-tagged) ──────────────────────
+        new("Sorcerous Burst", 0, "Evocation", SW, "1 action", "120 ft", "V, S", "Instantaneous", false, false,
+            "Ranged spell attack: 1d8 damage of a type you choose (acid, cold, fire, lightning, poison, psychic, or thunder). If you roll an 8 on a die, roll another d8 and add it (repeatable). Scales at levels 5/11/17.",
+            "PHB 2024"),
+        new("Aganazzar's Scorcher", 2, "Evocation", SW, "1 action", "Self (30-ft line)", "V, S, M", "Instantaneous", false, false,
+            "A line of roaring flame 30 ft long and 5 ft wide. Each creature in the line makes a DEX save, taking 3d8 fire damage on a fail (half on success). +1d8 per slot above 2nd.",
+            "Elemental Evil"),
+        new("Dragon's Breath", 2, "Transmutation", SW, "1 bonus action", "Touch", "V, S, M", "1 min", true, false,
+            "Touch a willing creature; until the spell ends it can use an action to exhale a 15-ft cone of acid, cold, fire, lightning, or poison (chosen when cast). DEX save or 3d6 damage (half on success). +1d6 per slot above 2nd.",
+            "Xanathar's Guide"),
     ];
 }

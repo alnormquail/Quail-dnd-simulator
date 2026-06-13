@@ -174,6 +174,17 @@ Belqorel, and Wally appear in the Party Hub but not the Guide.
 - Character Guide quick-reference with a session tracker (HP, spell-slot pips,
   sorcery points) and Wild Magic info for Winnie; Kennyth panel added.
 
+### Session 2026-06-12 (part 7) — Source-tagged spells from the party sheets
+
+- Added a `Source` field to `LibrarySpell` (defaults to "PHB 2024", so all
+  existing entries are untouched). This starts the source-tagging convention for
+  layering in non-PHB / supplement / homebrew content later.
+- Added the three party-sheet spells missing from the library:
+  **Sorcerous Burst** (PHB 2024), **Aganazzar's Scorcher** (Elemental Evil),
+  **Dragon's Breath** (Xanathar's Guide).
+- Spell pickers (Spells tab + level-up step) now show a small source chip for any
+  spell that isn't core PHB 2024, so non-by-the-book picks are clearly labeled.
+
 ### Session 2026-06-12 (part 6) — Character builder Phase 5 (Items & equipment)
 
 **Content** (`Models/Content/ItemLibrary.cs`)
