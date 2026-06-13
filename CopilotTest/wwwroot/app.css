@@ -2680,3 +2680,42 @@ a.char-tag-link:hover { color: var(--gold); }
 @media (max-width: 600px) {
     .turn-grid { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   Combat Guide — mobile (phone) layout
+   ============================================================ */
+@media (max-width: 600px) {
+    /* Character selector: 2 compact columns */
+    .guide-character-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .guide-char-card { padding: 12px 8px 10px; }
+
+    /* Stat chips: center and pack tighter */
+    .guide-stats-row { justify-content: center; gap: 6px; }
+    .guide-stat { min-width: 70px; padding: 8px 10px; }
+
+    /* Abilities: 3 across is fine, slightly tighter */
+    .guide-abilities { gap: 6px; }
+
+    /* Actions/Spells table → stacked labeled cards */
+    .guide-table thead { display: none; }
+    .guide-table, .guide-table tbody, .guide-table tr, .guide-table td { display: block; width: 100%; }
+    .guide-table tr {
+        border: 1px solid var(--border); border-radius: var(--radius);
+        background: var(--bg-card); margin-bottom: 10px; padding: 6px 2px;
+    }
+    .guide-table td {
+        border: none; padding: 4px 12px; display: flex; gap: 10px; align-items: baseline;
+    }
+    .guide-table td::before {
+        content: attr(data-label);
+        flex: none; min-width: 56px;
+        font-size: 0.66rem; font-weight: 700; letter-spacing: 0.5px;
+        text-transform: uppercase; color: var(--text-dim);
+    }
+    .guide-table td[data-label="Effect"] { flex-direction: column; gap: 2px; }
+    .guide-table tr:hover td { background: transparent; }
+
+    /* Section padding a touch tighter on phones */
+    .guide-panel { padding: 12px; }
+    .guide-section { padding: 12px; }
+}

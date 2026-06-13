@@ -261,10 +261,10 @@
                         @foreach (var action in Selected.Actions)
                         {
                             <tr class="@GetActionRowClass(action)">
-                                <td><strong>@action.DisplayName</strong></td>
-                                <td><span class="action-type-badge @GetActionBadgeClass(action)">@GetActionTypeLabel(action)</span></td>
-                                <td>@action.Range</td>
-                                <td>
+                                <td data-label="Name"><strong>@action.DisplayName</strong></td>
+                                <td data-label="Type"><span class="action-type-badge @GetActionBadgeClass(action)">@GetActionTypeLabel(action)</span></td>
+                                <td data-label="Range">@action.Range</td>
+                                <td data-label="Effect">
                                     @if (action.ActionType == ActionType.Spell && action.SaveDC > 0)
                                     {
                                         <span class="save-dc-inline">DC @action.SaveDC @action.SaveAbility save</span>
@@ -286,7 +286,7 @@
                                         @action.ShortSummary
                                     }
                                 </td>
-                                <td class="uses-cell">@GetUsesLabel(action)</td>
+                                <td class="uses-cell" data-label="Uses">@GetUsesLabel(action)</td>
                             </tr>
                         }
                     </tbody>

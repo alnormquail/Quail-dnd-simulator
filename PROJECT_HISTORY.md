@@ -175,6 +175,16 @@ Belqorel, and Wally appear in the Party Hub but not the Guide.
 - Character Guide quick-reference with a session tracker (HP, spell-slot pips,
   sorcery points) and Wild Magic info for Winnie; Kennyth panel added.
 
+### Session 2026-06-12 (part 16) — Guide: mobile polish
+
+- Made the combat guide phone-friendly: the Actions/Spells **table reflows into
+  labeled cards** on ≤600px (data-label attrs + CSS ::before), the character
+  selector goes 2-column, and stat chips/abilities pack tighter.
+- The guide was already the default page in the 📱 Phone Preview.
+- NOTE: players reaching the guide from their *own* phones still requires the
+  app to be network-reachable (bind 0.0.0.0 on the same wifi, or hosting) — see
+  the "no shared state / hosting" limitation in §7.
+
 ### Session 2026-06-12 (part 15) — Guide: spell descriptions
 
 - New **📖 Spells** section on the combat guide: the character's spells grouped
