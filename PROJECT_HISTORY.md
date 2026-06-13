@@ -184,10 +184,10 @@ Belqorel, and Wally appear in the Party Hub but not the Guide.
   prepared subset). Gideon's PDF had **no spells listed**, so sensible bard
   defaults were kept (flagged for the user).
 - Added two missing cantrips to the library: **Friends** and **Elementalism**.
-- Upgraded the startup backfill into `SyncPreloadedSpells` — it now *replaces*
-  a preloaded caster's spells when they differ from the (PDF-authoritative)
-  template, so existing databases get the corrections. No-op once in sync;
-  never touches user-created characters.
+- The spell correction is a **one-time** fix: gated behind an `AppMeta` flag
+  table (`preloaded-spells-corrected-v1`). It runs once to fix existing/old
+  databases, then never again — so the party members can be hand-edited freely
+  without their spells reverting. User-created characters are never touched.
 
 ### Session 2026-06-12 (part 8) — Populate preloaded casters' spell lists
 

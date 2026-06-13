@@ -132,20 +132,37 @@ public class CharacterService
 
         _db.SaveChanges();
 
-        SyncPreloadedSpells();
+        // One-time correction of the preloaded casters' spell lists to match
+        // their PDF sheets. After it runs once, the party members can be
+        // hand-edited freely without their spells reverting.
+        if (!MetaFlagSet("preloaded-spells-corrected-v1"))
+        {
+            CorrectPreloadedSpells();
+            SetMetaFlag("preloaded-spells-corrected-v1");
+        }
     }
 
+    private bool MetaFlagSet(string key)
+    {
+        using var cmd = _db.Database.GetDbConnection().CreateCommand();
+        if (cmd.Connection!.State != System.Data.ConnectionState.Open) cmd.Connection.Open();
+        cmd.CommandText = "SELECT COUNT(*) FROM AppMeta WHERE \"Key\" = $k;";
+        var p = cmd.CreateParameter(); p.ParameterName = "$k"; p.Value = key; cmd.Parameters.Add(p);
+        return Convert.ToInt64(cmd.ExecuteScalar()) > 0;
+    }
+
+    private void SetMetaFlag(string key) =>
+        _db.Database.ExecuteSqlRaw(
+            "INSERT OR IGNORE INTO \"AppMeta\" (\"Key\", \"Value\") VALUES ({0}, {1});",
+            key, DateTime.UtcNow.ToString("o"));
+
     /// <summary>
-    /// Keep the preloaded casters' spell lists in sync with their templates
-    /// (the authoritative party data from their PDF sheets). If a caster's DB
-    /// spell set differs from the template, it's replaced. Runs every startup
-    /// but is a no-op once in sync.
-    ///
-    /// Note: this makes the templates authoritative for the preloaded party, so
-    /// manual spell edits to those specific characters would revert on restart.
-    /// New (user-created) characters are never touched.
+    /// One-time: bring the preloaded casters' spell lists into line with their
+    /// PDF-sourced templates (replaces a caster's spells when they differ).
+    /// Gated by an AppMeta flag so it runs once and then leaves the party
+    /// members editable. Never touches user-created characters.
     /// </summary>
-    private void SyncPreloadedSpells()
+    private void CorrectPreloadedSpells()
     {
         var changed = false;
         foreach (var template in PreloadedCharacters.All.Where(t => t.Spells.Count > 0))

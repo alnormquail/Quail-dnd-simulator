@@ -56,6 +56,11 @@ using (var scope = app.Services.CreateScope())
                 FOREIGN KEY ("CharacterId") REFERENCES "Characters" ("Id") ON DELETE CASCADE
         );
         CREATE INDEX IF NOT EXISTS "IX_AbilityGrants_CharacterId" ON "AbilityGrants" ("CharacterId");
+
+        CREATE TABLE IF NOT EXISTS "AppMeta" (
+            "Key" TEXT NOT NULL CONSTRAINT "PK_AppMeta" PRIMARY KEY,
+            "Value" TEXT NOT NULL
+        );
         """);
 
     // Add columns introduced after first release (SQLite has no ADD COLUMN IF NOT
