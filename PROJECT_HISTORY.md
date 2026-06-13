@@ -174,6 +174,15 @@ Belqorel, and Wally appear in the Party Hub but not the Guide.
 - Character Guide quick-reference with a session tracker (HP, spell-slot pips,
   sorcery points) and Wild Magic info for Winnie; Kennyth panel added.
 
+### Session 2026-06-12 (part 11) — Load party inventory from the PDFs
+
+- Extracted each PDF sheet's equipment list and added it to the templates
+  (Winnie, Kennyth, Boan, Gideon, Job, Bren) via a new `Inv(...)` helper.
+- `LoadPreloadedInventory()` loads it into existing DBs once, gated by the
+  `preloaded-inventory-loaded-v1` AppMeta flag; only fills characters with an
+  empty inventory, so user-added gear is never clobbered. Same pattern as the
+  spell correction. (68 items loaded.)
+
 ### Session 2026-06-12 (part 10) — Starting equipment & magic-item hiding
 
 Design discussion settled on: **curated by default, full access on demand**.

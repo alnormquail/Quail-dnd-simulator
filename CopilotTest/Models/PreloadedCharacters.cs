@@ -15,6 +15,9 @@ public static class PreloadedCharacters
              .Select(s => SpellLibrary.ToSpell(s!, Guid.Empty))
              .ToList();
 
+    private static InventoryItem Inv(string name, int qty, ItemCategory cat, bool equipped = false) =>
+        new() { Name = name, Quantity = qty, Category = cat, IsEquipped = equipped };
+
     public static Character Spurt => new()
     {
         Id             = new Guid("a1000000-0000-0000-0000-000000000001"),
@@ -223,6 +226,22 @@ public static class PreloadedCharacters
             "Shield", "Sleep", "Thunderwave",
             "Hold Person", "Aganazzar's Scorcher"),
 
+        Inventory = new List<InventoryItem>
+        {
+            Inv("Dagger", 2, ItemCategory.Weapon, true),
+            Inv("Spear", 1, ItemCategory.Weapon, true),
+            Inv("Crystal (Arcane Focus)", 1, ItemCategory.Other, true),
+            Inv("Backpack", 1, ItemCategory.Other),
+            Inv("Rations", 10, ItemCategory.Consumable),
+            Inv("Oil", 2, ItemCategory.Consumable),
+            Inv("Torch", 10, ItemCategory.Other),
+            Inv("Rope (50 ft)", 1, ItemCategory.Other),
+            Inv("Waterskin", 1, ItemCategory.Other),
+            Inv("Tinderbox", 1, ItemCategory.Other),
+            Inv("Caltrops", 20, ItemCategory.Other),
+            Inv("Crowbar", 1, ItemCategory.Other),
+        },
+
         PersonalityTraits = "Winnie Vale — Wild Magic Sorcerer 5, High Elf Noble.",
         GoldPieces = 50,
     };
@@ -273,6 +292,11 @@ public static class PreloadedCharacters
             "Protection from Evil and Good", "Shield of Faith",
             "Aid", "Zone of Truth", "Find Steed"),
 
+        Inventory = new List<InventoryItem>
+        {
+            Inv("Greatsword", 1, ItemCategory.Weapon, true),
+        },
+
         PersonalityTraits = "Kennyth — Paladin 5, Gnome. Lay on Hands pool: 25 HP. Gnome Cunning: Advantage on INT/WIS/CHA saves vs magic.",
         GoldPieces = 30,
     };
@@ -313,6 +337,30 @@ public static class PreloadedCharacters
             new() { Skill = Skill.AnimalHandling, Proficiency = ProficiencyLevel.Proficient },
             new() { Skill = Skill.Nature,         Proficiency = ProficiencyLevel.Proficient },
             new() { Skill = Skill.Survival,       Proficiency = ProficiencyLevel.Proficient },
+        },
+
+        Inventory = new List<InventoryItem>
+        {
+            Inv("Studded Leather", 1, ItemCategory.Armor, true),
+            Inv("Handaxe", 1, ItemCategory.Weapon, true),
+            Inv("Scimitar", 1, ItemCategory.Weapon, true),
+            Inv("Shortsword", 1, ItemCategory.Weapon, true),
+            Inv("Longbow", 1, ItemCategory.Weapon, true),
+            Inv("Arrows", 20, ItemCategory.Other),
+            Inv("Quiver", 1, ItemCategory.Other),
+            Inv("Cartographer's Tools", 1, ItemCategory.Tool),
+            Inv("Backpack", 1, ItemCategory.Other),
+            Inv("Clothes, Common", 1, ItemCategory.Other),
+            Inv("Iron Pot", 1, ItemCategory.Other),
+            Inv("Shovel", 1, ItemCategory.Other),
+            Inv("Rations", 10, ItemCategory.Consumable),
+            Inv("Oil", 2, ItemCategory.Consumable),
+            Inv("Torch", 10, ItemCategory.Other),
+            Inv("Rope (50 ft)", 1, ItemCategory.Other),
+            Inv("Waterskin", 1, ItemCategory.Other),
+            Inv("Tinderbox", 1, ItemCategory.Other),
+            Inv("Caltrops", 20, ItemCategory.Other),
+            Inv("Crowbar", 1, ItemCategory.Other),
         },
 
         PersonalityTraits = "Boan Strickler — Fighter 5, Gnome Folk Hero. Extra Attack: 2 attacks per turn. Action Surge: 1/short rest. Gnome Cunning: Advantage on INT/WIS/CHA saves vs magic.",
@@ -371,6 +419,27 @@ public static class PreloadedCharacters
             "Shatter", "Invisibility",
             "Hypnotic Pattern"),
 
+        Inventory = new List<InventoryItem>
+        {
+            Inv("Leather Armor", 1, ItemCategory.Armor, true),
+            Inv("Dagger", 4, ItemCategory.Weapon, true),
+            Inv("Lute", 1, ItemCategory.Other, true),
+            Inv("Thieves' Tools", 1, ItemCategory.Tool),
+            Inv("Backpack", 1, ItemCategory.Other),
+            Inv("Pouch", 2, ItemCategory.Other),
+            Inv("Crowbar", 1, ItemCategory.Other),
+            Inv("Traveler's Clothes", 1, ItemCategory.Other),
+            Inv("Costume", 3, ItemCategory.Other),
+            Inv("Rations", 9, ItemCategory.Consumable),
+            Inv("Oil", 8, ItemCategory.Consumable),
+            Inv("Bullseye Lantern", 1, ItemCategory.Other),
+            Inv("Bedroll", 1, ItemCategory.Other),
+            Inv("Blanket", 1, ItemCategory.Other),
+            Inv("Mirror", 1, ItemCategory.Other),
+            Inv("Waterskin", 2, ItemCategory.Other),
+            Inv("Tinderbox", 2, ItemCategory.Other),
+        },
+
         PersonalityTraits = "Gideon Silverspoon — Bard 5, Half-Elf Criminal. Bardic Inspiration d8, 3/short rest. College of Lore: Cutting Words reaction.",
     };
 
@@ -421,6 +490,24 @@ public static class PreloadedCharacters
             "Spare the Dying", "Sacred Flame",
             "Shield of Faith",
             "Find Steed"),
+
+        Inventory = new List<InventoryItem>
+        {
+            Inv("Chain Mail", 1, ItemCategory.Armor, true),
+            Inv("Shield", 1, ItemCategory.Armor, true),
+            Inv("Longsword", 1, ItemCategory.Weapon, true),
+            Inv("Javelin", 6, ItemCategory.Weapon, true),
+            Inv("Amulet (Holy Symbol)", 1, ItemCategory.Other, true),
+            Inv("Calligrapher's Supplies", 1, ItemCategory.Tool),
+            Inv("Backpack", 1, ItemCategory.Other),
+            Inv("Book of Prayers", 1, ItemCategory.Other),
+            Inv("Robe", 2, ItemCategory.Other),
+            Inv("Rations", 7, ItemCategory.Consumable),
+            Inv("Holy Water", 1, ItemCategory.Consumable),
+            Inv("Blanket", 1, ItemCategory.Other),
+            Inv("Lamp", 1, ItemCategory.Other),
+            Inv("Tinderbox", 1, ItemCategory.Other),
+        },
 
         PersonalityTraits = "Job Goodhammer — Paladin 5, Human Acolyte. Lay on Hands pool: 25 HP. Oath of the Open Sea.",
     };
@@ -480,6 +567,14 @@ public static class PreloadedCharacters
             "Thunderwave", "Healing Word", "Faerie Fire", "Cure Wounds", "Fog Cloud",
             "Moonbeam", "Flaming Sphere", "Heat Metal",
             "Call Lightning"),
+
+        Inventory = new List<InventoryItem>
+        {
+            Inv("Leather Armor", 1, ItemCategory.Armor, true),
+            Inv("Dagger", 1, ItemCategory.Weapon, true),
+            Inv("Shortsword", 1, ItemCategory.Weapon, true),
+            Inv("Wooden Staff (Druidic Focus)", 1, ItemCategory.Other, true),
+        },
 
         PersonalityTraits = "Bren Gunning — Druid 5, Forest Gnome. Circle of the Land. Wild Shape 2/long rest (5 temp HP). Gnome Cunning: Advantage on INT/WIS/CHA saves vs magic.",
     };

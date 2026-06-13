@@ -140,6 +140,46 @@ public class CharacterService
             CorrectPreloadedSpells();
             SetMetaFlag("preloaded-spells-corrected-v1");
         }
+
+        // One-time load of the preloaded party's inventory from their PDF sheets.
+        // Only fills characters whose inventory is currently empty, so it never
+        // clobbers gear the user has added.
+        if (!MetaFlagSet("preloaded-inventory-loaded-v1"))
+        {
+            LoadPreloadedInventory();
+            SetMetaFlag("preloaded-inventory-loaded-v1");
+        }
+    }
+
+    /// <summary>
+    /// One-time: load each preloaded character's inventory (from their PDF
+    /// sheet) into the DB, but only for characters whose inventory is empty.
+    /// Inserts directly by FK; never touches user-created characters.
+    /// </summary>
+    private void LoadPreloadedInventory()
+    {
+        var changed = false;
+        foreach (var template in PreloadedCharacters.All.Where(t => t.Inventory.Count > 0))
+        {
+            if (!_db.Characters.Any(c => c.Id == template.Id)) continue;
+            if (_db.InventoryItems.Any(i => i.CharacterId == template.Id)) continue;  // already has gear
+
+            foreach (var item in template.Inventory)
+            {
+                _db.InventoryItems.Add(new InventoryItem
+                {
+                    CharacterId = template.Id,
+                    Name        = item.Name,
+                    Quantity    = item.Quantity,
+                    Weight      = item.Weight,
+                    Description = item.Description,
+                    IsEquipped  = item.IsEquipped,
+                    Category    = item.Category,
+                });
+            }
+            changed = true;
+        }
+        if (changed) _db.SaveChanges();
     }
 
     private bool MetaFlagSet(string key)
