@@ -154,6 +154,7 @@ All level 5 unless noted, seeded with deterministic GUIDs `a1000000-...-0000000N
 | 7 | Gideon Silverspoon | Bard 5 | Half-Elf | from PDF; 3rd-level slots |
 | 8 | Job Goodhammer | Paladin 5 | Human | from PDF |
 | 9 | Bren Gunning | Druid 5 | Forest Gnome | from PDF; big prepared list |
+| A | Korran Vale | Barbarian 4 | Half-Orc | from PDF; full Guide entry; a Vale, like Winnie |
 
 Characters 6–9 were transcribed from D&D Beyond PDF character sheets in
 `~/Downloads/ordercharacterslevel5pdfs/` (and `~/Downloads/Bren.pdf`).
@@ -173,6 +174,19 @@ Belqorel, and Wally appear in the Party Hub but not the Guide.
 - Party Hub + character sheets (stats / spells / inventory / profile tabs, edit mode).
 - Character Guide quick-reference with a session tracker (HP, spell-slot pips,
   sorcery points) and Wild Magic info for Winnie; Kennyth panel added.
+
+### Session 2026-06-12 (part 13) — Add Korran Vale (Barbarian)
+
+- The real Korran was finally located (the "Korran.pdf" in both order folders is
+  a mislabeled copy of Kennyth's sheet; her actual sheet came via a separate
+  PDF, `camillesharrow_159569379.pdf`).
+- **Korran Vale** — Barbarian 4, Half-Orc (GUID …000a): STR 17/DEX 13/CON 15/
+  INT 12/WIS 10/CHA 8, HP 41, AC 17 (Scale Mail of Force Resistance + Shield),
+  Greataxe/Handaxe, proficient in Athletics/Intimidation/Perception/Performance/
+  Persuasion/Survival, Rage 3/long rest, Relentless Endurance. Full inventory +
+  Guide entry. (She shares the Vale surname with Winnie.)
+- As a brand-new preloaded character she seeds fresh (full graph incl. inventory)
+  on next startup — no backfill needed.
 
 ### Session 2026-06-12 (part 12) — Combat guide QoL: live skills/saves
 

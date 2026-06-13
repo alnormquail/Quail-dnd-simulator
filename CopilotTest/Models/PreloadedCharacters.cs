@@ -6,7 +6,7 @@ namespace CopilotTest.Models;
 /// </summary>
 public static class PreloadedCharacters
 {
-    public static IReadOnlyList<Character> All => [Spurt, Belqorel, Wally, Winnie, Kennyth, Boan, Gideon, Job, Bren];
+    public static IReadOnlyList<Character> All => [Spurt, Belqorel, Wally, Winnie, Kennyth, Boan, Gideon, Job, Bren, Korran];
 
     /// <summary>Builds Spell entries from the shared library by name (skips unknowns).</summary>
     private static List<Spell> SpellsFor(params string[] names) =>
@@ -577,5 +577,67 @@ public static class PreloadedCharacters
         },
 
         PersonalityTraits = "Bren Gunning — Druid 5, Forest Gnome. Circle of the Land. Wild Shape 2/long rest (5 temp HP). Gnome Cunning: Advantage on INT/WIS/CHA saves vs magic.",
+    };
+
+    public static Character Korran => new()
+    {
+        Id             = new Guid("a1000000-0000-0000-0000-00000000000a"),
+        Name           = "Korran Vale",
+        Type           = CombatantType.PC,
+        CharacterClass = "Barbarian",
+        CharacterLevel = 4,
+        Race           = "Half-Orc",
+        Background     = "Custom",
+
+        Strength     = 17, Dexterity    = 13, Constitution = 15,
+        Intelligence = 12, Wisdom       = 10, Charisma     = 8,
+
+        MaxHitPoints     = 41,
+        ArmorClass       = 17,
+        Speed            = 30,
+        ProficiencyBonus = 2,
+
+        SaveProfStrength     = true,
+        SaveProfConstitution = true,
+
+        IsBarbarianClass = true,
+        RageBonus        = 2,
+        RageUsesPerDay   = 3,
+
+        Actions = new List<CombatAction>
+        {
+            new() { Name = "Greataxe",       ActionType = ActionType.Attack, AttackBonus = 5, DamageDice = "1d12", DamageBonus = 3, DamageType = DamageType.Slashing,    Range = "5 ft"  },
+            new() { Name = "Handaxe",        ActionType = ActionType.Attack, AttackBonus = 5, DamageDice = "1d6",  DamageBonus = 3, DamageType = DamageType.Slashing,    Range = "20/60 ft" },
+            new() { Name = "Unarmed Strike", ActionType = ActionType.Attack, AttackBonus = 5, DamageDice = "1",    DamageBonus = 3, DamageType = DamageType.Bludgeoning, Range = "5 ft"  },
+        },
+
+        Skills = new List<CharacterSkill>
+        {
+            new() { Skill = Skill.Athletics,    Proficiency = ProficiencyLevel.Proficient },
+            new() { Skill = Skill.Intimidation, Proficiency = ProficiencyLevel.Proficient },
+            new() { Skill = Skill.Perception,   Proficiency = ProficiencyLevel.Proficient },
+            new() { Skill = Skill.Performance,  Proficiency = ProficiencyLevel.Proficient },
+            new() { Skill = Skill.Persuasion,   Proficiency = ProficiencyLevel.Proficient },
+            new() { Skill = Skill.Survival,     Proficiency = ProficiencyLevel.Proficient },
+        },
+
+        Inventory = new List<InventoryItem>
+        {
+            Inv("Scale Mail (Armor of Force Resistance)", 1, ItemCategory.Armor, true),
+            Inv("Shield", 1, ItemCategory.Armor, true),
+            Inv("Greataxe", 2, ItemCategory.Weapon, true),
+            Inv("Handaxe", 8, ItemCategory.Weapon, true),
+            Inv("Backpack", 2, ItemCategory.Other),
+            Inv("Rations", 10, ItemCategory.Consumable),
+            Inv("Oil", 2, ItemCategory.Consumable),
+            Inv("Torch", 10, ItemCategory.Other),
+            Inv("Rope (50 ft)", 1, ItemCategory.Other),
+            Inv("Bedroll", 1, ItemCategory.Other),
+            Inv("Waterskin", 1, ItemCategory.Other),
+            Inv("Tinderbox", 1, ItemCategory.Other),
+        },
+
+        PersonalityTraits = "Korran Vale — Barbarian 4, Half-Orc. Rage 3/long rest (+2 dmg, resistance to bludgeoning/piercing/slashing). Relentless Endurance: drop to 1 HP instead of 0 once per long rest.",
+        GoldPieces = 30,
     };
 }

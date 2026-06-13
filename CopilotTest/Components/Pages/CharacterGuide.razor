@@ -471,6 +471,7 @@
         [new Guid("a1000000-0000-0000-0000-000000000007")] = "Half-Elf",
         [new Guid("a1000000-0000-0000-0000-000000000008")] = "Human",
         [new Guid("a1000000-0000-0000-0000-000000000009")] = "Forest Gnome",
+        [new Guid("a1000000-0000-0000-0000-00000000000a")] = "Half-Orc",
     };
 
     private string GetRace(Guid id) => RaceMap.TryGetValue(id, out var r) ? r : "—";
@@ -787,6 +788,38 @@
                 new("1st Level", 4),
                 new("2nd Level", 3),
                 new("3rd Level", 2),
+            ]
+        ),
+        // ── Korran Vale the Barbarian ────────────────────────────────────────
+        [new Guid("a1000000-0000-0000-0000-00000000000a")] = new(
+            Race: "Half-Orc",
+            Background: "Custom",
+            SavingThrows: [],
+            ProficientSkills: [],
+            Defenses:
+            [
+                "Rage: Resistance to Bludgeoning, Piercing, and Slashing damage while raging.",
+                "Relentless Endurance: When you drop to 0 HP (but aren't killed outright), drop to 1 HP instead — once per long rest.",
+                "Danger Sense: Advantage on Dexterity saving throws against effects you can see (while not Incapacitated).",
+                "Darkvision 60 ft."
+            ],
+            ClassFeatures:
+            [
+                "Rage (3/long rest): Bonus Action — gain +2 melee damage with Strength weapons, resistance to B/P/S damage, and Advantage on Strength checks & saves. Lasts up to 10 minutes.",
+                "Reckless Attack: On your first attack, you can attack with Advantage — but attacks against you have Advantage until your next turn.",
+                "Unarmored Defense: With no armor, AC = 10 + DEX + CON. (Korran wears Scale Mail + Shield for AC 17, which is higher.)",
+                "Savage Attacks (Half-Orc): On a critical hit with a melee weapon, roll one of the weapon's damage dice an extra time.",
+                "Primal Knowledge: You can channel Rage into extra movement/skills (Barbarian level 3+)."
+            ],
+            PlayTips:
+            [
+                "Open with Rage every fight — +2 damage and resistance to physical damage makes you the party's wall.",
+                "Use Reckless Attack when you need the hit to land (advantage), especially while raging when you're already tanky.",
+                "Greataxe is your main weapon: +5 to hit, 1d12+3 slashing, with Cleave to spill damage onto a second adjacent enemy.",
+                "You carry 8 Handaxes — throw one (+5, 1d6+3, range 20/60) when an enemy is out of reach.",
+                "Relentless Endurance is a free 'stay up once' — don't be afraid to be in the thick of it; you drop to 1 HP instead of going down (1/long rest).",
+                "Rage ends if you don't attack or take damage on your turn, so stay aggressive.",
+                "Your CHA is low (−1) — let Gideon or another face handle negotiations; you're better at intimidating."
             ]
         ),
     };
