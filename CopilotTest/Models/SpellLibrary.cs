@@ -427,6 +427,10 @@ public static class SpellLibrary
             "Create a stone wall of ten 10-ft panels. Concentrate the full duration and it becomes permanent."),
 
         // ── From the party's PDF sheets (source-tagged) ──────────────────────
+        new("Friends", 0, "Enchantment", ["bard", "sorcerer", "warlock", "wizard"], "1 action", "10 ft", "S, M", "1 min", true, false,
+            "You gain Advantage on Charisma checks against one creature that isn't hostile. When the spell ends, the creature realizes you used magic to influence it and may become hostile."),
+        new("Elementalism", 0, "Transmutation", ["druid", "sorcerer", "wizard"], "1 action", "30 ft", "V, S", "Instantaneous", false, false,
+            "Manipulate the elements for a minor effect: douse or ignite a small flame, make a 5-ft cube of mist/mud/dust, or send a harmless gust. (One option per casting.)"),
         new("Sorcerous Burst", 0, "Evocation", SW, "1 action", "120 ft", "V, S", "Instantaneous", false, false,
             "Ranged spell attack: 1d8 damage of a type you choose (acid, cold, fire, lightning, poison, psychic, or thunder). If you roll an 8 on a die, roll another d8 and add it (repeatable). Scales at levels 5/11/17.",
             "PHB 2024"),

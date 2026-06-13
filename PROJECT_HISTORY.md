@@ -174,6 +174,21 @@ Belqorel, and Wally appear in the Party Hub but not the Guide.
 - Character Guide quick-reference with a session tracker (HP, spell-slot pips,
   sorcery points) and Wild Magic info for Winnie; Kennyth panel added.
 
+### Session 2026-06-12 (part 9) — Correct caster spell lists from the PDFs
+
+- Re-read the level-5 PDF sheets and corrected each caster's spells to match
+  exactly: Winnie (Prestidigitation/Minor Illusion/Friends + Shield/Sleep/
+  Thunderwave + Hold Person/Aganazzar's), Kennyth (gnome/fighting-style cantrips
+  + oath spells + Find Steed, no Cure Wounds), Job (lean: Spare the Dying/Sacred
+  Flame/Shield of Faith/Find Steed), Bren (exact cantrips incl. Elementalism +
+  prepared subset). Gideon's PDF had **no spells listed**, so sensible bard
+  defaults were kept (flagged for the user).
+- Added two missing cantrips to the library: **Friends** and **Elementalism**.
+- Upgraded the startup backfill into `SyncPreloadedSpells` — it now *replaces*
+  a preloaded caster's spells when they differ from the (PDF-authoritative)
+  template, so existing databases get the corrections. No-op once in sync;
+  never touches user-created characters.
+
 ### Session 2026-06-12 (part 8) — Populate preloaded casters' spell lists
 
 - Each preloaded caster (Winnie, Kennyth, Gideon, Job, Bren; Spurt already had

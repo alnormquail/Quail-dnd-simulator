@@ -132,25 +132,32 @@ public class CharacterService
 
         _db.SaveChanges();
 
-        BackfillPreloadedSpells();
+        SyncPreloadedSpells();
     }
 
     /// <summary>
-    /// One-time backfill: preloaded casters that exist in the DB but have an
-    /// empty spell list get their template spells copied in. Safe to run every
-    /// startup — it only touches casters whose Spells collection is empty.
+    /// Keep the preloaded casters' spell lists in sync with their templates
+    /// (the authoritative party data from their PDF sheets). If a caster's DB
+    /// spell set differs from the template, it's replaced. Runs every startup
+    /// but is a no-op once in sync.
+    ///
+    /// Note: this makes the templates authoritative for the preloaded party, so
+    /// manual spell edits to those specific characters would revert on restart.
+    /// New (user-created) characters are never touched.
     /// </summary>
-    private void BackfillPreloadedSpells()
+    private void SyncPreloadedSpells()
     {
         var changed = false;
         foreach (var template in PreloadedCharacters.All.Where(t => t.Spells.Count > 0))
         {
-            // Insert spell rows directly by FK — never load/modify the parent
-            // Character (avoids spurious concurrency updates on startup).
-            var exists = _db.Characters.Any(c => c.Id == template.Id);
-            var alreadyHasSpells = _db.Spells.Any(s => s.CharacterId == template.Id);
-            if (!exists || alreadyHasSpells) continue;
+            if (!_db.Characters.Any(c => c.Id == template.Id)) continue;
 
+            var existing = _db.Spells.Where(s => s.CharacterId == template.Id).ToList();
+            var existingNames = existing.Select(s => s.Name).OrderBy(n => n).ToList();
+            var templateNames = template.Spells.Select(s => s.Name).OrderBy(n => n).ToList();
+            if (existingNames.SequenceEqual(templateNames)) continue;   // already in sync
+
+            _db.Spells.RemoveRange(existing);
             foreach (var s in template.Spells)
             {
                 _db.Spells.Add(new Spell

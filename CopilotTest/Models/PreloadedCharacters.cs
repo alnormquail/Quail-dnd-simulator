@@ -219,8 +219,8 @@ public static class PreloadedCharacters
         },
 
         Spells = SpellsFor(
-            "Fire Bolt", "Chill Touch", "Mage Hand",
-            "Shield", "Thunderwave", "Sleep",
+            "Prestidigitation", "Minor Illusion", "Friends", "Fire Bolt", "Chill Touch",
+            "Shield", "Sleep", "Thunderwave",
             "Hold Person", "Aganazzar's Scorcher"),
 
         PersonalityTraits = "Winnie Vale — Wild Magic Sorcerer 5, High Elf Noble.",
@@ -269,8 +269,9 @@ public static class PreloadedCharacters
         },
 
         Spells = SpellsFor(
-            "Shield of Faith", "Protection from Evil and Good", "Cure Wounds",
-            "Aid", "Zone of Truth"),
+            "Mending", "Prestidigitation", "Spare the Dying", "Guidance",
+            "Protection from Evil and Good", "Shield of Faith",
+            "Aid", "Zone of Truth", "Find Steed"),
 
         PersonalityTraits = "Kennyth — Paladin 5, Gnome. Lay on Hands pool: 25 HP. Gnome Cunning: Advantage on INT/WIS/CHA saves vs magic.",
         GoldPieces = 30,
@@ -417,9 +418,9 @@ public static class PreloadedCharacters
         },
 
         Spells = SpellsFor(
-            "Sacred Flame",
-            "Shield of Faith", "Bless", "Cure Wounds",
-            "Aid", "Magic Weapon"),
+            "Spare the Dying", "Sacred Flame",
+            "Shield of Faith",
+            "Find Steed"),
 
         PersonalityTraits = "Job Goodhammer — Paladin 5, Human Acolyte. Lay on Hands pool: 25 HP. Oath of the Open Sea.",
     };
@@ -472,10 +473,12 @@ public static class PreloadedCharacters
             new() { Skill = Skill.Stealth,      Proficiency = ProficiencyLevel.Proficient },
         },
 
+        // Druids prepare from the whole list; Bren's PDF lists nearly all druid
+        // spells, so this is a sensible prepared subset (his cantrips are exact).
         Spells = SpellsFor(
-            "Poison Spray", "Shocking Grasp", "Druidcraft",
-            "Thunderwave", "Healing Word", "Faerie Fire", "Cure Wounds",
-            "Moonbeam", "Flaming Sphere",
+            "Spare the Dying", "Poison Spray", "Minor Illusion", "Shocking Grasp", "Elementalism",
+            "Thunderwave", "Healing Word", "Faerie Fire", "Cure Wounds", "Fog Cloud",
+            "Moonbeam", "Flaming Sphere", "Heat Metal",
             "Call Lightning"),
 
         PersonalityTraits = "Bren Gunning — Druid 5, Forest Gnome. Circle of the Land. Wild Shape 2/long rest (5 temp HP). Gnome Cunning: Advantage on INT/WIS/CHA saves vs magic.",
