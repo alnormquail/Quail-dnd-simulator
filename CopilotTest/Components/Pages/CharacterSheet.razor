@@ -567,7 +567,31 @@ else
                             <input class="form-input" style="margin-top:6px" @bind="character.Background" placeholder="Background (free text)" />
                         }
                     </div>
-                    <div class="form-field"><label>Subclass</label><input class="form-input" @bind="character.Subclass" placeholder="School of Evocation..." /></div>
+                    <div class="form-field">
+                        <label>Subclass</label>
+                        @if (ContentLibrary.SubclassesForClass(character.CharacterClass).Any())
+                        {
+                            <select class="form-input" value="@character.SubclassKey" @onchange="OnSubclassChanged">
+                                <option value="">— None / choose later —</option>
+                                @foreach (var sub in ContentLibrary.SubclassesForClass(character.CharacterClass))
+                                {
+                                    <option value="@sub.Key">@sub.Name</option>
+                                }
+                            </select>
+                            @if (!string.IsNullOrEmpty(character.SubclassKey) && character.CharacterLevel < 3)
+                            {
+                                <div class="field-hint">Features unlock at level 3 — they'll apply automatically as you level up.</div>
+                            }
+                            else if (!string.IsNullOrEmpty(character.SubclassKey))
+                            {
+                                <div class="field-hint">✨ Subclass features applied (see Stats tab). Save to keep.</div>
+                            }
+                        }
+                        else
+                        {
+                            <input class="form-input" @bind="character.Subclass" placeholder="Subclass (free text)" />
+                        }
+                    </div>
                 </div>
 
                 @* Background ability-score allocation *@
@@ -859,7 +883,27 @@ else
                 {
                     var newSlots = LevelUpRules.SlotsForLevel(character.CharacterClass, newLevel);
                     var grants = LevelUpRules.FeatureGrants(character.CharacterClass, newLevel);
+                    var classSubclasses = ContentLibrary.SubclassesForClass(character.CharacterClass);
+                    var needsSubclass = classSubclasses.Any() && string.IsNullOrEmpty(character.SubclassKey) && newLevel >= 3;
+                    var subclassNow = ContentLibrary.GetSubclass(character.SubclassKey);
+                    var subclassFeats = subclassNow?.Features.Where(f => f.Level == newLevel).ToList() ?? [];
                     <div class="wizard-body">
+
+                        @if (needsSubclass)
+                        {
+                            <div class="wizard-subclass-prompt">
+                                <div class="wizard-subclass-title">🎓 Choose your subclass!</div>
+                                <p>Level @newLevel is when a @character.CharacterClass picks a subclass. Choose now and its features apply automatically:</p>
+                                <select class="form-input" value="@character.SubclassKey" @onchange="OnSubclassChanged">
+                                    <option value="">— Choose a subclass —</option>
+                                    @foreach (var sub in classSubclasses)
+                                    {
+                                        <option value="@sub.Key">@sub.Name</option>
+                                    }
+                                </select>
+                            </div>
+                        }
+
                         <div class="wizard-review-list">
                             <div class="wizard-review-row">✅ Level: @character.CharacterLevel → <strong>@newLevel</strong></div>
                             <div class="wizard-review-row">✅ Max HP: @character.MaxHitPoints → <strong>@(character.MaxHitPoints + hpGain)</strong></div>
@@ -884,6 +928,10 @@ else
                             @foreach (var g in grants)
                             {
                                 <div class="wizard-review-row">✅ New feature: <strong>@g.Name</strong> — @g.Description</div>
+                            }
+                            @foreach (var sf in subclassFeats)
+                            {
+                                <div class="wizard-review-row">✅ @subclassNow!.Name: <strong>@sf.Name</strong> — @sf.Description</div>
                             }
                         </div>
 
@@ -1120,6 +1168,13 @@ else
     private AbilityScore bgPlusTwo = AbilityScore.Strength;
     private AbilityScore bgPlusOne = AbilityScore.Dexterity;
     private string featToAdd = "";
+
+    private void OnSubclassChanged(ChangeEventArgs e)
+    {
+        if (character == null) return;
+        var key = e.Value?.ToString();
+        Content.ApplySubclass(character, string.IsNullOrEmpty(key) ? null : key);
+    }
 
     private void OnBackgroundChanged(ChangeEventArgs e)
     {
@@ -1431,6 +1486,9 @@ else
             if (!character.Spells.Any(s => s.Name.Equals(spell.Name, StringComparison.OrdinalIgnoreCase)))
                 character.Spells.Add(spell);
         }
+
+        // Auto-grant subclass features unlocked at the new level
+        Content.GrantSubclassFeaturesForLevel(character, newLevel);
 
         // Auto-grant class features for the new level
         foreach (var grant in LevelUpRules.FeatureGrants(character.CharacterClass, newLevel))

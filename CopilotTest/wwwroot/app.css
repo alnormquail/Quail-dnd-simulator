@@ -2545,3 +2545,10 @@ button.item-equip-dot { cursor: pointer; }
     background: var(--bg-card); border: 1px solid var(--gold); color: var(--gold);
     border-radius: 20px; padding: 2px 12px; font-size: 13px; font-weight: 600;
 }
+
+.wizard-subclass-prompt {
+    border: 1px solid var(--gold); border-radius: var(--radius);
+    background: rgba(255,163,0,0.08); padding: 12px 14px; margin-bottom: 14px;
+}
+.wizard-subclass-title { font-weight: 700; color: var(--gold); margin-bottom: 6px; }
+.wizard-subclass-prompt p { margin-bottom: 8px; font-size: 13px; }

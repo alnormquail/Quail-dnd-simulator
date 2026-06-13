@@ -17,6 +17,8 @@ public class Character
     public string SpeciesKey { get; set; } = string.Empty;
     /// <summary>Content-library key of the chosen background, if picked from the library.</summary>
     public string BackgroundKey { get; set; } = string.Empty;
+    /// <summary>Content-library key of the chosen subclass, if picked from the library.</summary>
+    public string SubclassKey { get; set; } = string.Empty;
 
     // Ability scores
     public int Strength { get; set; } = 10;

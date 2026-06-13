@@ -60,6 +60,21 @@ public static class AbilityNames
 
 public enum FeatCategory { Origin, General, FightingStyle, EpicBoon }
 
+/// <summary>A subclass feature gained at a specific class level.</summary>
+public record SubclassFeature(int Level, string Name, string Description);
+
+/// <summary>A subclass (e.g. "College of Lore") belonging to a class.</summary>
+public record SubclassData
+{
+    public string Key { get; init; } = "";
+    public string Name { get; init; } = "";
+    /// <summary>Lowercase class name this subclass belongs to (e.g. "bard").</summary>
+    public string ClassName { get; init; } = "";
+    public string Source { get; init; } = "PHB 2024";
+    public RulesEdition Edition { get; init; } = RulesEdition.Edition2024;
+    public IReadOnlyList<SubclassFeature> Features { get; init; } = [];
+}
+
 /// <summary>
 /// A 2024 background: ability bonuses are allocated by the player among three
 /// listed abilities (+2/+1 or +1/+1/+1), plus skills, a tool, and an Origin feat.

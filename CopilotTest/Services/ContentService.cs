@@ -127,6 +127,59 @@ public class ContentService
         }
     }
 
+    // ── Subclasses ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Set (or clear) a character's subclass, granting all of its features up to
+    /// the character's current level. Reverses the previous subclass first.
+    /// Features are tagged with the subclass name for clean removal.
+    /// </summary>
+    public void ApplySubclass(Character character, string? subclassKey)
+    {
+        var previous = ContentLibrary.GetSubclass(NullIfEmpty(character.SubclassKey));
+        if (previous != null)
+            character.Features.RemoveAll(f => f.Source == previous.Name);
+
+        var next = ContentLibrary.GetSubclass(NullIfEmpty(subclassKey));
+        if (next == null)
+        {
+            character.SubclassKey = string.Empty;
+            character.Subclass    = string.Empty;
+            return;
+        }
+
+        character.SubclassKey = next.Key;
+        character.Subclass    = next.Name;
+
+        foreach (var feat in next.Features.Where(f => f.Level <= character.CharacterLevel))
+            AddSubclassFeature(character, next, feat);
+    }
+
+    /// <summary>
+    /// Grant the chosen subclass's features that are gained at exactly this level
+    /// (used by the level-up wizard). No-op if no subclass is set.
+    /// </summary>
+    public void GrantSubclassFeaturesForLevel(Character character, int level)
+    {
+        var sub = ContentLibrary.GetSubclass(NullIfEmpty(character.SubclassKey));
+        if (sub == null) return;
+        foreach (var feat in sub.Features.Where(f => f.Level == level))
+            AddSubclassFeature(character, sub, feat);
+    }
+
+    private static void AddSubclassFeature(Character character, SubclassData sub, SubclassFeature feat)
+    {
+        if (character.Features.Any(f => f.Name == feat.Name && f.Source == sub.Name)) return;
+        character.Features.Add(new CharacterFeature
+        {
+            CharacterId = character.Id,
+            Name        = feat.Name,
+            Description = feat.Description,
+            Source      = sub.Name,
+            LevelGained = feat.Level,
+        });
+    }
+
     // ── Standalone feats ───────────────────────────────────────────────────────
 
     /// <summary>Add a feat the player picked directly (not via a background).</summary>

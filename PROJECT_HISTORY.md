@@ -22,7 +22,9 @@
 2. **Backgrounds + Feats** ✅ (Phase 2, done 2026-06-12) — backgrounds with
    ability-score allocation + Origin feat; standalone feat picker; reversible
    ability-score grants.
-3. **Class/subclass deepening** — subclass features into the level-up wizard.
+3. **Class/subclass deepening** ✅ (Phase 3, done 2026-06-12) — subclass library,
+   sheet picker, and level-up wizard integration (subclass features auto-grant
+   at the right levels; wizard prompts for subclass at level 3).
 4. **Creation wizard** — from-scratch flow (Species → Class → Background →
    Abilities → Equipment) built on phases 1–3.
 5. **Items + content breadth** — magic items; pour in more books, source-tagged.
@@ -168,6 +170,29 @@ Belqorel, and Wally appear in the Party Hub but not the Guide.
 - Party Hub + character sheets (stats / spells / inventory / profile tabs, edit mode).
 - Character Guide quick-reference with a session tracker (HP, spell-slot pips,
   sorcery points) and Wild Magic info for Winnie; Kennyth panel added.
+
+### Session 2026-06-12 (part 4) — Character builder Phase 3 (Subclasses)
+
+**Content** (`Models/Content/SubclassLibrary.cs`, `ContentModels.cs`)
+- `SubclassData` + `SubclassFeature` (level-keyed). `SubclassLibrary` seeds all
+  twelve classes' four 2024 PHB subclasses — every subclass has its defining
+  level-3 feature; the party's classes (Barbarian, Bard, Cleric, Druid, Fighter,
+  Paladin, Rogue, Sorcerer, Wizard) get features through levels 6/10/14+.
+  Remaining feature depth for Monk/Ranger/Warlock is a fill-in-later content task.
+- Exposed via `ContentLibrary.SubclassesForClass` / `GetSubclass`.
+
+**Engine** (`Services/ContentService.cs`, `Character.SubclassKey` + migration)
+- `ApplySubclass(character, key)` — grants all subclass features up to the
+  character's current level, reversible by source tag (subclass name).
+- `GrantSubclassFeaturesForLevel(character, level)` — used by the wizard to add
+  exactly the features unlocked at a new level.
+
+**UI** (`CharacterSheet.razor`)
+- Profile tab: Subclass becomes a dropdown of the class's library subclasses
+  (free-text fallback for unknown classes); picking applies features live.
+- Level-up wizard: grants subclass features on level up, lists them in Review,
+  and at level 3 (with no subclass yet) shows an inline "Choose your subclass!"
+  prompt so the choice and its features happen during the level-up.
 
 ### Session 2026-06-12 (part 3) — Character builder Phase 2 (Backgrounds + Feats)
 

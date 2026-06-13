@@ -19,6 +19,10 @@ public static class ContentLibrary
     public static BackgroundData? GetBackground(string? key) =>
         key is null ? null : _backgrounds.FirstOrDefault(b => b.Key == key);
 
+    public static IReadOnlyList<SubclassData> SubclassesForClass(string className) =>
+        SubclassLibrary.ForClass(className);
+    public static SubclassData? GetSubclass(string? key) => SubclassLibrary.Get(key);
+
     public static IReadOnlyList<FeatData> Feats => _feats;
     public static FeatData? GetFeat(string? key) =>
         key is null ? null : _feats.FirstOrDefault(f => f.Key == key);
