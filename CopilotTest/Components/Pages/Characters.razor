@@ -55,39 +55,41 @@
         <div class="character-grid">
             @foreach (var c in characters)
             {
-                <div class="character-card" @onclick='() => Nav.NavigateTo($"/characters/{c.Id}")'>
-                    <div class="char-card-header">
-                        <span class="char-card-icon">@TypeIcon(c.Type)</span>
-                        <div>
-                            <div class="char-card-name">@c.Name</div>
-                            @if (!string.IsNullOrEmpty(c.ClassDisplay))
-                            {
-                                <div class="char-card-class">@c.ClassDisplay</div>
-                            }
-                            @if (!string.IsNullOrEmpty(c.Race))
-                            {
-                                <div class="char-card-race">@c.Race</div>
-                            }
+                <div class="character-card">
+                    <a class="char-card-link" href="/characters/@c.Id">
+                        <div class="char-card-header">
+                            <span class="char-card-icon">@TypeIcon(c.Type)</span>
+                            <div>
+                                <div class="char-card-name">@c.Name</div>
+                                @if (!string.IsNullOrEmpty(c.ClassDisplay))
+                                {
+                                    <div class="char-card-class">@c.ClassDisplay</div>
+                                }
+                                @if (!string.IsNullOrEmpty(c.Race))
+                                {
+                                    <div class="char-card-race">@c.Race</div>
+                                }
+                            </div>
                         </div>
-                    </div>
-                    <div class="char-card-stats">
-                        <div class="char-stat-box" title="Max HP">
-                            <span class="char-stat-val">@c.MaxHitPoints</span>
-                            <span class="char-stat-lbl">HP</span>
+                        <div class="char-card-stats">
+                            <div class="char-stat-box" title="Max HP">
+                                <span class="char-stat-val">@c.MaxHitPoints</span>
+                                <span class="char-stat-lbl">HP</span>
+                            </div>
+                            <div class="char-stat-box" title="Armor Class">
+                                <span class="char-stat-val">@c.ArmorClass</span>
+                                <span class="char-stat-lbl">AC</span>
+                            </div>
+                            <div class="char-stat-box" title="Speed">
+                                <span class="char-stat-val">@c.Speed</span>
+                                <span class="char-stat-lbl">Spd</span>
+                            </div>
+                            <div class="char-stat-box" title="Passive Perception">
+                                <span class="char-stat-val">@c.PassivePerception</span>
+                                <span class="char-stat-lbl">PP</span>
+                            </div>
                         </div>
-                        <div class="char-stat-box" title="Armor Class">
-                            <span class="char-stat-val">@c.ArmorClass</span>
-                            <span class="char-stat-lbl">AC</span>
-                        </div>
-                        <div class="char-stat-box" title="Speed">
-                            <span class="char-stat-val">@c.Speed</span>
-                            <span class="char-stat-lbl">Spd</span>
-                        </div>
-                        <div class="char-stat-box" title="Passive Perception">
-                            <span class="char-stat-val">@c.PassivePerception</span>
-                            <span class="char-stat-lbl">PP</span>
-                        </div>
-                    </div>
+                    </a>
                     <div class="char-card-footer">
                         @if (c.SpellSlots.Any())
                         {
@@ -97,8 +99,8 @@
                         {
                             <span class="char-tag">🔥 Rage ×@c.RageUsesPerDay</span>
                         }
-                        <button class="btn-play-card" @onclick='() => Nav.NavigateTo($"/play/{c.Id}")' @onclick:stopPropagation="true">▶ Play</button>
-                        <span class="char-tag-link">View Sheet →</span>
+                        <a class="btn-play-card" href="/play/@c.Id">▶ Play</a>
+                        <a class="char-tag-link" href="/characters/@c.Id">View Sheet →</a>
                     </div>
                 </div>
             }

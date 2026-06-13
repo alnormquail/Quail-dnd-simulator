@@ -2590,3 +2590,10 @@ button.item-equip-dot { cursor: pointer; }
 .skill-choice.disabled { opacity: 0.45; cursor: not-allowed; }
 
 .create-actions { justify-content: flex-start; flex-wrap: wrap; }
+
+/* Card uses a real anchor link for reliable navigation */
+.char-card-link { display: block; color: inherit; text-decoration: none; }
+.char-card-link:hover { color: inherit; }
+.btn-play-card { text-decoration: none; display: inline-flex; align-items: center; }
+a.char-tag-link { text-decoration: none; }
+a.char-tag-link:hover { color: var(--gold); }
