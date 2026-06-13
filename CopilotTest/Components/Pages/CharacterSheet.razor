@@ -484,6 +484,9 @@ else
                             <option value="MagicItem">Magic Items</option>
                             <option value="Gear">Gear</option>
                         </select>
+                        <label class="bg-alloc-radio" title="Magic items are normally DM-awarded loot, not bought or starting gear">
+                            <input type="checkbox" checked="@showMagicItems" @onchange="e => showMagicItems = (bool)(e.Value ?? false)" /> Show magic items (DM loot)
+                        </label>
                     </div>
                     <div class="picker-list">
                         @foreach (var it in FilteredItems())
@@ -1379,11 +1382,15 @@ else
     private string itemKindFilter = "";
     private string? itemExpanded = null;
 
+    private bool showMagicItems = false;
+
     private IEnumerable<ItemData> FilteredItems()
     {
         var items = ItemLibrary.All.AsEnumerable();
         if (!string.IsNullOrEmpty(itemKindFilter) && Enum.TryParse<ItemKind>(itemKindFilter, out var kind))
             items = items.Where(i => i.Kind == kind);
+        else if (!showMagicItems)
+            items = items.Where(i => i.Kind != ItemKind.MagicItem);   // magic items are DM loot — hidden by default
         if (!string.IsNullOrWhiteSpace(itemQuery))
             items = items.Where(i => i.Name.Contains(itemQuery, StringComparison.OrdinalIgnoreCase));
         return items.OrderBy(i => i.Kind).ThenBy(i => i.Name);

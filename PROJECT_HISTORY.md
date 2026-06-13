@@ -174,6 +174,23 @@ Belqorel, and Wally appear in the Party Hub but not the Guide.
 - Character Guide quick-reference with a session tracker (HP, spell-slot pips,
   sorcery points) and Wild Magic info for Winnie; Kennyth panel added.
 
+### Session 2026-06-12 (part 10) — Starting equipment & magic-item hiding
+
+Design discussion settled on: **curated by default, full access on demand**.
+Magic items are DM loot, so they're kept out of the normal flow; starting gear
+comes from the class + background (rules-defined), not a class×race×level matrix.
+(Skipped: gold-by-level for higher starts, and curated flavor loadouts.)
+
+- **Magic items hidden by default** in the sheet's "Add from Library" picker,
+  behind a "Show magic items (DM loot)" toggle. The fix for the
+  "+3 battleaxe on a level-2 wizard" problem.
+- **`StartingKits`** (`Models/Content/StartingKits.cs`) — 2024 class kits as
+  library refs (wire up attacks/AC) + plain gear (focuses, packs, spellbooks).
+- **`ContentService.ApplyKitItem`** applies a kit line (library item or plain).
+- **Creation wizard Equipment step** (now step 7, Review step 8): one-click
+  "Add {Class} + {Background} starting equipment," a removable pending list, and
+  an optional browse picker with magic items excluded. Applied on Create.
+
 ### Session 2026-06-12 (part 9) — Correct caster spell lists from the PDFs
 
 - Re-read the level-5 PDF sheets and corrected each caster's spells to match

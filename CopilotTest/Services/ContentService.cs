@@ -160,6 +160,33 @@ public class ContentService
             RecalculateArmorClass(character);
     }
 
+    /// <summary>
+    /// Add one kit item: a library item (wires up attack/AC and sets quantity)
+    /// or a plain named entry (focuses, packs, etc.).
+    /// </summary>
+    public void ApplyKitItem(Character character, KitItem ki)
+    {
+        if (ki.LibraryKey != null && ItemLibrary.Get(ki.LibraryKey) is { } item)
+        {
+            AddItemFromLibrary(character, item);
+            if (ki.Quantity > 1)
+            {
+                var inv = character.Inventory.LastOrDefault(i => i.Name == item.Name);
+                if (inv != null) inv.Quantity = ki.Quantity;
+            }
+        }
+        else
+        {
+            character.Inventory.Add(new InventoryItem
+            {
+                CharacterId = character.Id,
+                Name        = ki.Name,
+                Quantity    = ki.Quantity,
+                Category    = ItemCategory.Other,
+            });
+        }
+    }
+
     /// <summary>Recompute AC from the character's equipped armor + shield (5e formula).</summary>
     public void RecalculateArmorClass(Character character)
     {

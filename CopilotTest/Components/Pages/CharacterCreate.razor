@@ -219,8 +219,63 @@
             }
         }
 
-        @* ── Step 7: Review ── *@
+        @* ── Step 7: Equipment ── *@
         @if (step == 7)
+        {
+            <h3>Equipment</h3>
+            <p class="field-hint">Start with your class &amp; background's <strong>recommended starting equipment</strong>, then add anything else. (Magic items are DM-awarded loot, so they're not shown here.)</p>
+
+            <div class="feat-picker-row" style="margin-bottom:12px">
+                <button class="btn btn-primary" @onclick="AddRecommendedEquipment" disabled="@equipmentAdded">
+                    @(equipmentAdded ? "✓ Recommended equipment added" : $"➕ Add {className} + {ContentLibrary.GetBackground(backgroundKey)?.Name ?? "background"} starting equipment")
+                </button>
+                <button class="btn btn-sm btn-reset" @onclick="() => showEquipPicker = !showEquipPicker">@(showEquipPicker ? "Hide items" : "Browse more items")</button>
+            </div>
+
+            @if (pendingEquipment.Any())
+            {
+                <div class="current-feats" style="margin-bottom:12px">
+                    @foreach (var ki in pendingEquipment)
+                    {
+                        <span class="feat-chip">@(ki.Quantity > 1 ? $"{ki.Name} ×{ki.Quantity}" : ki.Name) <button class="btn-remove" @onclick="() => pendingEquipment.Remove(ki)">✕</button></span>
+                    }
+                </div>
+            }
+
+            @if (showEquipPicker)
+            {
+                <div class="library-panel">
+                    <div class="picker-controls">
+                        <input class="form-input" placeholder="Search items…" value="@equipQuery"
+                               @oninput="e => equipQuery = e.Value?.ToString() ?? string.Empty" />
+                        <select class="form-input" @bind="equipKindFilter">
+                            <option value="">All gear</option>
+                            <option value="Weapon">Weapons</option>
+                            <option value="Armor">Armor</option>
+                            <option value="Shield">Shields</option>
+                            <option value="Gear">Gear</option>
+                        </select>
+                    </div>
+                    <div class="picker-list">
+                        @foreach (var it in BrowseItems())
+                        {
+                            <div class="picker-row">
+                                <div class="picker-row-main">
+                                    <span class="item-cat-icon">@ItemKindIcon(it.Kind)</span>
+                                    <span class="spell-name">@it.Name</span>
+                                    @if (it.Kind == ItemKind.Weapon) { <span class="spell-school">@it.DamageDice @it.DamageType</span> }
+                                    else if (it.Kind == ItemKind.Armor) { <span class="spell-school">AC @it.BaseAC @it.ArmorWeight</span> }
+                                    <button class="btn btn-sm btn-add" @onclick="() => AddPickedItem(it)">+ Add</button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        }
+
+        @* ── Step 8: Review ── *@
+        @if (step == 8)
         {
             <h3>Review &amp; Create</h3>
             <div class="wizard-review-list">
@@ -228,6 +283,10 @@
                 <div class="wizard-review-row">Species: @(ContentLibrary.GetSpecies(speciesKey)?.Name ?? "—") · Background: @(ContentLibrary.GetBackground(backgroundKey)?.Name ?? "—")</div>
                 <div class="wizard-review-row">Final ability scores: @string.Join(" · ", AbilityOrder.Select(a => $"{AbilityShort(a)} {FinalScore(a)} ({FormatMod(Character.GetModifier(FinalScore(a)))})"))</div>
                 <div class="wizard-review-row">Skills: @string.Join(", ", AllSkillNames())</div>
+                @if (pendingEquipment.Any())
+                {
+                    <div class="wizard-review-row">Equipment: @string.Join(", ", pendingEquipment.Select(k => k.Quantity > 1 ? $"{k.Name} ×{k.Quantity}" : k.Name))</div>
+                }
             </div>
             @if (!string.IsNullOrEmpty(validationMessage))
             {
@@ -242,7 +301,7 @@
                 <button class="btn btn-reset" @onclick="Back">← Back</button>
             }
             <a class="btn btn-reset" href="/characters">Cancel</a>
-            @if (step < 7)
+            @if (step < 8)
             {
                 <button class="btn btn-primary" @onclick="Next" disabled="@(!CanAdvance())">Next →</button>
             }
@@ -276,6 +335,13 @@
     private string subclassKey = "";
     private string validationMessage = "";
 
+    // Equipment step state
+    private readonly List<KitItem> pendingEquipment = new();
+    private bool equipmentAdded = false;
+    private bool showEquipPicker = false;
+    private string equipQuery = "";
+    private string equipKindFilter = "";
+
     private static readonly AbilityScore[] AbilityOrder =
         [AbilityScore.Strength, AbilityScore.Dexterity, AbilityScore.Constitution,
          AbilityScore.Intelligence, AbilityScore.Wisdom, AbilityScore.Charisma];
@@ -290,7 +356,8 @@
         yield return ("Background", 4);
         yield return ("Skills", 5);
         if (HasSubclassStep) yield return ("Subclass", 6);
-        yield return ("Review", 7);
+        yield return ("Equipment", 7);
+        yield return ("Review", 8);
     }
 
     // ── Navigation ────────────────────────────────────────────────────────────
@@ -298,7 +365,7 @@
     {
         var n = step + 1;
         if (n == 6 && !HasSubclassStep) n = 7;   // skip subclass step
-        step = Math.Min(7, n);
+        step = Math.Min(8, n);
     }
 
     private void Back()
@@ -316,6 +383,50 @@
         4 => !string.IsNullOrEmpty(backgroundKey),
         5 => SelectedSkillCount == (ClassLibrary.Get(className)?.SkillChoiceCount ?? 0),
         _ => true,
+    };
+
+    // ── Equipment ───────────────────────────────────────────────────────────────
+    private void AddRecommendedEquipment()
+    {
+        foreach (var ki in StartingKits.ForClass(className))
+            if (!pendingEquipment.Any(p => p.Name == ki.Name)) pendingEquipment.Add(ki);
+
+        // Background gear (from its equipment string; "N gp" entries are ignored here).
+        var bg = ContentLibrary.GetBackground(backgroundKey);
+        if (bg != null)
+        {
+            foreach (var raw in bg.Equipment.Split(','))
+            {
+                var part = raw.Trim();
+                if (part.Length == 0 || System.Text.RegularExpressions.Regex.IsMatch(part, @"^\d+\s*gp$", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                    continue;
+                if (!pendingEquipment.Any(p => p.Name == part))
+                    pendingEquipment.Add(new KitItem(null, part));
+            }
+        }
+        equipmentAdded = true;
+    }
+
+    private void AddPickedItem(ItemData it)
+    {
+        if (!pendingEquipment.Any(p => p.Name == it.Name))
+            pendingEquipment.Add(new KitItem(it.Key, it.Name));
+    }
+
+    private IEnumerable<ItemData> BrowseItems()
+    {
+        var items = ItemLibrary.All.Where(i => i.Kind != ItemKind.MagicItem);  // magic items are DM loot
+        if (!string.IsNullOrEmpty(equipKindFilter) && Enum.TryParse<ItemKind>(equipKindFilter, out var kind))
+            items = items.Where(i => i.Kind == kind);
+        if (!string.IsNullOrWhiteSpace(equipQuery))
+            items = items.Where(i => i.Name.Contains(equipQuery, StringComparison.OrdinalIgnoreCase));
+        return items.OrderBy(i => i.Kind).ThenBy(i => i.Name);
+    }
+
+    private string ItemKindIcon(ItemKind kind) => kind switch
+    {
+        ItemKind.Weapon => "⚔️", ItemKind.Armor => "🛡️", ItemKind.Shield => "🛡️",
+        ItemKind.MagicItem => "✨", _ => "📦",
     };
 
     // ── Ability methods ────────────────────────────────────────────────────────
@@ -440,6 +551,10 @@
         // Spell slots for casters.
         foreach (var (slotLevel, max) in LevelUpRules.SlotsForLevel(cd.Name, level))
             c.SpellSlots.Add(new SpellSlot { CharacterId = c.Id, Level = slotLevel, MaxSlots = max });
+
+        // Equipment (weapons become attacks, armor/shields set AC).
+        foreach (var ki in pendingEquipment)
+            Content.ApplyKitItem(c, ki);
 
         CharacterService.Create(c);
         Nav.NavigateTo($"/characters/{c.Id}");
