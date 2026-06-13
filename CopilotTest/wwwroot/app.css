@@ -2552,3 +2552,41 @@ button.item-equip-dot { cursor: pointer; }
 }
 .wizard-subclass-title { font-weight: 700; color: var(--gold); margin-bottom: 6px; }
 .wizard-subclass-prompt p { margin-bottom: 8px; font-size: 13px; }
+
+/* ============================================================
+   Character creation wizard (/create)
+   ============================================================ */
+.create-steps { flex-wrap: wrap; margin-bottom: 18px; }
+.create-card { padding: 22px; }
+.create-card h3 { color: var(--gold); margin-bottom: 14px; }
+
+.ability-method { display: flex; gap: 20px; margin-bottom: 12px; flex-wrap: wrap; }
+.over-budget { color: var(--red) !important; }
+
+.create-ability-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 24px; margin: 12px 0; }
+.create-ability-row { display: flex; align-items: center; gap: 12px; }
+.create-ability-label { width: 38px; font-weight: 700; color: var(--gold); }
+.create-ability-row .form-input { width: 90px; }
+.create-ability-mod { color: var(--text-dim); min-width: 32px; text-align: right; }
+
+.pb-controls { display: inline-flex; align-items: center; gap: 8px; }
+.pb-score { min-width: 26px; text-align: center; font-weight: 700; font-size: 16px; }
+
+.preview-box {
+    margin-top: 12px; padding: 12px 14px;
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+}
+.preview-line { margin-bottom: 8px; font-size: 13px; }
+.preview-trait { margin-bottom: 6px; font-size: 13px; }
+.preview-trait strong { color: var(--gold); }
+
+.skill-choice-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; margin-top: 8px; }
+.skill-choice {
+    display: flex; align-items: center; gap: 8px; cursor: pointer;
+    padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--bg-card);
+}
+.skill-choice.chosen { border-color: var(--gold); background: rgba(255,163,0,0.08); }
+.skill-choice.disabled { opacity: 0.45; cursor: not-allowed; }
+
+.create-actions { justify-content: flex-start; flex-wrap: wrap; }

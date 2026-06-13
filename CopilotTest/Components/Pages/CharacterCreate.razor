@@ -1,0 +1,450 @@
+@page "/create"
+@using CopilotTest.Models
+@using CopilotTest.Models.Content
+@using CopilotTest.Services
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+@rendermode InteractiveServer
+@inject CharacterService CharacterService
+@inject ContentService Content
+@inject NavigationManager Nav
+
+<PageTitle>Create a Character</PageTitle>
+
+<div class="app-container">
+    <header class="app-header">
+        <h1>🧙 Create a Character</h1>
+        <p class="subtitle">Step-by-step builder — picks apply their rules automatically (2024 PHB)</p>
+    </header>
+
+    @* Step indicator *@
+    <div class="wizard-steps create-steps">
+        @foreach (var (label, num) in StepLabels())
+        {
+            <span class="wizard-step @(step == num ? "step-active" : step > num ? "step-done" : "")">@label</span>
+        }
+    </div>
+
+    <div class="card create-card">
+
+        @* ── Step 1: Basics ── *@
+        @if (step == 1)
+        {
+            <h3>The Basics</h3>
+            <div class="form-row"><label>Character name *</label>
+                <input class="form-input" @bind="name" placeholder="e.g. Thora Ironfist" /></div>
+            <div class="form-row"><label>Class</label>
+                <select class="form-input" @bind="className">
+                    @foreach (var c in ClassLibrary.All)
+                    {
+                        <option value="@c.Name">@c.Name</option>
+                    }
+                </select>
+            </div>
+            @if (ClassLibrary.Get(className) is { } cd)
+            {
+                <div class="field-hint">Primary ability: @cd.PrimaryAbility · Saving throws: @string.Join(", ", cd.SaveProficiencies.Select(AbilityShort)) · Hit die: d@(LevelUpRules.GetHitDie(className))</div>
+            }
+            <div class="form-row"><label>Level</label>
+                <input type="number" class="form-input small" @bind="level" min="1" max="20" /></div>
+        }
+
+        @* ── Step 2: Abilities ── *@
+        @if (step == 2)
+        {
+            <h3>Ability Scores</h3>
+            <div class="ability-method">
+                <label class="bg-alloc-radio"><input type="radio" name="abmethod" checked="@(method == "array")" @onchange='() => SetMethod("array")' /> Standard Array</label>
+                <label class="bg-alloc-radio"><input type="radio" name="abmethod" checked="@(method == "pointbuy")" @onchange='() => SetMethod("pointbuy")' /> Point Buy</label>
+                <label class="bg-alloc-radio"><input type="radio" name="abmethod" checked="@(method == "manual")" @onchange='() => SetMethod("manual")' /> Manual</label>
+            </div>
+
+            @if (method == "array")
+            {
+                <p class="field-hint">Assign each value (15, 14, 13, 12, 10, 8) to one ability — use each exactly once.</p>
+            }
+            else if (method == "pointbuy")
+            {
+                <p class="field-hint @(PointsLeft < 0 ? "over-budget" : "")">Points remaining: <strong>@PointsLeft</strong> / @AbilityGen.PointBuyBudget · scores 8–15.</p>
+            }
+
+            <div class="create-ability-grid">
+                @foreach (var ab in AbilityOrder)
+                {
+                    <div class="create-ability-row">
+                        <span class="create-ability-label">@AbilityShort(ab)</span>
+                        @if (method == "array")
+                        {
+                            <select class="form-input" value="@scores[ab]" @onchange="e => SetArray(ab, e.Value?.ToString())">
+                                @foreach (var v in AbilityGen.StandardArray.Distinct())
+                                {
+                                    <option value="@v">@v</option>
+                                }
+                            </select>
+                        }
+                        else if (method == "pointbuy")
+                        {
+                            <div class="pb-controls">
+                                <button class="qty-btn" @onclick="() => PointBuyAdjust(ab, -1)" disabled="@(scores[ab] <= 8)">−</button>
+                                <span class="pb-score">@scores[ab]</span>
+                                <button class="qty-btn" @onclick="() => PointBuyAdjust(ab, 1)" disabled="@(scores[ab] >= 15 || PointsLeft < CostStep(ab))">+</button>
+                            </div>
+                        }
+                        else
+                        {
+                            <input type="number" class="form-input small" min="1" max="20"
+                                   value="@scores[ab]" @onchange="e => SetManual(ab, e.Value?.ToString())" />
+                        }
+                        <span class="create-ability-mod">@FormatMod(Character.GetModifier(scores[ab]))</span>
+                    </div>
+                }
+            </div>
+            <div class="field-hint">Your background will add its bonuses on top of these in the next steps.</div>
+        }
+
+        @* ── Step 3: Species ── *@
+        @if (step == 3)
+        {
+            <h3>Species</h3>
+            <select class="form-input" @bind="speciesKey">
+                <option value="">— Choose a species —</option>
+                @foreach (var sp in ContentLibrary.Species)
+                {
+                    <option value="@sp.Key">@sp.Name</option>
+                }
+            </select>
+            @if (ContentLibrary.GetSpecies(speciesKey) is { } spd)
+            {
+                <div class="preview-box">
+                    <div class="preview-line"><strong>@spd.Summary</strong> · Speed @spd.Speed ft@(spd.DarkvisionFt > 0 ? $" · Darkvision {spd.DarkvisionFt} ft" : "")</div>
+                    @foreach (var t in spd.Traits)
+                    {
+                        <div class="preview-trait"><strong>@t.Name</strong> — @t.Description</div>
+                    }
+                </div>
+            }
+        }
+
+        @* ── Step 4: Background ── *@
+        @if (step == 4)
+        {
+            <h3>Background</h3>
+            <select class="form-input" @bind="backgroundKey">
+                <option value="">— Choose a background —</option>
+                @foreach (var bg in ContentLibrary.Backgrounds)
+                {
+                    <option value="@bg.Key">@bg.Name</option>
+                }
+            </select>
+            @if (ContentLibrary.GetBackground(backgroundKey) is { } bgd)
+            {
+                <div class="preview-box">
+                    <div class="preview-line">@bgd.Description</div>
+                    <div class="preview-line">Skills: @string.Join(", ", bgd.SkillProficiencies.Select(s => SkillAbilityMap.DisplayName(s))) · Tool: @bgd.ToolProficiency · Feat: @(ContentLibrary.GetFeat(bgd.OriginFeatKey)?.Name ?? "—")</div>
+
+                    <div class="bg-alloc-title" style="margin-top:10px">Ability Score Bonuses</div>
+                    <div class="bg-alloc-controls">
+                        <label class="bg-alloc-radio"><input type="radio" name="cbgmode" checked="@(bgMode == "2-1")" @onchange='() => bgMode = "2-1"' /> +2 / +1</label>
+                        <label class="bg-alloc-radio"><input type="radio" name="cbgmode" checked="@(bgMode == "1-1-1")" @onchange='() => bgMode = "1-1-1"' /> +1 / +1 / +1</label>
+                    </div>
+                    @if (bgMode == "2-1")
+                    {
+                        <div class="bg-alloc-picks">
+                            <div class="form-field"><label>+2 to</label>
+                                <select class="form-input" value="@bgPlusTwo" @onchange="e => SetBgPlusTwo(bgd, e.Value?.ToString())">
+                                    @foreach (var ab in bgd.AbilityOptions) { <option value="@ab">@AbilityShort(ab)</option> }
+                                </select>
+                            </div>
+                            <div class="form-field"><label>+1 to</label>
+                                <select class="form-input" value="@bgPlusOne" @onchange="e => SetBgPlusOne(e.Value?.ToString())">
+                                    @foreach (var ab in bgd.AbilityOptions.Where(a => a != bgPlusTwo)) { <option value="@ab">@AbilityShort(ab)</option> }
+                                </select>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="bg-alloc-spread">Each gets <strong>+1</strong>:
+                            @foreach (var ab in bgd.AbilityOptions) { <span class="bg-alloc-pill">+1 @AbilityShort(ab)</span> }
+                        </div>
+                    }
+                </div>
+            }
+        }
+
+        @* ── Step 5: Class skills ── *@
+        @if (step == 5)
+        {
+            var cd = ClassLibrary.Get(className)!;
+            <h3>@cd.Name Skills</h3>
+            <p class="field-hint">Choose <strong>@cd.SkillChoiceCount</strong> (@SelectedSkillCount selected). Saving-throw proficiencies (@string.Join(", ", cd.SaveProficiencies.Select(AbilityShort))) are granted automatically.</p>
+            <div class="skill-choice-grid">
+                @foreach (var sk in cd.SkillOptions)
+                {
+                    var chosen = selectedSkills.Contains(sk);
+                    var atLimit = SelectedSkillCount >= cd.SkillChoiceCount && !chosen;
+                    <label class="skill-choice @(chosen ? "chosen" : "") @(atLimit ? "disabled" : "")">
+                        <input type="checkbox" checked="@chosen" disabled="@atLimit" @onchange="() => ToggleSkill(sk)" />
+                        @SkillAbilityMap.DisplayName(sk)
+                    </label>
+                }
+            </div>
+        }
+
+        @* ── Step 6: Subclass (level 3+) ── *@
+        @if (step == 6)
+        {
+            <h3>Subclass</h3>
+            @if (ContentLibrary.SubclassesForClass(className).Any())
+            {
+                <select class="form-input" @bind="subclassKey">
+                    <option value="">— None / choose later —</option>
+                    @foreach (var sub in ContentLibrary.SubclassesForClass(className))
+                    {
+                        <option value="@sub.Key">@sub.Name</option>
+                    }
+                </select>
+                @if (ContentLibrary.GetSubclass(subclassKey) is { } subd)
+                {
+                    <div class="preview-box">
+                        @foreach (var f in subd.Features.Where(f => f.Level <= level))
+                        {
+                            <div class="preview-trait"><strong>@f.Name</strong> (lvl @f.Level) — @f.Description</div>
+                        }
+                    </div>
+                }
+            }
+            else
+            {
+                <p class="field-hint">No subclass library entries for @className yet — you can set one later on the sheet.</p>
+            }
+        }
+
+        @* ── Step 7: Review ── *@
+        @if (step == 7)
+        {
+            <h3>Review &amp; Create</h3>
+            <div class="wizard-review-list">
+                <div class="wizard-review-row"><strong>@(string.IsNullOrWhiteSpace(name) ? "(unnamed)" : name)</strong> — @className @level@(ContentLibrary.GetSubclass(subclassKey) is { } s ? $" ({s.Name})" : "")</div>
+                <div class="wizard-review-row">Species: @(ContentLibrary.GetSpecies(speciesKey)?.Name ?? "—") · Background: @(ContentLibrary.GetBackground(backgroundKey)?.Name ?? "—")</div>
+                <div class="wizard-review-row">Final ability scores: @string.Join(" · ", AbilityOrder.Select(a => $"{AbilityShort(a)} {FinalScore(a)} ({FormatMod(Character.GetModifier(FinalScore(a)))})"))</div>
+                <div class="wizard-review-row">Skills: @string.Join(", ", AllSkillNames())</div>
+            </div>
+            @if (!string.IsNullOrEmpty(validationMessage))
+            {
+                <div class="field-hint over-budget">@validationMessage</div>
+            }
+        }
+
+        @* ── Nav buttons ── *@
+        <div class="modal-actions create-actions">
+            @if (step > 1)
+            {
+                <button class="btn btn-reset" @onclick="Back">← Back</button>
+            }
+            <a class="btn btn-reset" href="/characters">Cancel</a>
+            @if (step < 7)
+            {
+                <button class="btn btn-primary" @onclick="Next" disabled="@(!CanAdvance())">Next →</button>
+            }
+            else
+            {
+                <button class="btn btn-start" @onclick="CreateCharacter">🎉 Create Character</button>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private int step = 1;
+    private string name = "";
+    private string className = "Fighter";
+    private int level = 1;
+
+    private string method = "array";
+    private readonly Dictionary<AbilityScore, int> scores = new()
+    {
+        [AbilityScore.Strength] = 15, [AbilityScore.Dexterity] = 14, [AbilityScore.Constitution] = 13,
+        [AbilityScore.Intelligence] = 12, [AbilityScore.Wisdom] = 10, [AbilityScore.Charisma] = 8,
+    };
+
+    private string speciesKey = "";
+    private string backgroundKey = "";
+    private string bgMode = "2-1";
+    private AbilityScore bgPlusTwo = AbilityScore.Strength;
+    private AbilityScore bgPlusOne = AbilityScore.Dexterity;
+    private readonly HashSet<Skill> selectedSkills = new();
+    private string subclassKey = "";
+    private string validationMessage = "";
+
+    private static readonly AbilityScore[] AbilityOrder =
+        [AbilityScore.Strength, AbilityScore.Dexterity, AbilityScore.Constitution,
+         AbilityScore.Intelligence, AbilityScore.Wisdom, AbilityScore.Charisma];
+
+    private bool HasSubclassStep => level >= 3 && ContentLibrary.SubclassesForClass(className).Any();
+
+    private IEnumerable<(string, int)> StepLabels()
+    {
+        yield return ("Basics", 1);
+        yield return ("Abilities", 2);
+        yield return ("Species", 3);
+        yield return ("Background", 4);
+        yield return ("Skills", 5);
+        if (HasSubclassStep) yield return ("Subclass", 6);
+        yield return ("Review", 7);
+    }
+
+    // ── Navigation ────────────────────────────────────────────────────────────
+    private void Next()
+    {
+        var n = step + 1;
+        if (n == 6 && !HasSubclassStep) n = 7;   // skip subclass step
+        step = Math.Min(7, n);
+    }
+
+    private void Back()
+    {
+        var p = step - 1;
+        if (p == 6 && !HasSubclassStep) p = 5;
+        step = Math.Max(1, p);
+    }
+
+    private bool CanAdvance() => step switch
+    {
+        1 => !string.IsNullOrWhiteSpace(name) && ClassLibrary.Get(className) != null,
+        2 => method != "array" || ArrayValid(),
+        3 => !string.IsNullOrEmpty(speciesKey),
+        4 => !string.IsNullOrEmpty(backgroundKey),
+        5 => SelectedSkillCount == (ClassLibrary.Get(className)?.SkillChoiceCount ?? 0),
+        _ => true,
+    };
+
+    // ── Ability methods ────────────────────────────────────────────────────────
+    private void SetMethod(string m)
+    {
+        method = m;
+        if (m == "array")
+        {
+            var vals = AbilityGen.StandardArray;
+            for (int i = 0; i < AbilityOrder.Length; i++) scores[AbilityOrder[i]] = vals[i];
+        }
+        else if (m == "pointbuy")
+        {
+            foreach (var a in AbilityOrder) scores[a] = 8;
+        }
+    }
+
+    private void SetArray(AbilityScore ab, string? v) { if (int.TryParse(v, out var n)) scores[ab] = n; }
+    private void SetManual(AbilityScore ab, string? v) { if (int.TryParse(v, out var n)) scores[ab] = Math.Clamp(n, 1, 20); }
+
+    private bool ArrayValid()
+    {
+        var assigned = AbilityOrder.Select(a => scores[a]).OrderBy(x => x);
+        return assigned.SequenceEqual(AbilityGen.StandardArray.OrderBy(x => x));
+    }
+
+    private int PointsLeft => AbilityGen.PointBuyBudget - AbilityGen.PointBuySpent(AbilityOrder.Select(a => scores[a]));
+    private int CostStep(AbilityScore ab) =>
+        AbilityGen.PointBuyCost(Math.Min(15, scores[ab] + 1)) - AbilityGen.PointBuyCost(scores[ab]);
+    private void PointBuyAdjust(AbilityScore ab, int delta)
+    {
+        var next = Math.Clamp(scores[ab] + delta, 8, 15);
+        if (delta > 0 && PointsLeft < CostStep(ab)) return;
+        scores[ab] = next;
+    }
+
+    // ── Background allocation ───────────────────────────────────────────────────
+    private void SetBgPlusTwo(BackgroundData bg, string? v)
+    {
+        if (Enum.TryParse<AbilityScore>(v, out var a))
+        {
+            bgPlusTwo = a;
+            if (bgPlusOne == bgPlusTwo) bgPlusOne = bg.AbilityOptions.First(x => x != a);
+        }
+    }
+    private void SetBgPlusOne(string? v) { if (Enum.TryParse<AbilityScore>(v, out var a)) bgPlusOne = a; }
+
+    private List<AbilityBonus> BuildAllocation(BackgroundData bg)
+    {
+        if (bgMode == "1-1-1") return bg.AbilityOptions.Select(a => new AbilityBonus(a, 1)).ToList();
+        var list = new List<AbilityBonus> { new(bgPlusTwo, 2) };
+        if (bgPlusOne != bgPlusTwo) list.Add(new AbilityBonus(bgPlusOne, 1));
+        return list;
+    }
+
+    // ── Skills ──────────────────────────────────────────────────────────────────
+    private int SelectedSkillCount => selectedSkills.Count;
+    private void ToggleSkill(Skill sk)
+    {
+        if (!selectedSkills.Remove(sk)) selectedSkills.Add(sk);
+    }
+
+    // ── Review helpers ────────────────────────────────────────────────────────
+    private int FinalScore(AbilityScore a)
+    {
+        var bonus = 0;
+        var bg = ContentLibrary.GetBackground(backgroundKey);
+        if (bg != null) bonus += BuildAllocation(bg).Where(b => b.Ability == a).Sum(b => b.Amount);
+        return scores[a] + bonus;
+    }
+
+    private IEnumerable<string> AllSkillNames()
+    {
+        var set = new HashSet<Skill>(selectedSkills);
+        var bg = ContentLibrary.GetBackground(backgroundKey);
+        if (bg != null) foreach (var s in bg.SkillProficiencies) set.Add(s);
+        var sp = ContentLibrary.GetSpecies(speciesKey);
+        if (sp != null) foreach (var s in sp.SkillProficiencies) set.Add(s);
+        return set.Select(s => SkillAbilityMap.DisplayName(s));
+    }
+
+    // ── Create ──────────────────────────────────────────────────────────────────
+    private void CreateCharacter()
+    {
+        var cd = ClassLibrary.Get(className);
+        if (cd == null || string.IsNullOrWhiteSpace(name)) { validationMessage = "Please complete the required fields."; return; }
+
+        var c = new Character
+        {
+            Id               = Guid.NewGuid(),
+            Name             = name.Trim(),
+            CharacterClass   = cd.Name,
+            CharacterLevel   = level,
+            Type             = CombatantType.PC,
+            ArmorClass       = 10,
+            Speed            = 30,
+            ProficiencyBonus = LevelUpRules.ProficiencyForLevel(level),
+            Strength         = scores[AbilityScore.Strength],
+            Dexterity        = scores[AbilityScore.Dexterity],
+            Constitution     = scores[AbilityScore.Constitution],
+            Intelligence     = scores[AbilityScore.Intelligence],
+            Wisdom           = scores[AbilityScore.Wisdom],
+            Charisma         = scores[AbilityScore.Charisma],
+        };
+
+        // Class saving throws + chosen skills.
+        foreach (var save in cd.SaveProficiencies) c.SetSaveProficiency(save, true);
+        foreach (var sk in selectedSkills)
+            c.Skills.Add(new CharacterSkill { CharacterId = c.Id, Skill = sk, Proficiency = ProficiencyLevel.Proficient });
+
+        // Apply content (species → background → subclass).
+        Content.ApplySpecies(c, speciesKey);
+        var bg = ContentLibrary.GetBackground(backgroundKey);
+        Content.ApplyBackground(c, backgroundKey, bg != null ? BuildAllocation(bg) : []);
+        if (level >= 3 && !string.IsNullOrEmpty(subclassKey)) Content.ApplySubclass(c, subclassKey);
+
+        // Hit points (after background, since CON may have risen).
+        var hitDie = LevelUpRules.GetHitDie(cd.Name);
+        var conMod = c.ConstitutionModifier;
+        c.MaxHitPoints = Math.Max(1, hitDie + conMod + (level - 1) * (hitDie / 2 + 1 + conMod));
+
+        // Spell slots for casters.
+        foreach (var (slotLevel, max) in LevelUpRules.SlotsForLevel(cd.Name, level))
+            c.SpellSlots.Add(new SpellSlot { CharacterId = c.Id, Level = slotLevel, MaxSlots = max });
+
+        CharacterService.Create(c);
+        Nav.NavigateTo($"/characters/{c.Id}");
+    }
+
+    private static string FormatMod(int m) => m >= 0 ? $"+{m}" : m.ToString();
+    private static string AbilityShort(AbilityScore a) => AbilityNames.Short(a);
+}

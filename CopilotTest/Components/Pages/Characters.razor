@@ -13,7 +13,8 @@
     </header>
 
     <div class="hub-toolbar">
-        <button class="btn btn-primary" @onclick="ShowNewCharacterForm">+ New Character</button>
+        <a class="btn btn-primary" href="/create">🧙 Build a Character</a>
+        <button class="btn btn-reset" @onclick="ShowNewCharacterForm">+ Quick Add</button>
     </div>
 
     @if (showNewForm)

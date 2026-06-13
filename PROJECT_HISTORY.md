@@ -25,8 +25,9 @@
 3. **Class/subclass deepening** ✅ (Phase 3, done 2026-06-12) — subclass library,
    sheet picker, and level-up wizard integration (subclass features auto-grant
    at the right levels; wizard prompts for subclass at level 3).
-4. **Creation wizard** — from-scratch flow (Species → Class → Background →
-   Abilities → Equipment) built on phases 1–3.
+4. **Creation wizard** ✅ (Phase 4, done 2026-06-12) — from-scratch flow
+   (Basics → Abilities → Species → Background → Skills → Subclass → Review)
+   with Standard Array / Point Buy / Manual ability generation.
 5. **Items + content breadth** — magic items; pour in more books, source-tagged.
 
 ---
@@ -170,6 +171,25 @@ Belqorel, and Wally appear in the Party Hub but not the Guide.
 - Party Hub + character sheets (stats / spells / inventory / profile tabs, edit mode).
 - Character Guide quick-reference with a session tracker (HP, spell-slot pips,
   sorcery points) and Wild Magic info for Winnie; Kennyth panel added.
+
+### Session 2026-06-12 (part 5) — Character builder Phase 4 (Creation wizard)
+
+**Content** (`Models/Content/`)
+- `ClassLibrary` / `ClassData` — all 12 classes' saving-throw proficiencies and
+  level-1 skill-choice lists/counts.
+- `AbilityGen` — Standard Array values + Point Buy cost table/budget helpers.
+
+**Page** (`Components/Pages/CharacterCreate.razor`, route `/create`)
+- Step flow: Basics (name/class/level) → Abilities → Species → Background →
+  Class Skills → Subclass (shown only at level 3+) → Review & Create.
+- Ability scores: **Standard Array** (assign 15/14/13/12/10/8), **Point Buy**
+  (27-point budget with live remaining count and +/- guards), or **Manual**.
+- Reuses `ContentService.ApplySpecies/ApplyBackground/ApplySubclass`, so all
+  picks auto-apply their effects. On Create it also sets class save proficiencies,
+  chosen skills, class-appropriate HP (computed after background CON bonus), and
+  spell slots, then opens the finished sheet.
+- Party Hub: **🧙 Build a Character** opens the wizard; **+ Quick Add** keeps the
+  old one-line form as a fallback.
 
 ### Session 2026-06-12 (part 4) — Character builder Phase 3 (Subclasses)
 
