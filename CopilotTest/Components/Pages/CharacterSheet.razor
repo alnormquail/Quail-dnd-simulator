@@ -607,6 +607,16 @@ else
                                 </div>
                             </div>
                         }
+                        else
+                        {
+                            <div class="bg-alloc-spread">
+                                Each of these gets <strong>+1</strong>:
+                                @foreach (var ab in bgData.AbilityOptions)
+                                {
+                                    <span class="bg-alloc-pill">+1 @AbilityShort(ab)</span>
+                                }
+                            </div>
+                        }
                         <div class="field-hint">✨ Skills: @string.Join(", ", bgData.SkillProficiencies.Select(s => SkillAbilityMap.DisplayName(s))) · Tool: @bgData.ToolProficiency · Feat: @(ContentLibrary.GetFeat(bgData.OriginFeatKey)?.Name ?? "—"). Applied automatically — Save to keep.</div>
                     </div>
                 }

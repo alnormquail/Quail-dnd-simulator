@@ -2539,3 +2539,9 @@ button.item-equip-dot { cursor: pointer; }
     background: rgba(255,163,0,0.08); border: 1px solid var(--gold);
     border-radius: var(--radius); font-size: 13px; color: var(--gold);
 }
+
+.bg-alloc-spread { margin-bottom: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bg-alloc-pill {
+    background: var(--bg-card); border: 1px solid var(--gold); color: var(--gold);
+    border-radius: 20px; padding: 2px 12px; font-size: 13px; font-weight: 600;
+}
