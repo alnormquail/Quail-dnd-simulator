@@ -28,7 +28,9 @@
 4. **Creation wizard** ✅ (Phase 4, done 2026-06-12) — from-scratch flow
    (Basics → Abilities → Species → Background → Skills → Subclass → Review)
    with Standard Array / Point Buy / Manual ability generation.
-5. **Items + content breadth** — magic items; pour in more books, source-tagged.
+5. **Items + content breadth** 🚧 (Phase 5 started 2026-06-12) — item/equipment
+   library with auto-apply (weapons→attacks, armor/shield→AC) done; pouring in
+   more books and filling Monk/Ranger/Warlock subclass depth is ongoing.
 
 ---
 
@@ -171,6 +173,27 @@ Belqorel, and Wally appear in the Party Hub but not the Guide.
 - Party Hub + character sheets (stats / spells / inventory / profile tabs, edit mode).
 - Character Guide quick-reference with a session tracker (HP, spell-slot pips,
   sorcery points) and Wild Magic info for Winnie; Kennyth panel added.
+
+### Session 2026-06-12 (part 6) — Character builder Phase 5 (Items & equipment)
+
+**Content** (`Models/Content/ItemLibrary.cs`)
+- `ItemData` + `ItemLibrary`: 2024 PHB simple/martial weapons, all armor (light/
+  medium/heavy), shield, iconic magic items, and common gear.
+
+**Engine** (`Services/ContentService.cs`)
+- `AddItemFromLibrary` — weapons add an inventory item **and** a computed
+  `CombatAction` (attack = ability mod + proficiency, ability auto-picked for
+  finesse/ranged); armor/shields are equipped and trigger AC recompute.
+- `RecalculateArmorClass` — 5e AC formula (light +DEX, medium +DEX cap 2, heavy
+  flat, +2 shield, 10+DEX unarmored). Also called when toggling equip on the sheet.
+
+**UI** (`CharacterSheet.razor`, Inventory tab)
+- "📦 Add from Library" picker: search + type filter (Weapon/Armor/Shield/Magic/
+  Gear), expandable details, one-click add. Equip-dot toggle now keeps AC in sync.
+
+> Note: an `AddColumnIfMissing`-style migration was **not** needed here — items
+> reuse the existing Inventory/Actions tables. AC is set at equip time (not a
+> live formula), matching the bake-and-edit pattern used elsewhere.
 
 ### Session 2026-06-12 (part 5) — Character builder Phase 4 (Creation wizard)
 

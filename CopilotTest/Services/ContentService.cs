@@ -127,6 +127,82 @@ public class ContentService
         }
     }
 
+    // ── Items / equipment ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Add a library item to the character. Weapons also create a ready-to-use
+    /// CombatAction; armor and shields are equipped and recompute AC.
+    /// </summary>
+    public void AddItemFromLibrary(Character character, ItemData item)
+    {
+        var inv = new InventoryItem
+        {
+            CharacterId = character.Id,
+            Name        = item.Name,
+            Quantity    = 1,
+            Weight      = item.Weight > 0 ? item.Weight.ToString("0.#") : "",
+            Category    = item.ToCategory(),
+            Description = item.Description,
+            IsEquipped  = item.Kind is ItemKind.Weapon or ItemKind.Armor or ItemKind.Shield,
+        };
+
+        // Only one suit of armor equipped at a time.
+        if (item.Kind == ItemKind.Armor)
+            foreach (var other in character.Inventory.Where(i => i.IsEquipped && IsArmor(i)))
+                other.IsEquipped = false;
+
+        character.Inventory.Add(inv);
+
+        if (item.Kind == ItemKind.Weapon)
+            character.Actions.Add(BuildWeaponAction(character, item));
+
+        if (item.Kind is ItemKind.Armor or ItemKind.Shield)
+            RecalculateArmorClass(character);
+    }
+
+    /// <summary>Recompute AC from the character's equipped armor + shield (5e formula).</summary>
+    public void RecalculateArmorClass(Character character)
+    {
+        var dex = character.DexterityModifier;
+
+        var armor = character.Inventory
+            .Where(i => i.IsEquipped)
+            .Select(i => ItemLibrary.All.FirstOrDefault(d => d.Name == i.Name && d.Kind == ItemKind.Armor))
+            .FirstOrDefault(d => d != null);
+
+        var hasShield = character.Inventory.Any(i => i.IsEquipped &&
+            ItemLibrary.All.Any(d => d.Name == i.Name && d.Kind == ItemKind.Shield));
+
+        int ac = armor?.ArmorWeight switch
+        {
+            ArmorWeight.Light  => armor.BaseAC + dex,
+            ArmorWeight.Medium => armor.BaseAC + Math.Min(dex, 2),
+            ArmorWeight.Heavy  => armor.BaseAC,
+            _                  => 10 + dex,   // unarmored
+        };
+        if (hasShield) ac += 2;
+        character.ArmorClass = ac;
+    }
+
+    private static bool IsArmor(InventoryItem i) =>
+        ItemLibrary.All.Any(d => d.Name == i.Name && d.Kind == ItemKind.Armor);
+
+    private static CombatAction BuildWeaponAction(Character character, ItemData item)
+    {
+        var useDex = item.Ranged || (item.Finesse && character.DexterityModifier > character.StrengthModifier);
+        var mod = useDex ? character.DexterityModifier : character.StrengthModifier;
+        return new CombatAction
+        {
+            Name        = item.Name,
+            ActionType  = ActionType.Attack,
+            AttackBonus = mod + character.ProficiencyBonus,
+            DamageDice  = item.DamageDice,
+            DamageBonus = mod,
+            DamageType  = item.DamageType,
+            Range       = item.RangeText,
+        };
+    }
+
     // ── Subclasses ───────────────────────────────────────────────────────────
 
     /// <summary>

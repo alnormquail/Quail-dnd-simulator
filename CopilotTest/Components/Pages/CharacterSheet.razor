@@ -452,9 +452,52 @@ else
                 }
                 else
                 {
-                    <button class="btn btn-sm btn-add" style="margin-left:12px" @onclick="() => quickAddOpen = !quickAddOpen">+ Quick Add</button>
+                    <button class="btn btn-sm btn-add" style="margin-left:12px" @onclick="() => showItemLibrary = !showItemLibrary">@(showItemLibrary ? "Hide Library" : "📦 Add from Library")</button>
+                    <button class="btn btn-sm btn-add" style="margin-left:8px" @onclick="() => quickAddOpen = !quickAddOpen">+ Quick Add</button>
                 }
             </div>
+
+            @if (showItemLibrary && !editMode)
+            {
+                <div class="library-panel">
+                    <div class="picker-controls">
+                        <input class="form-input" placeholder="Search items…" value="@itemQuery"
+                               @oninput="e => itemQuery = e.Value?.ToString() ?? string.Empty" />
+                        <select class="form-input" @bind="itemKindFilter">
+                            <option value="">All types</option>
+                            <option value="Weapon">Weapons</option>
+                            <option value="Armor">Armor</option>
+                            <option value="Shield">Shields</option>
+                            <option value="MagicItem">Magic Items</option>
+                            <option value="Gear">Gear</option>
+                        </select>
+                    </div>
+                    <div class="picker-list">
+                        @foreach (var it in FilteredItems())
+                        {
+                            <div class="picker-row @(itemExpanded == it.Key ? "picker-expanded" : "")">
+                                <div class="picker-row-main" @onclick="() => itemExpanded = itemExpanded == it.Key ? null : it.Key">
+                                    <span class="item-cat-icon">@ItemKindIcon(it.Kind)</span>
+                                    <span class="spell-name">@it.Name</span>
+                                    @if (it.Kind == ItemKind.Weapon) { <span class="spell-school">@it.DamageDice @it.DamageType</span> }
+                                    else if (it.Kind == ItemKind.Armor) { <span class="spell-school">AC @it.BaseAC @it.ArmorWeight</span> }
+                                    else if (it.Kind == ItemKind.Shield) { <span class="spell-school">+@it.AcBonus AC</span> }
+                                    <button class="btn btn-sm btn-add" @onclick="() => AddItemFromLib(it)" @onclick:stopPropagation="true">+ Add</button>
+                                </div>
+                                @if (itemExpanded == it.Key)
+                                {
+                                    <div class="spell-detail">
+                                        @if (!string.IsNullOrEmpty(it.Properties)) { <div class="spell-meta"><span><strong>Properties:</strong> @it.Properties</span></div> }
+                                        @if (!string.IsNullOrEmpty(it.Description)) { <p class="spell-desc">@it.Description</p> }
+                                        @if (it.Kind == ItemKind.Weapon) { <p class="spell-desc">Adds a ready-to-use attack to your Stats tab, with attack/damage computed from your ability scores.</p> }
+                                        @if (it.Kind is ItemKind.Armor or ItemKind.Shield) { <p class="spell-desc">Equipping this updates your AC automatically.</p> }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
 
             @if (quickAddOpen && !editMode)
             {
@@ -1302,8 +1345,43 @@ else
     private void ToggleEquipped(InventoryItem item)
     {
         item.IsEquipped = !item.IsEquipped;
+        // Keep AC in sync if this item is armor or a shield.
+        if (character != null) Content.RecalculateArmorClass(character);
         SaveInventoryQuietly();
     }
+
+    // ── Item library picker ──────────────────────────────────────────────────
+    private bool showItemLibrary = false;
+    private string itemQuery = "";
+    private string itemKindFilter = "";
+    private string? itemExpanded = null;
+
+    private IEnumerable<ItemData> FilteredItems()
+    {
+        var items = ItemLibrary.All.AsEnumerable();
+        if (!string.IsNullOrEmpty(itemKindFilter) && Enum.TryParse<ItemKind>(itemKindFilter, out var kind))
+            items = items.Where(i => i.Kind == kind);
+        if (!string.IsNullOrWhiteSpace(itemQuery))
+            items = items.Where(i => i.Name.Contains(itemQuery, StringComparison.OrdinalIgnoreCase));
+        return items.OrderBy(i => i.Kind).ThenBy(i => i.Name);
+    }
+
+    private void AddItemFromLib(ItemData item)
+    {
+        if (character == null) return;
+        Content.AddItemFromLibrary(character, item);
+        CharacterService.Update(character);
+        character = CharacterService.GetById(Id);
+    }
+
+    private string ItemKindIcon(ItemKind kind) => kind switch
+    {
+        ItemKind.Weapon    => "⚔️",
+        ItemKind.Armor     => "🛡️",
+        ItemKind.Shield    => "🛡️",
+        ItemKind.MagicItem => "✨",
+        _                  => "📦",
+    };
 
     private void AdjustQuantity(InventoryItem item, int delta)
     {
