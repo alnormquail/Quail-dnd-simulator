@@ -7,6 +7,25 @@
 **Owner:** alnormquail (Alex)
 **Last updated:** 2026-06-12
 
+> **Direction (2026-06-12):** The app's #1 priority is now a **character
+> tracker/builder** (D&D-Beyond-style editing where picking options auto-applies
+> their modifiers), with the full character-sheet reference and combat guide as
+> the key views. The dice/combat simulator is secondary. Content leads with the
+> **2024 PHB** (matches the party's sheets), tagged by source so 2014 +
+> supplement content can layer in later. Builder supports both a from-scratch
+> wizard and smart inline editing. Homebrew/custom content is deferred. See the
+> "Character builder" roadmap and §6 changelog below.
+
+### Character builder roadmap (phased)
+1. **Engine + species** ✅ (Phase 1, done 2026-06-12) — content data model,
+   provenance auto-apply, species picker.
+2. **Backgrounds + Feats** — same pattern; backgrounds carry the 2024 ability
+   bonuses + Origin feat.
+3. **Class/subclass deepening** — subclass features into the level-up wizard.
+4. **Creation wizard** — from-scratch flow (Species → Class → Background →
+   Abilities → Equipment) built on phases 1–3.
+5. **Items + content breadth** — magic items; pour in more books, source-tagged.
+
 ---
 
 ## 1. What this project is
@@ -149,7 +168,34 @@ Belqorel, and Wally appear in the Party Hub but not the Guide.
 - Character Guide quick-reference with a session tracker (HP, spell-slot pips,
   sorcery points) and Wild Magic info for Winnie; Kennyth panel added.
 
-### Session 2026-06-12 (commits `5b398cf` → `16e4574`)
+### Session 2026-06-12 (part 2) — Character builder Phase 1
+
+**Content engine foundation** (`Models/Content/`, `Services/ContentService.cs`)
+- `ContentModels.cs` — edition-agnostic content records (`SpeciesData`,
+  `ContentTrait`, `AbilityBonus`, `RulesEdition`); every entry tagged by `Source`
+  + `Edition`.
+- `ContentLibrary.cs` — read-only library, seeded with **~14 2024 PHB species**
+  (Human, Elf high/wood/drow, Dwarf, Gnome forest/rock, Halfling, Orc,
+  Dragonborn, Tiefling, Aasimar, Goliath). 2024 species grant no ability bonuses
+  (those live on backgrounds — Phase 2).
+- `ContentService.ApplySpecies()` — provenance auto-apply: picking a species
+  writes its traits (into `CharacterFeatures`, `Source` = species name), skill
+  proficiencies, speed, and Race onto the sheet; swapping/clearing removes
+  exactly what the old species added (library is source of truth, no per-char
+  delta storage).
+- `Character.SpeciesKey` added; column installed on existing DBs via a new
+  `AddColumnIfMissing` helper in `Program.cs` (SQLite has no
+  `ADD COLUMN IF NOT EXISTS`, so it checks `pragma_table_info` first).
+- Species dropdown wired into the sheet's Profile tab (edit mode): pick a species
+  → traits/proficiencies apply live and show on the Stats tab; "Custom" option
+  keeps the free-text Race field for anything not in the library.
+
+> Decision reversal: briefly chose 2014 as the content spine, then switched to
+> **2024** because the party's sheets are 2024 and the rules are more uniform
+> (cleaner auto-apply). The one already-written file was edition-agnostic, so no
+> rework.
+
+### Session 2026-06-12 (part 1) (commits `5b398cf` → `16e4574`)
 
 **Roster & data**
 - Added Boan, Gideon, Job, Bren from PDFs (9 characters total).

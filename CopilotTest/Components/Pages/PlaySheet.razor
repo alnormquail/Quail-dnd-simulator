@@ -1,0 +1,418 @@
+@page "/play/{Id:guid}"
+@using CopilotTest.Models
+@using CopilotTest.Services
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+@rendermode InteractiveServer
+@implements IDisposable
+@inject CharacterService CharacterService
+@inject DiceService Dice
+@inject RollLogService Log
+@inject PlayState Play
+@inject NavigationManager Nav
+
+@if (character is null)
+{
+    <div class="app-container"><p style="color:var(--text-dim);padding:40px">Character not found. <a href="/characters">← Back to Party Hub</a></p></div>
+}
+else
+{
+<div class="play-wrap">
+  <div class="play-main">
+
+    <div class="play-header">
+        <div>
+            <h1 class="play-name">@character.Name</h1>
+            <div class="play-sub">
+                <span>@character.Race @character.CharacterClass @character.CharacterLevel</span>
+                @if (!string.IsNullOrEmpty(character.Subclass)) { <span>· @character.Subclass</span> }
+            </div>
+        </div>
+        <div class="play-header-actions">
+            <a class="btn btn-round" href="/characters/@character.Id">⚙️ Full Sheet</a>
+            <a class="btn btn-round" href="/characters">📚 Party</a>
+        </div>
+    </div>
+
+    @* ── Advantage / disadvantage selector ── *@
+    <div class="adv-bar">
+        <span class="adv-label">d20 rolls:</span>
+        <button class="adv-btn @(mode == RollMode.Disadvantage ? "adv-dis" : "")" @onclick="() => mode = RollMode.Disadvantage">Disadvantage</button>
+        <button class="adv-btn @(mode == RollMode.Normal ? "adv-norm" : "")" @onclick="() => mode = RollMode.Normal">Normal</button>
+        <button class="adv-btn @(mode == RollMode.Advantage ? "adv-adv" : "")" @onclick="() => mode = RollMode.Advantage">Advantage</button>
+    </div>
+
+    @* ── Combat block ── *@
+    <div class="play-combat">
+        <div class="cbx hp-box">
+            <div class="cbx-lbl">Hit Points</div>
+            <div class="hp-big"><span class="hp-cur @(live.CurrentHp == 0 ? "hp-down" : "")">@live.CurrentHp</span><span class="hp-sep">/</span><span class="hp-max">@live.MaxHp</span></div>
+            @if (live.TempHp > 0) { <div class="hp-temp">+@live.TempHp temp</div> }
+            <div class="hp-controls">
+                <input type="number" class="hp-input" @bind="hpAmount" min="0" />
+                <button class="btn btn-dmg" @onclick="ApplyDamage">− Damage</button>
+                <button class="btn btn-heal" @onclick="ApplyHeal">+ Heal</button>
+            </div>
+            <div class="hp-controls">
+                <input type="number" class="hp-input" @bind="tempAmount" min="0" />
+                <button class="btn btn-temp" @onclick="ApplyTemp">Set Temp HP</button>
+            </div>
+        </div>
+
+        <div class="cbx clickable" @onclick="RollInitiative" title="Tap to roll initiative">
+            <div class="cbx-lbl">Initiative</div>
+            <div class="cbx-val">@Mod(character.DexterityModifier)</div>
+            <div class="cbx-hint">tap to roll</div>
+        </div>
+        <div class="cbx"><div class="cbx-lbl">Armor Class</div><div class="cbx-val">@character.ArmorClass</div></div>
+        <div class="cbx"><div class="cbx-lbl">Speed</div><div class="cbx-val">@character.Speed<span class="cbx-unit"> ft</span></div></div>
+        <div class="cbx"><div class="cbx-lbl">Prof. Bonus</div><div class="cbx-val">+@character.ProficiencyBonus</div></div>
+        @if (character.SpellSlots.Any())
+        {
+            <div class="cbx"><div class="cbx-lbl">Spell Save DC</div><div class="cbx-val">@SpellDc()</div></div>
+        }
+    </div>
+
+    @* ── Resources: "Today I can…" ── *@
+    <div class="play-card">
+        <div class="play-card-head">
+            <h3>Today I can…</h3>
+            <div class="rest-btns">
+                <button class="btn btn-rest-short" @onclick="ShortRest">🌙 Short Rest</button>
+                <button class="btn btn-rest-long" @onclick="LongRest">🛌 Long Rest</button>
+            </div>
+        </div>
+
+        @if (character.SpellSlots.Any())
+        {
+            <div class="res-row">
+                <span class="res-name">Spell Slots</span>
+                <div class="res-pip-groups">
+                @foreach (var slot in character.SpellSlots.OrderBy(s => s.Level))
+                {
+                    var used = live.SlotsUsed.TryGetValue(slot.Level, out var u) ? u : 0;
+                    <div class="slot-group">
+                        <span class="slot-lvl">L@(slot.Level)</span>
+                        @for (var i = 0; i < slot.MaxSlots; i++)
+                        {
+                            var idx = i;
+                            var available = idx >= used;
+                            <span class="pip @(available ? "pip-on" : "pip-off")"
+                                  @onclick="() => ToggleSlot(slot.Level, slot.MaxSlots, idx)"
+                                  title="@(available ? "Expend a slot" : "Restore a slot")"></span>
+                        }
+                    </div>
+                }
+                </div>
+            </div>
+        }
+
+        @foreach (var pool in live.Pools)
+        {
+            <div class="res-row">
+                <span class="res-name">@pool.Name @if (pool.Note is not null) { <span class="res-note">(@pool.Note)</span> }</span>
+                @if (pool.UsePips)
+                {
+                    <div class="res-pips">
+                        @for (var i = 0; i < pool.Max; i++)
+                        {
+                            var idx = i;
+                            var filled = idx < pool.Current;
+                            <span class="pip @(filled ? "pip-on" : "pip-off")"
+                                  @onclick="() => TogglePool(pool, idx)"
+                                  title="@(filled ? "Use one" : "Restore one")"></span>
+                        }
+                        <span class="res-count">@pool.Current/@pool.Max</span>
+                        <span class="res-restore">· @(pool.RestoreOn == RestKind.Short ? "short" : "long") rest</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="res-pool-num">
+                        <span class="res-count">@pool.Current<span class="res-slash">/@pool.Max</span></span>
+                        <input type="number" class="pool-input" @bind="poolSpend" min="1" />
+                        <button class="btn btn-mini" @onclick="() => SpendPool(pool)">Use</button>
+                        <button class="btn btn-mini btn-mini-ghost" @onclick="() => pool.Current = pool.Max">Reset</button>
+                        <span class="res-restore">· @(pool.RestoreOn == RestKind.Short ? "short" : "long") rest</span>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    @* ── Actions & attacks ── *@
+    <div class="play-card">
+        <h3>Actions &amp; Attacks</h3>
+        <div class="action-list">
+        @foreach (var a in character.Actions)
+        {
+            var limited = a.UsesPerDay > 0;
+            var remaining = live.ActionUses.TryGetValue(a.Id, out var r) ? r : a.UsesPerDay;
+            var spent = limited && remaining <= 0;
+            <div class="action-row @(spent ? "action-spent" : "")">
+                <button class="action-go" disabled="@spent" @onclick="() => UseAction(a)" title="Roll">🎲</button>
+                <div class="action-info">
+                    <div class="action-name">@a.Name @if (a.SpellLevel > 0) { <span class="action-lvl">Lvl @a.SpellLevel</span> }</div>
+                    <div class="action-sum">@a.ShortSummary</div>
+                </div>
+                @if (limited)
+                {
+                    <span class="action-uses">@remaining<span class="res-slash">/@a.UsesPerDay</span></span>
+                }
+                else
+                {
+                    <span class="action-uses-free">at will</span>
+                }
+            </div>
+        }
+        </div>
+    </div>
+
+    @* ── Ability checks / saves / skills ── *@
+    <div class="play-grid">
+        <div class="play-card">
+            <h3>Ability Checks</h3>
+            <div class="abil-grid">
+            @foreach (var ab in Enum.GetValues<AbilityScore>())
+            {
+                <button class="abil-tile" @onclick="() => RollAbility(ab)">
+                    <span class="abil-name">@Short(ab)</span>
+                    <span class="abil-mod">@Mod(character.GetAbilityModifier(ab))</span>
+                    <span class="abil-score">@Score(ab)</span>
+                </button>
+            }
+            </div>
+        </div>
+
+        <div class="play-card">
+            <h3>Saving Throws</h3>
+            <div class="tap-list">
+            @foreach (var ab in Enum.GetValues<AbilityScore>())
+            {
+                var prof = character.GetSaveProficiency(ab);
+                <button class="tap-row" @onclick="() => RollSave(ab)">
+                    <span class="prof-dot @(prof ? "prof-dot-on" : "")"></span>
+                    <span class="tap-bonus">@Mod(character.GetSaveBonus(ab))</span>
+                    <span class="tap-name">@ab</span>
+                </button>
+            }
+            </div>
+        </div>
+
+        <div class="play-card">
+            <h3>Skills</h3>
+            <div class="tap-list">
+            @foreach (var sk in Enum.GetValues<Skill>())
+            {
+                var prof = character.GetSkillProficiency(sk);
+                <button class="tap-row" @onclick="() => RollSkill(sk)">
+                    <span class="prof-dot @(prof == ProficiencyLevel.Proficient ? "prof-dot-on" : prof == ProficiencyLevel.Expertise ? "prof-dot-exp" : "")"></span>
+                    <span class="tap-bonus">@Mod(character.GetSkillBonus(sk))</span>
+                    <span class="tap-name">@SkillAbilityMap.DisplayName(sk)</span>
+                    <span class="tap-ability">@Short(SkillAbilityMap.Map[sk])</span>
+                </button>
+            }
+            </div>
+        </div>
+    </div>
+  </div>
+
+  @* ── Roll log ── *@
+  <aside class="roll-log">
+    <div class="roll-log-head">
+        <h3>🎲 Rolls</h3>
+        <button class="btn btn-mini btn-mini-ghost" @onclick="() => Log.Clear()">Clear</button>
+    </div>
+    @if (!Log.Entries.Any())
+    {
+        <p class="roll-empty">Tap any ability, save, skill, or attack to roll. Results show up here.</p>
+    }
+    else
+    {
+        @foreach (var e in Log.Entries)
+        {
+            <div class="roll-entry @(e.Crit ? "roll-crit" : "") @(e.Fumble ? "roll-fumble" : "")">
+                <div class="roll-top">
+                    <span class="roll-who">@e.Who</span>
+                    <span class="roll-total">@e.Total</span>
+                </div>
+                <div class="roll-label">@e.Label@(e.Crit ? " — CRIT!" : "")@(e.Fumble ? " — fumble" : "")</div>
+                <div class="roll-detail">@e.Detail</div>
+            </div>
+        }
+    }
+  </aside>
+</div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private Character? character;
+    private LiveResources live = new();
+    private RollMode mode = RollMode.Normal;
+    private int hpAmount;
+    private int tempAmount;
+    private int poolSpend = 1;
+
+    protected override void OnInitialized()
+    {
+        character = CharacterService.GetById(Id);
+        if (character is not null) live = Play.For(character);
+        Log.Changed += OnLogChanged;
+    }
+
+    private void OnLogChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => Log.Changed -= OnLogChanged;
+
+    // ── Display helpers ──
+    private string Mod(int n) => n >= 0 ? $"+{n}" : n.ToString();
+
+    private string Short(AbilityScore a) => a switch
+    {
+        AbilityScore.Strength => "STR",
+        AbilityScore.Dexterity => "DEX",
+        AbilityScore.Constitution => "CON",
+        AbilityScore.Intelligence => "INT",
+        AbilityScore.Wisdom => "WIS",
+        AbilityScore.Charisma => "CHA",
+        _ => a.ToString()
+    };
+
+    private int Score(AbilityScore a) => a switch
+    {
+        AbilityScore.Strength => character!.Strength,
+        AbilityScore.Dexterity => character!.Dexterity,
+        AbilityScore.Constitution => character!.Constitution,
+        AbilityScore.Intelligence => character!.Intelligence,
+        AbilityScore.Wisdom => character!.Wisdom,
+        AbilityScore.Charisma => character!.Charisma,
+        _ => 10
+    };
+
+    private int SpellDc()
+    {
+        var cls = (character!.CharacterClass ?? "").Trim();
+        var mod = cls switch
+        {
+            "Bard" or "Paladin" or "Sorcerer" or "Warlock" => character.CharismaModifier,
+            "Cleric" or "Druid" or "Ranger" => character.WisdomModifier,
+            "Wizard" or "Artificer" => character.IntelligenceModifier,
+            _ => Math.Max(character.CharismaModifier, Math.Max(character.WisdomModifier, character.IntelligenceModifier))
+        };
+        return 8 + character.ProficiencyBonus + mod;
+    }
+
+    // ── d20 rolls ──
+    private void RollAbility(AbilityScore ab) =>
+        Push(Dice.RollD20(character!.GetAbilityModifier(ab), mode), $"{Short(ab)} check", RollKind.Check);
+
+    private void RollSave(AbilityScore ab) =>
+        Push(Dice.RollD20(character!.GetSaveBonus(ab), mode), $"{ab} save", RollKind.Save);
+
+    private void RollSkill(Skill sk) =>
+        Push(Dice.RollD20(character!.GetSkillBonus(sk), mode), $"{SkillAbilityMap.DisplayName(sk)} check", RollKind.Check);
+
+    private void RollInitiative() =>
+        Push(Dice.RollD20(character!.DexterityModifier, mode), "Initiative", RollKind.Initiative);
+
+    private void Push(D20Roll roll, string label, RollKind kind) =>
+        Log.Add(new RollEntry(DateTime.Now, character!.Name, label, roll.Detail, roll.Total, kind, roll.IsCrit, roll.IsFumble));
+
+    private void UseAction(CombatAction a)
+    {
+        var isAttack = a.ActionType is ActionType.Attack or ActionType.SpellAttack;
+        if (isAttack)
+        {
+            var hit = Dice.RollD20(a.AttackBonus, mode);
+            Log.Add(new RollEntry(DateTime.Now, character!.Name, $"{a.Name} — to hit", hit.Detail, hit.Total, RollKind.Attack, hit.IsCrit, hit.IsFumble));
+            if (!string.IsNullOrEmpty(a.DamageDice) || a.DamageBonus != 0)
+            {
+                var dmg = Dice.RollDamage(a.DamageDice, a.DamageBonus, crit: hit.IsCrit);
+                Log.Add(new RollEntry(DateTime.Now, character.Name, $"{a.Name} — damage ({a.DamageType})", dmg.Detail, dmg.Total, RollKind.Damage, hit.IsCrit, false));
+            }
+        }
+        else if (a.ActionType == ActionType.Spell)
+        {
+            if (!string.IsNullOrEmpty(a.DamageDice))
+            {
+                var dmg = Dice.RollDamage(a.DamageDice, a.DamageBonus);
+                var lbl = a.SaveDC > 0 ? $"{a.Name} — DC {a.SaveDC} {a.SaveAbility} ({a.DamageType})" : $"{a.Name} ({a.DamageType})";
+                Log.Add(new RollEntry(DateTime.Now, character!.Name, lbl, dmg.Detail, dmg.Total, RollKind.Damage, false, false));
+            }
+            else
+            {
+                var lbl = a.SaveDC > 0 ? $"DC {a.SaveDC} {a.SaveAbility} save" : "no roll needed";
+                Log.Add(new RollEntry(DateTime.Now, character!.Name, $"Cast {a.Name}", lbl, 0, RollKind.Other, false, false));
+            }
+        }
+        else
+        {
+            Log.Add(new RollEntry(DateTime.Now, character!.Name, $"Use {a.Name}", a.Description.Length > 0 ? a.Description : "—", 0, RollKind.Other, false, false));
+        }
+
+        if (a.UsesPerDay > 0)
+        {
+            var rem = live.ActionUses.TryGetValue(a.Id, out var v) ? v : a.UsesPerDay;
+            live.ActionUses[a.Id] = Math.Max(0, rem - 1);
+        }
+    }
+
+    // ── Hit points ──
+    private void ApplyDamage()
+    {
+        var dmg = Math.Max(0, hpAmount);
+        if (live.TempHp > 0)
+        {
+            var fromTemp = Math.Min(live.TempHp, dmg);
+            live.TempHp -= fromTemp;
+            dmg -= fromTemp;
+        }
+        live.CurrentHp = Math.Max(0, live.CurrentHp - dmg);
+        hpAmount = 0;
+    }
+
+    private void ApplyHeal()
+    {
+        live.CurrentHp = Math.Min(live.MaxHp, live.CurrentHp + Math.Max(0, hpAmount));
+        hpAmount = 0;
+    }
+
+    private void ApplyTemp()
+    {
+        live.TempHp = Math.Max(live.TempHp, Math.Max(0, tempAmount)); // temp HP doesn't stack — keep the higher
+        tempAmount = 0;
+    }
+
+    // ── Spell slots & pools ──
+    private void ToggleSlot(int level, int max, int idx)
+    {
+        var used = live.SlotsUsed.TryGetValue(level, out var u) ? u : 0;
+        var available = idx >= used;
+        used += available ? 1 : -1;
+        live.SlotsUsed[level] = Math.Clamp(used, 0, max);
+    }
+
+    private void TogglePool(ResourcePool pool, int idx)
+    {
+        var filled = idx < pool.Current;
+        pool.Current = Math.Clamp(pool.Current + (filled ? -1 : 1), 0, pool.Max);
+    }
+
+    private void SpendPool(ResourcePool pool) =>
+        pool.Current = Math.Clamp(pool.Current - Math.Max(0, poolSpend), 0, pool.Max);
+
+    // ── Rests ──
+    private void ShortRest()
+    {
+        Play.Rest(character!, RestKind.Short);
+        live = Play.For(character!);
+        Log.Add(new RollEntry(DateTime.Now, character!.Name, "🌙 Short Rest", "short-rest resources restored", 0, RollKind.Other, false, false));
+    }
+
+    private void LongRest()
+    {
+        Play.Rest(character!, RestKind.Long);
+        live = Play.For(character!);
+        Log.Add(new RollEntry(DateTime.Now, character!.Name, "🛌 Long Rest", "HP, spell slots & resources restored", 0, RollKind.Other, false, false));
+    }
+}

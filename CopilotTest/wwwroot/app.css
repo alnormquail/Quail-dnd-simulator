@@ -2346,3 +2346,166 @@ button.item-equip-dot { cursor: pointer; }
     .ps-features { font-size: 9px; color: black; }
     .ps-feature-row { margin-bottom: 2px; line-height: 1.4; }
 }
+
+/* ============================================================
+   PLAY MODE  (/play/{id}) — D&D-Beyond-style live sheet
+   ============================================================ */
+.play-wrap {
+    max-width: 1400px; margin: 0 auto; padding: 16px;
+    display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 16px; align-items: start;
+}
+.play-main { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+
+.play-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.play-name { font-size: 1.9rem; color: var(--gold); text-shadow: 0 0 18px rgba(255,163,0,0.35); letter-spacing: 1px; }
+.play-sub { color: var(--text-dim); margin-top: 2px; }
+.play-sub span { margin-right: 6px; }
+.play-header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* advantage selector */
+.adv-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.adv-label { color: var(--text-dim); font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
+.adv-btn {
+    background: var(--bg-card); color: var(--text-dim); border: 1px solid var(--border);
+    border-radius: 999px; padding: 6px 16px; cursor: pointer; font-size: 13px; font-weight: 600;
+}
+.adv-btn:hover { background: var(--bg-card-hover); color: var(--text); }
+.adv-norm { background: var(--text-dim); color: var(--bg-dark); border-color: var(--text-dim); }
+.adv-adv  { background: var(--green); color: #fff; border-color: var(--green); }
+.adv-dis  { background: var(--red); color: #fff; border-color: var(--red); }
+
+/* combat block */
+.play-combat { display: flex; flex-wrap: wrap; gap: 12px; }
+.cbx {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 12px 16px; min-width: 104px; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 2px; box-shadow: var(--shadow);
+}
+.cbx-lbl { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; text-align: center; }
+.cbx-val { font-size: 1.7rem; font-weight: 800; color: var(--text); line-height: 1.1; }
+.cbx-unit { font-size: 0.9rem; color: var(--text-dim); font-weight: 400; }
+.cbx-hint { font-size: 10px; color: var(--gold); opacity: 0.85; }
+.cbx.clickable { cursor: pointer; border-color: var(--gold); }
+.cbx.clickable:hover { background: var(--bg-card-hover); transform: translateY(-1px); }
+
+.hp-box { min-width: 220px; align-items: stretch; gap: 6px; }
+.hp-big { text-align: center; font-weight: 800; }
+.hp-cur { font-size: 2.1rem; color: var(--green); }
+.hp-cur.hp-down { color: var(--red); }
+.hp-sep { font-size: 1.4rem; color: var(--text-dim); margin: 0 4px; }
+.hp-max { font-size: 1.4rem; color: var(--text-dim); }
+.hp-temp { text-align: center; color: var(--accent2); font-size: 12px; font-weight: 700; }
+.hp-controls { display: flex; gap: 6px; align-items: center; }
+.hp-input, .pool-input {
+    width: 64px; background: var(--bg-dark); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px; text-align: center; font-size: 14px;
+}
+.pool-input { width: 56px; }
+.btn-dmg  { background: var(--red); color: #fff; flex: 1; }
+.btn-heal { background: var(--green); color: #fff; flex: 1; }
+.btn-temp { background: var(--bg-card-hover); color: var(--accent2); border: 1px solid var(--accent2); flex: 1; }
+
+/* generic play card */
+.play-card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
+.play-card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.play-card-head h3 { margin-bottom: 0; }
+.rest-btns { display: flex; gap: 8px; }
+.btn-rest-short { background: var(--bg-card-hover); color: var(--text); border: 1px solid var(--border); }
+.btn-rest-long  { background: var(--gold); color: var(--bg-dark); font-weight: 700; }
+
+/* resource rows */
+.res-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px dashed var(--border); }
+.res-row:last-child { border-bottom: none; }
+.res-name { min-width: 150px; font-weight: 700; color: var(--text); }
+.res-note { color: var(--text-dim); font-weight: 400; font-size: 12px; }
+.res-pip-groups { display: flex; gap: 16px; flex-wrap: wrap; }
+.slot-group { display: flex; align-items: center; gap: 6px; }
+.slot-lvl { font-size: 12px; color: var(--text-dim); font-weight: 700; min-width: 22px; }
+.res-pips, .res-pool-num { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.res-count { font-weight: 800; color: var(--gold); margin-left: 4px; }
+.res-slash { color: var(--text-dim); font-weight: 400; }
+.res-restore { color: var(--text-dim); font-size: 11px; }
+
+.pip {
+    width: 18px; height: 18px; border-radius: 50%; cursor: pointer; display: inline-block;
+    border: 2px solid var(--gold); transition: transform 0.08s ease;
+}
+.pip:hover { transform: scale(1.15); }
+.pip-on  { background: var(--gold); box-shadow: 0 0 8px rgba(255,163,0,0.5); }
+.pip-off { background: transparent; border-color: var(--text-dim); }
+
+/* actions */
+.action-list { display: flex; flex-direction: column; gap: 8px; }
+.action-row { display: flex; align-items: center; gap: 12px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px; }
+.action-row.action-spent { opacity: 0.5; }
+.action-go {
+    background: var(--accent); color: #fff; border: none; border-radius: 8px; width: 40px; height: 40px;
+    font-size: 18px; cursor: pointer; flex-shrink: 0;
+}
+.action-go:hover:not(:disabled) { background: var(--accent2); transform: translateY(-1px); }
+.action-go:disabled { background: var(--border); cursor: not-allowed; }
+.action-info { flex: 1; min-width: 0; }
+.action-name { font-weight: 700; color: var(--text); }
+.action-lvl { font-size: 11px; color: var(--accent2); border: 1px solid var(--accent2); border-radius: 4px; padding: 0 5px; margin-left: 4px; }
+.action-sum { font-size: 12px; color: var(--text-dim); }
+.action-uses { font-weight: 800; color: var(--gold); white-space: nowrap; }
+.action-uses-free { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+
+/* abilities / saves / skills grid */
+.play-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.abil-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.abil-tile {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 10px 4px; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer;
+}
+.abil-tile:hover { background: var(--bg-card-hover); border-color: var(--gold); transform: translateY(-1px); }
+.abil-name { font-size: 10px; color: var(--text-dim); letter-spacing: 1px; }
+.abil-mod { font-size: 1.5rem; font-weight: 800; color: var(--gold); }
+.abil-score { font-size: 11px; color: var(--text-dim); }
+
+.tap-list { display: flex; flex-direction: column; gap: 2px; }
+.tap-row {
+    display: flex; align-items: center; gap: 8px; background: transparent; border: none;
+    border-radius: 6px; padding: 6px 8px; cursor: pointer; text-align: left; width: 100%; color: var(--text);
+}
+.tap-row:hover { background: var(--bg-card-hover); }
+.tap-bonus { font-weight: 800; color: var(--gold); min-width: 30px; }
+.tap-name { flex: 1; min-width: 0; }
+.tap-ability { font-size: 10px; color: var(--text-dim); }
+.prof-dot-exp { background: var(--accent2); box-shadow: 0 0 6px var(--accent2); }
+
+/* roll log */
+.roll-log { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; box-shadow: var(--shadow); }
+.roll-log-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.roll-log-head h3 { margin-bottom: 0; }
+.roll-empty { color: var(--text-dim); font-size: 13px; line-height: 1.5; }
+.roll-entry { background: var(--bg-card); border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; }
+.roll-entry.roll-crit { border-left-color: var(--gold); background: rgba(255,163,0,0.08); }
+.roll-entry.roll-fumble { border-left-color: var(--red); background: rgba(157,34,53,0.10); }
+.roll-top { display: flex; justify-content: space-between; align-items: baseline; }
+.roll-who { font-size: 12px; color: var(--text-dim); }
+.roll-total { font-size: 1.4rem; font-weight: 800; color: var(--gold); }
+.roll-label { font-weight: 700; font-size: 13px; color: var(--text); }
+.roll-detail { font-size: 12px; color: var(--text-dim); font-family: 'Segoe UI', monospace; }
+
+/* play button on party hub cards */
+.btn-play-card {
+    background: var(--green); color: #fff; border: none; border-radius: 999px;
+    padding: 4px 14px; font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.btn-play-card:hover { background: var(--accent2); color: var(--bg-dark); }
+
+@media (max-width: 900px) {
+    .play-wrap { grid-template-columns: 1fr; }
+    .roll-log { position: static; max-height: none; }
+    .play-grid { grid-template-columns: 1fr; }
+    /* combat block becomes a clean grid so cards never overlap on phones */
+    .play-combat { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .cbx { min-width: 0; padding: 10px 8px; }
+    .cbx-val { font-size: 1.4rem; }
+    .hp-box { grid-column: 1 / -1; align-items: stretch; }
+    .hp-input, .pool-input { min-width: 0; }
+    .btn-dmg, .btn-heal, .btn-temp { font-size: 12px; padding: 6px 6px; }
+}
+
+.field-hint { font-size: 12px; color: var(--gold); margin-top: 4px; line-height: 1.4; }

@@ -3,8 +3,10 @@
 @using CopilotTest.Services
 @using static Microsoft.AspNetCore.Components.Web.RenderMode
 @rendermode InteractiveServer
+@using CopilotTest.Models.Content
 @inject CharacterService CharacterService
 @inject CombatEngineService Combat
+@inject ContentService Content
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 
@@ -526,7 +528,24 @@ else
             @if (editMode)
             {
                 <div class="stat-grid" style="margin-bottom:20px">
-                    <div class="form-field"><label>Race</label><input class="form-input" @bind="character.Race" placeholder="Human, Elf..." /></div>
+                    <div class="form-field">
+                        <label>Species</label>
+                        <select class="form-input" value="@character.SpeciesKey" @onchange="OnSpeciesChanged">
+                            <option value="">— Custom / not from library —</option>
+                            @foreach (var sp in ContentLibrary.Species)
+                            {
+                                <option value="@sp.Key">@sp.Name</option>
+                            }
+                        </select>
+                        @if (string.IsNullOrEmpty(character.SpeciesKey))
+                        {
+                            <input class="form-input" style="margin-top:6px" @bind="character.Race" placeholder="Race (free text)" />
+                        }
+                        else
+                        {
+                            <div class="field-hint">✨ @(ContentLibrary.GetSpecies(character.SpeciesKey)?.Summary) — traits applied automatically (see Stats tab). Save to keep.</div>
+                        }
+                    </div>
                     <div class="form-field"><label>Background</label><input class="form-input" @bind="character.Background" placeholder="Acolyte, Criminal..." /></div>
                     <div class="form-field"><label>Subclass</label><input class="form-input" @bind="character.Subclass" placeholder="School of Evocation..." /></div>
                 </div>
@@ -985,6 +1004,13 @@ else
     private void AddFeature()
     {
         character!.Features.Add(new CharacterFeature { CharacterId = Id, Name = "", LevelGained = character.CharacterLevel });
+    }
+
+    private void OnSpeciesChanged(ChangeEventArgs e)
+    {
+        if (character == null) return;
+        var key = e.Value?.ToString();
+        Content.ApplySpecies(character, string.IsNullOrEmpty(key) ? null : key);
     }
 
     private void RemoveSpell(Spell spell)

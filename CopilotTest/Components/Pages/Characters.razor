@@ -96,6 +96,7 @@
                         {
                             <span class="char-tag">🔥 Rage ×@c.RageUsesPerDay</span>
                         }
+                        <button class="btn-play-card" @onclick='() => Nav.NavigateTo($"/play/{c.Id}")' @onclick:stopPropagation="true">▶ Play</button>
                         <span class="char-tag-link">View Sheet →</span>
                     </div>
                 </div>

@@ -16,6 +16,12 @@ builder.Services.AddScoped<DndApiService>();
 builder.Services.AddScoped<CharacterService>();
 builder.Services.AddScoped<CombatEngineService>();
 builder.Services.AddScoped<PdfImportService>();
+builder.Services.AddScoped<ContentService>();
+
+// Play-mode services (dice roller, per-session roll log, live play state)
+builder.Services.AddScoped<DiceService>();
+builder.Services.AddScoped<RollLogService>();
+builder.Services.AddScoped<PlayState>();
 
 var app = builder.Build();
 
@@ -41,6 +47,10 @@ using (var scope = app.Services.CreateScope())
         CREATE INDEX IF NOT EXISTS "IX_CharacterFeatures_CharacterId" ON "CharacterFeatures" ("CharacterId");
         """);
 
+    // Add columns introduced after first release (SQLite has no ADD COLUMN IF NOT
+    // EXISTS, so check the table schema first).
+    AddColumnIfMissing(db, "Characters", "SpeciesKey", "TEXT NOT NULL DEFAULT ''");
+
     var chars = scope.ServiceProvider.GetRequiredService<CharacterService>();
     chars.SeedIfEmpty();
 }
@@ -59,3 +69,14 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.Run();
+
+// Adds a column to a SQLite table only if it isn't already present.
+static void AddColumnIfMissing(DndDbContext db, string table, string column, string columnDef)
+{
+    using var cmd = db.Database.GetDbConnection().CreateCommand();
+    if (cmd.Connection!.State != System.Data.ConnectionState.Open) cmd.Connection.Open();
+    cmd.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = '{column}';";
+    var exists = Convert.ToInt64(cmd.ExecuteScalar()) > 0;
+    if (!exists)
+        db.Database.ExecuteSqlRaw($"ALTER TABLE \"{table}\" ADD COLUMN \"{column}\" {columnDef};");
+}

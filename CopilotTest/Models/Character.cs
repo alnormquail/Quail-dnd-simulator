@@ -13,6 +13,9 @@ public class Character
     public string Race { get; set; } = string.Empty;
     public string Background { get; set; } = string.Empty;
 
+    /// <summary>Content-library key of the chosen species (e.g. "high-elf"), if picked from the library.</summary>
+    public string SpeciesKey { get; set; } = string.Empty;
+
     // Ability scores
     public int Strength { get; set; } = 10;
     public int Dexterity { get; set; } = 10;
