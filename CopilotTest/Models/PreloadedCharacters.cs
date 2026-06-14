@@ -186,7 +186,8 @@ public static class PreloadedCharacters
         CharacterLevel = 5,
         Race           = "High Elf",
         Background     = "Noble",
-        Subclass       = "Wild Magic",
+        Subclass       = "Wild Magic Sorcery",
+        SubclassKey    = "sorc-wildmagic",
 
         Strength     = 8,  Dexterity    = 13, Constitution = 14,
         Intelligence = 14, Wisdom       = 10, Charisma     = 18,
@@ -264,6 +265,8 @@ public static class PreloadedCharacters
     {
         Id             = new Guid("a1000000-0000-0000-0000-000000000005"),
         Name           = "Kennyth",
+        Subclass       = "Oath of Devotion",
+        SubclassKey    = "pal-devotion",
         Type           = CombatantType.PC,
         CharacterClass = "Paladin",
         CharacterLevel = 5,
@@ -329,6 +332,8 @@ public static class PreloadedCharacters
     {
         Id             = new Guid("a1000000-0000-0000-0000-000000000006"),
         Name           = "Boan Strickler",
+        Subclass       = "Champion",
+        SubclassKey    = "fighter-champion",
         Type           = CombatantType.PC,
         CharacterClass = "Fighter",
         CharacterLevel = 5,
@@ -405,6 +410,8 @@ public static class PreloadedCharacters
     {
         Id             = new Guid("a1000000-0000-0000-0000-000000000007"),
         Name           = "Gideon Silverspoon",
+        Subclass       = "College of Lore",
+        SubclassKey    = "bard-lore",
         Type           = CombatantType.PC,
         CharacterClass = "Bard",
         CharacterLevel = 5,
@@ -576,6 +583,7 @@ public static class PreloadedCharacters
         Race           = "Forest Gnome",
         Background     = "Custom",
         Subclass       = "Circle of the Land",
+        SubclassKey    = "druid-land",
 
         Strength     = 11, Dexterity    = 13, Constitution = 9,
         Intelligence = 14, Wisdom       = 15, Charisma     = 13,

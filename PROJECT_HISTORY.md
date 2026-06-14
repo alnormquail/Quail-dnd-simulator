@@ -187,6 +187,17 @@ Belqorel, and Wally appear in the Party Hub but not the Guide.
 - Character Guide quick-reference with a session tracker (HP, spell-slot pips,
   sorcery points) and Wild Magic info for Winnie; Kennyth panel added.
 
+### Session 2026-06-12 (part 21) — Link party subclasses to the edit dropdown
+
+- The sheet's Edit → Profile subclass **dropdown already existed** (Phase 3) but
+  the preloaded party had no `SubclassKey`, so it showed "— None —".
+- Set `SubclassKey`/`Subclass` on Winnie (Wild Magic), Kennyth (Oath of
+  Devotion), Boan (Champion), Gideon (College of Lore), Bren (Circle of the
+  Land) in the templates, plus a one-time `LinkPreloadedSubclasses()` raw-SQL
+  backfill (case-insensitive Id match) so existing DBs get linked too.
+- Job (Oath of the Open Sea — not a 2024 PHB subclass) and Korran (subclass not
+  on her captured sheet) stay unlinked; their dropdown shows "None" to pick from.
+
 ### Session 2026-06-12 (part 20) — Guide: full mechanics + click-to-roll
 
 - "On Your Turn" items now show the **full mechanical line** for attacks/spells

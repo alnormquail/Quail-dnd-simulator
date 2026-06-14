@@ -157,6 +157,14 @@ public class CharacterService
             LoadPreloadedFeatures();
             SetMetaFlag("preloaded-features-loaded-v1");
         }
+
+        // One-time: link the party's subclasses so the sheet's subclass dropdown
+        // reflects their actual subclass (only fills characters with none set).
+        if (!MetaFlagSet("preloaded-subclass-linked-v1"))
+        {
+            LinkPreloadedSubclasses();
+            SetMetaFlag("preloaded-subclass-linked-v1");
+        }
     }
 
     /// <summary>
@@ -217,6 +225,22 @@ public class CharacterService
             changed = true;
         }
         if (changed) _db.SaveChanges();
+    }
+
+    /// <summary>
+    /// One-time: set SubclassKey + Subclass on preloaded party members that have
+    /// none, so the sheet's subclass dropdown shows their actual subclass. Raw
+    /// UPDATE (case-insensitive Id match) to avoid EF concurrency on startup.
+    /// </summary>
+    private void LinkPreloadedSubclasses()
+    {
+        foreach (var t in PreloadedCharacters.All.Where(c => !string.IsNullOrEmpty(c.SubclassKey)))
+        {
+            _db.Database.ExecuteSqlRaw(
+                "UPDATE \"Characters\" SET \"SubclassKey\" = {0}, \"Subclass\" = {1} " +
+                "WHERE \"Id\" = {2} COLLATE NOCASE AND (\"SubclassKey\" = '' OR \"SubclassKey\" IS NULL);",
+                t.SubclassKey, t.Subclass, t.Id.ToString());
+        }
     }
 
     private bool MetaFlagSet(string key)
