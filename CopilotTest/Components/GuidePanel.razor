@@ -596,7 +596,9 @@
         {
             var match = c.Actions.FirstOrDefault(a => a.Name == s.Name);
             var lvl = s.Level == 0 ? "Cantrip" : $"L{s.Level}";
-            var detail = match != null ? $"{lvl} · {ActionDetail(match)}" : $"{lvl} · {s.Range}".TrimEnd(' ', '·');
+            var detail = match != null && IsRollable(match)
+                ? $"{lvl} · {ActionDetail(match)}"
+                : $"{lvl} · {s.Range}".TrimEnd(' ', '·');
             items.Add(new($"✦ {s.Name}", detail, Action: match));
         }
 

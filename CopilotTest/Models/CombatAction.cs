@@ -50,12 +50,21 @@ public class CombatAction
 
     public string DisplayName => SpellLevel > 0 ? $"{Name} (Lvl {SpellLevel})" : Name;
 
+    private string DamageText =>
+        string.IsNullOrEmpty(DamageDice) ? "" :
+        $"{DamageDice}{(DamageBonus != 0 ? (DamageBonus > 0 ? $"+{DamageBonus}" : $"{DamageBonus}") : "")} {DamageType} dmg";
+
     public string ShortSummary => ActionType switch
     {
         ActionType.Attack or ActionType.SpellAttack =>
-            $"+{AttackBonus} to hit, {DamageDice}{(DamageBonus != 0 ? (DamageBonus > 0 ? $"+{DamageBonus}" : $"{DamageBonus}") : "")} {DamageType} dmg",
-        ActionType.Spell =>
-            $"DC {SaveDC} {SaveAbility} save, {DamageDice}{(DamageBonus != 0 ? (DamageBonus > 0 ? $"+{DamageBonus}" : $"{DamageBonus}") : "")} {DamageType} dmg",
+            $"+{AttackBonus} to hit{(DamageText.Length > 0 ? $", {DamageText}" : "")}",
+        // Save spell only when it actually has a save DC.
+        ActionType.Spell when SaveDC > 0 =>
+            $"DC {SaveDC} {SaveAbility} save{(DamageText.Length > 0 ? $", {DamageText}" : "")}",
+        // Damaging spell with no save (e.g. Divine Smite): just the damage.
+        ActionType.Spell when DamageText.Length > 0 => DamageText,
+        // Buff/utility spell: fall back to the description, else a dash.
+        ActionType.Spell => Description.Length > 0 ? (Description.Length > 40 ? Description[..40] + "…" : Description) : "—",
         _ => Description.Length > 40 ? Description[..40] + "…" : Description
     };
 }
