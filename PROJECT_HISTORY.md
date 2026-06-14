@@ -187,6 +187,12 @@ Belqorel, and Wally appear in the Party Hub but not the Guide.
 - Character Guide quick-reference with a session tracker (HP, spell-slot pips,
   sorcery points) and Wild Magic info for Winnie; Kennyth panel added.
 
+### Session 2026-06-12 (part 25) — Fill missing subclass spells
+
+- Added Arms of Hadar, Hunger of Hadar, and Sending to the spell library — the
+  only spells referenced by subclass `GrantedSpells` that weren't yet present.
+  Verified: every subclass-granted spell now resolves (nothing skipped).
+
 ### Session 2026-06-12 (part 24) — Remaining subclass spell lists
 
 - Added `GrantedSpells` for Sorcerer (Aberrant/Clockwork/Draconic), Druid

@@ -440,5 +440,13 @@ public static class SpellLibrary
         new("Dragon's Breath", 2, "Transmutation", SW, "1 bonus action", "Touch", "V, S, M", "1 min", true, false,
             "Touch a willing creature; until the spell ends it can use an action to exhale a 15-ft cone of acid, cold, fire, lightning, or poison (chosen when cast). DEX save or 3d6 damage (half on success). +1d6 per slot above 2nd.",
             "Xanathar's Guide"),
+
+        // ── Filling subclass-granted gaps ────────────────────────────────────
+        new("Arms of Hadar", 1, "Conjuration", ["warlock", "sorcerer"], "1 action", "Self (10-ft radius)", "V, S", "Instantaneous", false, false,
+            "Tendrils of dark energy erupt from you: each creature in a 10-ft radius makes a STR save, taking 2d6 necrotic on a fail (half on success) and being unable to take reactions until its next turn. +1d6 per slot above 1st."),
+        new("Hunger of Hadar", 3, "Conjuration", ["warlock", "sorcerer"], "1 action", "150 ft", "V, S, M", "1 min", true, false,
+            "Open a 20-ft sphere of cold void. A creature starting its turn there takes 2d6 cold; a creature ending its turn there makes a DEX save or takes 2d6 acid. The area is Darkness and difficult terrain."),
+        new("Sending", 3, "Divination", ["bard", "cleric", "wizard", "sorcerer"], "1 action", "Unlimited", "V, S, M", "1 round", false, false,
+            "Send a short message of 25 words or less to a creature you're familiar with, anywhere on the same plane; it can reply in kind."),
     ];
 }
