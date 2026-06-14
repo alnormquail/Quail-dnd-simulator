@@ -241,7 +241,10 @@ public class ContentService
     {
         var previous = ContentLibrary.GetSubclass(NullIfEmpty(character.SubclassKey));
         if (previous != null)
+        {
             character.Features.RemoveAll(f => f.Source == previous.Name);
+            character.Spells.RemoveAll(s => s.Source == previous.Name);   // remove only this subclass's granted spells
+        }
 
         var next = ContentLibrary.GetSubclass(NullIfEmpty(subclassKey));
         if (next == null)
@@ -256,6 +259,37 @@ public class ContentService
 
         foreach (var feat in next.Features.Where(f => f.Level <= character.CharacterLevel))
             AddSubclassFeature(character, next, feat);
+
+        GrantSubclassSpells(character, next);
+    }
+
+    /// <summary>
+    /// Add a subclass's always-prepared spells that the character can currently
+    /// cast, tagged with the subclass name. Skips spells already on the sheet
+    /// (from any source) so nothing is duplicated.
+    /// </summary>
+    public void GrantSubclassSpells(Character character, SubclassData subclass)
+    {
+        if (subclass.GrantedSpells.Count == 0) return;
+        var maxLevel = SpellLibrary.MaxSpellLevel(character.CharacterClass, character.CharacterLevel);
+
+        foreach (var name in subclass.GrantedSpells)
+        {
+            var lib = SpellLibrary.All.FirstOrDefault(x => x.Name == name);
+            if (lib == null || lib.Level > maxLevel) continue;
+            if (character.Spells.Any(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase))) continue;
+
+            var spell = SpellLibrary.ToSpell(lib, character.Id);
+            spell.Source = subclass.Name;
+            character.Spells.Add(spell);
+        }
+    }
+
+    /// <summary>Top up the current subclass's spells after a level-up (newly castable ones).</summary>
+    public void RefreshSubclassSpells(Character character)
+    {
+        var sub = ContentLibrary.GetSubclass(NullIfEmpty(character.SubclassKey));
+        if (sub != null) GrantSubclassSpells(character, sub);
     }
 
     /// <summary>

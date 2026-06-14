@@ -1604,8 +1604,9 @@ else
                 character.Spells.Add(spell);
         }
 
-        // Auto-grant subclass features unlocked at the new level
+        // Auto-grant subclass features unlocked at the new level + any newly-castable oath/circle spells
         Content.GrantSubclassFeaturesForLevel(character, newLevel);
+        Content.RefreshSubclassSpells(character);
 
         // Auto-grant class features for the new level
         foreach (var grant in LevelUpRules.FeatureGrants(character.CharacterClass, newLevel))

@@ -160,10 +160,10 @@ public class CharacterService
 
         // One-time: link the party's subclasses so the sheet's subclass dropdown
         // reflects their actual subclass (only fills characters with none set).
-        if (!MetaFlagSet("preloaded-subclass-linked-v1"))
+        if (!MetaFlagSet("preloaded-subclass-linked-v2"))
         {
             LinkPreloadedSubclasses();
-            SetMetaFlag("preloaded-subclass-linked-v1");
+            SetMetaFlag("preloaded-subclass-linked-v2");
         }
     }
 

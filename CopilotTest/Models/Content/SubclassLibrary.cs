@@ -145,22 +145,32 @@ public static class SubclassLibrary
             F(3, "Sacred Weapon / Oath of Devotion Spells", "Channel Divinity to add CHA to weapon attacks and emit light; always-prepared oath spells (Protection from Evil and Good, Shield of Faith...)."),
             F(7, "Aura of Devotion", "You and allies in your aura can't be Charmed."),
             F(15, "Smite of Protection", "Your Divine Smite also grants you and nearby allies Half Cover."),
-            F(20, "Holy Nimbus", "Become wreathed in light: deal radiant damage to nearby foes and gain advantage on saves vs spells.")),
+            F(20, "Holy Nimbus", "Become wreathed in light: deal radiant damage to nearby foes and gain advantage on saves vs spells."))
+            with { GrantedSpells = ["Protection from Evil and Good", "Shield of Faith", "Aid", "Zone of Truth", "Beacon of Hope", "Dispel Magic"] },
         Sc("pal-glory", "Oath of Glory", "paladin",
             F(3, "Inspiring Smite / Peerless Athlete", "Channel Divinity to share temp HP after a Divine Smite; enhance your athletics and jumps."),
             F(7, "Aura of Alacrity", "You and allies who start near you gain +10 ft speed."),
             F(15, "Glorious Defense", "Reaction to add CHA to an ally's AC and counterattack."),
-            F(20, "Living Legend", "Advantage on CHA checks, turn a miss into a hit, and bolster saves.")),
+            F(20, "Living Legend", "Advantage on CHA checks, turn a miss into a hit, and bolster saves."))
+            with { GrantedSpells = ["Guiding Bolt", "Heroism", "Magic Weapon", "Haste", "Protection from Energy"] },
         Sc("pal-ancients", "Oath of the Ancients", "paladin",
             F(3, "Nature's Wrath / Oath of the Ancients Spells", "Channel Divinity to restrain foes with spectral vines; nature/fey oath spells."),
             F(7, "Aura of Warding", "You and allies in your aura have resistance to damage from spells."),
             F(15, "Undying Sentinel", "Stay at 1 HP when you'd drop to 0 (1/long rest) and don't age."),
-            F(20, "Elder Champion", "Transform: regain HP, cast oath spells faster, and weaken foes' saves.")),
+            F(20, "Elder Champion", "Transform: regain HP, cast oath spells faster, and weaken foes' saves."))
+            with { GrantedSpells = ["Speak with Animals", "Misty Step", "Moonbeam", "Plant Growth", "Protection from Energy"] },
         Sc("pal-vengeance", "Oath of Vengeance", "paladin",
             F(3, "Vow of Enmity / Oath of Vengeance Spells", "Channel Divinity for advantage vs one foe; vengeance oath spells (Hunter's Mark, Hold Person...)."),
             F(7, "Relentless Avenger", "Opportunity-attack hits let you move without provoking."),
             F(15, "Soul of Vengeance", "Reaction attack against your Vow of Enmity target when it attacks."),
-            F(20, "Avenging Angel", "Sprout wings, gain flight, and frighten nearby foes.")),
+            F(20, "Avenging Angel", "Sprout wings, gain flight, and frighten nearby foes."))
+            with { GrantedSpells = ["Bane", "Hunter's Mark", "Hold Person", "Misty Step", "Haste"] },
+        Sc("pal-opensea", "Oath of the Open Sea", "paladin",
+            F(3, "Marine Layer / Oath of the Open Sea Spells", "Channel Divinity to conjure obscuring fog; nautical oath spells."),
+            F(7, "Fury of the Tides", "On a hit, push a creature 10 ft and add bonus damage."),
+            F(15, "Stormy Waters", "Creatures take damage and are knocked prone when they enter or leave your reach."),
+            F(20, "Mythic Swashbuckler", "Climb/jump/swim freely, attack at advantage, and impose disadvantage in response."))
+            with { Source = "Spelljammer (AAG)", GrantedSpells = ["Fog Cloud", "Gust of Wind", "Misty Step", "Water Breathing", "Wind Wall", "Water Walk"] },
 
         // ── Ranger ──
         Sc("ranger-beastmaster", "Beast Master", "ranger",

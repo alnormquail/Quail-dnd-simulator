@@ -17,5 +17,9 @@ public class Spell
     public bool IsPrepared { get; set; } = true;
     public string Description { get; set; } = string.Empty;
 
+    /// <summary>Provenance: what granted this spell (e.g. "Oath of Devotion", "Feat: Magic Initiate").
+    /// Empty for spells the player added directly or that were imported from a sheet.</summary>
+    public string Source { get; set; } = string.Empty;
+
     public string LevelDisplay => Level == 0 ? "Cantrip" : $"Level {Level}";
 }

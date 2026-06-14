@@ -499,6 +499,8 @@ public static class PreloadedCharacters
     {
         Id             = new Guid("a1000000-0000-0000-0000-000000000008"),
         Name           = "Job Goodhammer",
+        Subclass       = "Oath of the Open Sea",
+        SubclassKey    = "pal-opensea",
         Type           = CombatantType.PC,
         CharacterClass = "Paladin",
         CharacterLevel = 5,

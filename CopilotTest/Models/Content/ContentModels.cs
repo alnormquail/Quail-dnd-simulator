@@ -73,6 +73,8 @@ public record SubclassData
     public string Source { get; init; } = "PHB 2024";
     public RulesEdition Edition { get; init; } = RulesEdition.Edition2024;
     public IReadOnlyList<SubclassFeature> Features { get; init; } = [];
+    /// <summary>Spell names this subclass grants (always-prepared). Granted when castable; removed on swap.</summary>
+    public IReadOnlyList<string> GrantedSpells { get; init; } = [];
 }
 
 /// <summary>
