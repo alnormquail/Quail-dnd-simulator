@@ -794,6 +794,8 @@
         [new Guid("a1000000-0000-0000-0000-000000000006")] = new(
             TurnExtras:
             [
+                new("Action", "Nick: free off-hand attack", "When you attack with the Scimitar (Nick mastery), make the Two-Weapon Fighting attack with a Light weapon as part of the same Attack action — no Bonus Action needed."),
+                new("Bonus Action", "Off-Hand Attack (Two-Weapon Fighting)", "Attack with a second Light weapon (+6, 1d6+3) — your Fighting Style adds your STR mod to the damage. Use this if you didn't use the Scimitar's Nick this turn."),
                 new("Bonus Action", "Second Wind", "Heal 1d10+5 (3/long rest)"),
                 new("Action", "Action Surge", "Take one extra action this turn (1/short rest)"),
             ],
@@ -808,21 +810,22 @@
             ],
             ClassFeatures:
             [
-                "Extra Attack: Make 2 attacks whenever you take the Attack action.",
-                "Action Surge (1/short rest): Take one additional Action on your turn — great for 4 attacks in one round.",
+                "Fighting Style — Two-Weapon Fighting: when you fight with two Light weapons, you add your ability modifier (STR +3) to the damage of the off-hand attack.",
+                "Weapon Masteries: Scimitar (Nick) — make the extra two-weapon attack as part of your Attack action, no Bonus Action needed; Shortsword & Handaxe (Vex) — a hit gives you Advantage on your next attack against that target.",
+                "Extra Attack: Make 2 attacks whenever you take the Attack action (plus the Nick off-hand attack = 3 swings).",
+                "Action Surge (1/short rest): Take one additional Action — can stack with two-weapon fighting for a huge burst round.",
                 "Second Wind (1/short rest): Bonus Action — heal 1d10 + 5 HP.",
-                "Fighting Style: Choose based on your weapon setup (Dueling, Archery, etc.).",
                 "Indomitable (1/long rest): Reroll a failed saving throw — use it on a scary save like being paralyzed."
             ],
             PlayTips:
             [
-                "You are the party's front-line fighter — your job is to hit things hard and stay alive.",
-                "Action Surge is your big button. Save it for when you need 4 attacks in one turn or to take down a tough enemy quickly.",
-                "Second Wind is a free bonus action heal every short rest — use it when you drop below half HP.",
-                "With STR 17 (+3), you hit hard in melee. Lead with your Scimitar or Shortsword in tight spaces.",
-                "Longbow gives you a solid 150 ft. ranged option (+5 to hit, 1d8+2) — useful when you can't close in safely.",
-                "Gnome Cunning makes you surprisingly resistant to spells targeting INT/WIS/CHA — you won't be mind-controlled easily.",
-                "Indomitable is a lifesaver — save it for a devastating failed save like paralysis or being turned."
+                "You're a two-weapon fighter: with Extra Attack + the Scimitar's Nick mastery you swing THREE times on a normal turn (Scimitar, second Light weapon via Nick, plus your Extra Attack).",
+                "Lead with the Scimitar so Nick gives you the off-hand attack for free — that keeps your Bonus Action open for Second Wind.",
+                "Vex (Shortsword/Handaxe): when you hit, your next attack against that creature has Advantage — chain your swings onto the same target to snowball hits.",
+                "Action Surge is your nova button: a second Attack action means up to 5–6 swings in one turn. Save it for a key moment.",
+                "Second Wind is a free Bonus-Action heal each short rest — use it when you dip below half HP.",
+                "Longbow is your ranged option (+5, 1d8+2 at 150 ft) when you can't close in.",
+                "Gnome Cunning makes you resistant to spells targeting INT/WIS/CHA — you won't be mind-controlled easily."
             ]
         ),
         // ── Gideon Silverspoon the Bard ──────────────────────────────────────
