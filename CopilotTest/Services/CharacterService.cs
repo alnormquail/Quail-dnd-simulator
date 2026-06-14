@@ -149,6 +149,14 @@ public class CharacterService
             LoadPreloadedInventory();
             SetMetaFlag("preloaded-inventory-loaded-v1");
         }
+
+        // One-time load of the preloaded party's class/species features onto the
+        // Stats tab. Only fills characters whose feature list is currently empty.
+        if (!MetaFlagSet("preloaded-features-loaded-v1"))
+        {
+            LoadPreloadedFeatures();
+            SetMetaFlag("preloaded-features-loaded-v1");
+        }
     }
 
     /// <summary>
@@ -175,6 +183,35 @@ public class CharacterService
                     Description = item.Description,
                     IsEquipped  = item.IsEquipped,
                     Category    = item.Category,
+                });
+            }
+            changed = true;
+        }
+        if (changed) _db.SaveChanges();
+    }
+
+    /// <summary>
+    /// One-time: load each preloaded character's class/species features into the
+    /// DB, but only for characters whose feature list is empty. Inserts by FK;
+    /// never touches user-created characters.
+    /// </summary>
+    private void LoadPreloadedFeatures()
+    {
+        var changed = false;
+        foreach (var template in PreloadedCharacters.All.Where(t => t.Features.Count > 0))
+        {
+            if (!_db.Characters.Any(c => c.Id == template.Id)) continue;
+            if (_db.CharacterFeatures.Any(f => f.CharacterId == template.Id)) continue;  // already has features
+
+            foreach (var f in template.Features)
+            {
+                _db.CharacterFeatures.Add(new CharacterFeature
+                {
+                    CharacterId = template.Id,
+                    Name        = f.Name,
+                    Description = f.Description,
+                    Source      = f.Source,
+                    LevelGained = f.LevelGained,
                 });
             }
             changed = true;

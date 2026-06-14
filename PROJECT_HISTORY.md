@@ -187,6 +187,18 @@ Belqorel, and Wally appear in the Party Hub but not the Guide.
 - Character Guide quick-reference with a session tracker (HP, spell-slot pips,
   sorcery points) and Wild Magic info for Winnie; Kennyth panel added.
 
+### Session 2026-06-12 (part 19) — Party features on the Stats tab
+
+- Added a `Feat(...)` helper and a `Features` list to each party member
+  (Winnie, Kennyth, Boan, Gideon, Job, Bren, Korran) covering their class,
+  subclass, and species features — including Boan's Two-Weapon Fighting style
+  and Nick/Vex weapon masteries.
+- `LoadPreloadedFeatures()` loads them into existing DBs once, gated by the
+  `preloaded-features-loaded-v1` flag; only fills characters with no features,
+  so user/content-engine grants are never clobbered. (43 features loaded.)
+- These now show in the sheet's **Features & Traits** section; the original demo
+  trio (Spurt/Belqorel/Wally) were left as-is.
+
 ### Session 2026-06-12 (part 18) — Guide as a sheet tab (shared component)
 
 - Extracted the entire guide panel into a reusable **`Components/GuidePanel.razor`**

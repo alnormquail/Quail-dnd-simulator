@@ -18,6 +18,9 @@ public static class PreloadedCharacters
     private static InventoryItem Inv(string name, int qty, ItemCategory cat, bool equipped = false) =>
         new() { Name = name, Quantity = qty, Category = cat, IsEquipped = equipped };
 
+    private static CharacterFeature Feat(string name, string source, string desc) =>
+        new() { Name = name, Source = source, Description = desc, LevelGained = 1 };
+
     public static Character Spurt => new()
     {
         Id             = new Guid("a1000000-0000-0000-0000-000000000001"),
@@ -242,6 +245,17 @@ public static class PreloadedCharacters
             Inv("Crowbar", 1, ItemCategory.Other),
         },
 
+        Features = new List<CharacterFeature>
+        {
+            Feat("Font of Magic (5 SP)", "Sorcerer", "Convert Sorcery Points into spell slots or vice versa; fuel Metamagic."),
+            Feat("Metamagic", "Sorcerer", "Subtle Spell (cast with no V/S components) and Twinned Spell (target a second creature)."),
+            Feat("Innate Sorcery", "Sorcerer", "Bonus Action, 2/long rest: +1 spell save DC and advantage on spell attacks for 1 minute."),
+            Feat("Wild Magic Surge", "Wild Magic Sorcery", "Casting a leveled spell can trigger a chaotic d100 surge (at the DM's discretion)."),
+            Feat("Tides of Chaos", "Wild Magic Sorcery", "1/long rest: gain Advantage on a d20 roll; recharges when you cause a surge."),
+            Feat("Bend Luck", "Wild Magic Sorcery", "Reaction, 2 SP: add or subtract 1d4 from any creature's d20 roll."),
+            Feat("Fey Ancestry & Trance", "High Elf", "Advantage vs Charmed; immune to magical sleep; 4-hour Trance. Darkvision 60 ft."),
+        },
+
         PersonalityTraits = "Winnie Vale — Wild Magic Sorcerer 5, High Elf Noble.",
         GoldPieces = 50,
     };
@@ -295,6 +309,16 @@ public static class PreloadedCharacters
         Inventory = new List<InventoryItem>
         {
             Inv("Greatsword", 1, ItemCategory.Weapon, true),
+        },
+
+        Features = new List<CharacterFeature>
+        {
+            Feat("Lay on Hands (25 HP pool)", "Paladin", "Bonus Action: heal from a 25 HP/long-rest pool, or spend 5 HP to cure poison."),
+            Feat("Divine Smite", "Paladin", "Expend a spell slot on a melee hit: +2d8 radiant (1st) / +3d8 (2nd); +1d8 vs Undead/Fiends. Free 1/long rest."),
+            Feat("Channel Divinity (2/long rest)", "Paladin", "Divine Sense, or Sacred Weapon."),
+            Feat("Extra Attack", "Paladin", "Attack twice whenever you take the Attack action."),
+            Feat("Sacred Weapon", "Oath of Devotion", "Channel Divinity: add CHA to weapon attacks and emit light for 1 minute."),
+            Feat("Gnomish Cunning", "Gnome", "Advantage on INT, WIS, and CHA saving throws. Darkvision 60 ft."),
         },
 
         PersonalityTraits = "Kennyth — Paladin 5, Gnome. Lay on Hands pool: 25 HP. Gnome Cunning: Advantage on INT/WIS/CHA saves vs magic.",
@@ -361,6 +385,17 @@ public static class PreloadedCharacters
             Inv("Tinderbox", 1, ItemCategory.Other),
             Inv("Caltrops", 20, ItemCategory.Other),
             Inv("Crowbar", 1, ItemCategory.Other),
+        },
+
+        Features = new List<CharacterFeature>
+        {
+            Feat("Fighting Style: Two-Weapon Fighting", "Fighter", "Add your ability modifier (STR +3) to the damage of your off-hand attack."),
+            Feat("Weapon Masteries", "Fighter", "Scimitar (Nick): make the two-weapon off-hand attack as part of your Attack action. Shortsword & Handaxe (Vex): a hit gives Advantage on your next attack vs that target."),
+            Feat("Extra Attack", "Fighter", "Attack twice whenever you take the Attack action (3 swings with the Scimitar's Nick)."),
+            Feat("Action Surge (1/short rest)", "Fighter", "Take one additional action on your turn."),
+            Feat("Second Wind (3/long rest)", "Fighter", "Bonus Action: heal 1d10+5; also fuels Tactical Mind on a failed check."),
+            Feat("Improved Critical", "Champion", "Score a critical hit on a 19-20."),
+            Feat("Gnomish Cunning", "Gnome", "Advantage on INT, WIS, and CHA saving throws. Darkvision 60 ft."),
         },
 
         PersonalityTraits = "Boan Strickler — Fighter 5, Gnome Folk Hero. Extra Attack: 2 attacks per turn. Action Surge: 1/short rest. Gnome Cunning: Advantage on INT/WIS/CHA saves vs magic.",
@@ -440,6 +475,16 @@ public static class PreloadedCharacters
             Inv("Tinderbox", 2, ItemCategory.Other),
         },
 
+        Features = new List<CharacterFeature>
+        {
+            Feat("Bardic Inspiration (d6, 3/short rest)", "Bard", "Bonus Action: give an ally a d6 to add to a roll within 10 minutes."),
+            Feat("Expertise", "Bard", "Double proficiency on Performance and Persuasion (+9)."),
+            Feat("Jack of All Trades", "Bard", "Add half proficiency (+1) to ability checks you're not proficient in."),
+            Feat("Font of Inspiration", "Bard", "Regain all Bardic Inspiration on a short or long rest."),
+            Feat("Cutting Words", "College of Lore", "Reaction: expend Bardic Inspiration to subtract it from an enemy's attack, check, or damage."),
+            Feat("Fey Ancestry", "Half-Elf", "Advantage vs Charmed; immune to magical sleep. Darkvision 60 ft."),
+        },
+
         PersonalityTraits = "Gideon Silverspoon — Bard 5, Half-Elf Criminal. Bardic Inspiration d8, 3/short rest. College of Lore: Cutting Words reaction.",
     };
 
@@ -509,6 +554,15 @@ public static class PreloadedCharacters
             Inv("Tinderbox", 1, ItemCategory.Other),
         },
 
+        Features = new List<CharacterFeature>
+        {
+            Feat("Lay on Hands (25 HP pool)", "Paladin", "Bonus Action: heal from a 25 HP/long-rest pool, or spend 5 HP to cure poison."),
+            Feat("Divine Smite", "Paladin", "Expend a spell slot on a melee hit: +2d8 radiant (1st) / +3d8 (2nd). Free 1/long rest."),
+            Feat("Channel Divinity (2/long rest)", "Paladin", "Divine Sense, or Fury of the Tides (on a hit, push the target 10 ft for bonus damage)."),
+            Feat("Extra Attack", "Paladin", "Attack twice whenever you take the Attack action."),
+            Feat("Human Versatility", "Human", "Heroic Inspiration on a long rest, a bonus skill, and an Origin feat."),
+        },
+
         PersonalityTraits = "Job Goodhammer — Paladin 5, Human Acolyte. Lay on Hands pool: 25 HP. Oath of the Open Sea.",
     };
 
@@ -576,6 +630,16 @@ public static class PreloadedCharacters
             Inv("Wooden Staff (Druidic Focus)", 1, ItemCategory.Other, true),
         },
 
+        Features = new List<CharacterFeature>
+        {
+            Feat("Wild Shape (2/long rest)", "Druid", "Bonus Action: transform into a Beast for 2 hours, gaining 5 temp HP."),
+            Feat("Druidic", "Druid", "You know Druidic and always have Speak with Animals prepared."),
+            Feat("Primal Order: Magician", "Druid", "Know an extra cantrip; +2 bonus to INT (Arcana/Nature) checks."),
+            Feat("Wild Resurgence & Wild Companion", "Druid", "Convert spell slots ↔ Wild Shape uses; expend a use to cast Find Familiar."),
+            Feat("Land's Aid & Natural Recovery", "Circle of the Land", "Expend Wild Shape for a 10-ft AoE (DC 13 CON, 2d6 necrotic; heal an ally 2d6); recover spell slots on a short rest."),
+            Feat("Gnomish Cunning", "Forest Gnome", "Advantage on INT, WIS, and CHA saving throws. Darkvision 60 ft."),
+        },
+
         PersonalityTraits = "Bren Gunning — Druid 5, Forest Gnome. Circle of the Land. Wild Shape 2/long rest (5 temp HP). Gnome Cunning: Advantage on INT/WIS/CHA saves vs magic.",
     };
 
@@ -635,6 +699,16 @@ public static class PreloadedCharacters
             Inv("Bedroll", 1, ItemCategory.Other),
             Inv("Waterskin", 1, ItemCategory.Other),
             Inv("Tinderbox", 1, ItemCategory.Other),
+        },
+
+        Features = new List<CharacterFeature>
+        {
+            Feat("Rage (3/long rest)", "Barbarian", "Bonus Action: +2 melee damage, resistance to bludgeoning/piercing/slashing, advantage on STR checks & saves."),
+            Feat("Reckless Attack", "Barbarian", "Attack with Advantage on your turn; attacks against you have Advantage until your next turn."),
+            Feat("Danger Sense", "Barbarian", "Advantage on DEX saving throws against effects you can see."),
+            Feat("Relentless Endurance", "Half-Orc", "When dropped to 0 HP (but not killed), drop to 1 HP instead — 1/long rest."),
+            Feat("Savage Attacks", "Half-Orc", "On a melee critical hit, roll one of the weapon's damage dice an extra time."),
+            Feat("Darkvision 60 ft.", "Half-Orc", "See in dim light within 60 ft as if bright light."),
         },
 
         PersonalityTraits = "Korran Vale — Barbarian 4, Half-Orc. Rage 3/long rest (+2 dmg, resistance to bludgeoning/piercing/slashing). Relentless Endurance: drop to 1 HP instead of 0 once per long rest.",
