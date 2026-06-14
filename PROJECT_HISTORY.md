@@ -187,6 +187,20 @@ Belqorel, and Wally appear in the Party Hub but not the Guide.
 - Character Guide quick-reference with a session tracker (HP, spell-slot pips,
   sorcery points) and Wild Magic info for Winnie; Kennyth panel added.
 
+### Session 2026-06-12 (part 23) — More subclass spells + magic-item library
+
+- Seeded `GrantedSpells` for the **Cleric domains** (Life/Light/Trickery/War)
+  and **Warlock patrons** (Archfey/Celestial/Fiend/Great Old One). Spells not in
+  the SRD library are safely skipped by `GrantSubclassSpells`.
+- Greatly expanded the **magic-item library** (`ItemLibrary`) with a broad set
+  across rarities via a new `Mi(...)` helper: potions/oils, rings, wands/staffs/
+  rods, +1/+2/+3 weapons & armor & shields, special weapons (Flame Tongue,
+  Vorpal, Holy Avenger…), and wondrous items (Amulet of Health, Boots of Speed,
+  Bag of Tricks, Robe of the Archmagi, stat tomes, etc.). ~55 added.
+- NOT a literal 300-item DMG dump (impractical/error-prone to hand-author); it's
+  the commonly-used items, expandable on request. Still hidden behind the
+  "Show magic items (DM loot)" toggle in the picker.
+
 ### Session 2026-06-12 (part 22) — Smart subclass swaps (spell provenance)
 
 - Added a **`Source` tag to the Spell entity** (+ migration column) so spells

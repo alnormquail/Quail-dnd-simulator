@@ -69,22 +69,26 @@ public static class SubclassLibrary
             F(3, "Disciple of Life / Life Domain Spells", "Your healing spells restore extra HP (2 + spell level)."),
             F(6, "Blessed Healer", "Your healing spells also heal you."),
             F(10, "Divine Strike", "Once per turn, a weapon hit deals +1d8 radiant."),
-            F(14, "Supreme Healing", "Healing dice are maximized instead of rolled.")),
+            F(14, "Supreme Healing", "Healing dice are maximized instead of rolled."))
+            with { GrantedSpells = ["Bless", "Cure Wounds", "Aid", "Lesser Restoration", "Revivify", "Beacon of Hope", "Mass Healing Word"] },
         Sc("cleric-light", "Light Domain", "cleric",
             F(3, "Warding Flare / Radiance of the Dawn", "Reaction to impose disadvantage on an attacker; Channel Divinity blasts radiant damage."),
             F(6, "Improved Warding Flare", "Warding Flare also grants temp HP and regains on a short rest."),
             F(10, "Potent Spellcasting", "Add your WIS modifier to cleric cantrip damage."),
-            F(14, "Corona of Light", "Emit sunlight; foes have disadvantage vs your fire/radiant spells.")),
+            F(14, "Corona of Light", "Emit sunlight; foes have disadvantage vs your fire/radiant spells."))
+            with { GrantedSpells = ["Burning Hands", "Faerie Fire", "Flaming Sphere", "Scorching Ray", "Daylight", "Fireball", "Wall of Fire", "Flame Strike"] },
         Sc("cleric-trickery", "Trickery Domain", "cleric",
             F(3, "Blessing of the Trickster / Invoke Duplicity", "Give a creature advantage on Stealth; create an illusory duplicate to flank and cast through."),
             F(6, "Trickster's Transposition", "Swap places with your duplicate as a Bonus Action."),
             F(10, "Divine Strike (Poison)", "Once per turn, a weapon hit deals +1d8 poison."),
-            F(14, "Improved Duplicity", "Your duplicate heals allies near it.")),
+            F(14, "Improved Duplicity", "Your duplicate heals allies near it."))
+            with { GrantedSpells = ["Charm Person", "Disguise Self", "Mirror Image", "Pass without Trace", "Dispel Magic", "Dimension Door", "Polymorph", "Dominate Person"] },
         Sc("cleric-war", "War Domain", "cleric",
             F(3, "War Priest / Guided Strike", "Make an extra weapon attack as a Bonus Action; Channel Divinity for +10 to hit."),
             F(6, "War God's Blessing", "Channel Divinity to grant +10 to an ally's attack."),
             F(10, "Divine Strike", "Once per turn, a weapon hit deals +1d8 of your deity's damage."),
-            F(14, "Avatar of Battle", "Resistance to nonmagical bludgeoning, piercing, and slashing.")),
+            F(14, "Avatar of Battle", "Resistance to nonmagical bludgeoning, piercing, and slashing."))
+            with { GrantedSpells = ["Divine Favor", "Shield of Faith", "Magic Weapon", "Spiritual Weapon", "Crusader's Mantle", "Spirit Guardians", "Freedom of Movement", "Stoneskin", "Flame Strike", "Hold Monster"] },
 
         // ── Druid ──
         Sc("druid-land", "Circle of the Land", "druid",
@@ -225,13 +229,17 @@ public static class SubclassLibrary
 
         // ── Warlock ──
         Sc("warlock-archfey", "Archfey Patron", "warlock",
-            F(3, "Steps of the Fey", "Misty Step a set number of times per long rest, with a bonus effect (refreshing or taunting).")),
+            F(3, "Steps of the Fey", "Misty Step a set number of times per long rest, with a bonus effect (refreshing or taunting)."))
+            with { GrantedSpells = ["Faerie Fire", "Sleep", "Calm Emotions", "Misty Step", "Plant Growth", "Dominate Beast", "Greater Invisibility", "Dominate Person"] },
         Sc("warlock-celestial", "Celestial Patron", "warlock",
-            F(3, "Healing Light / Bonus Cantrips", "A pool of d6 healing dice as a Bonus Action; gain Light, Sacred Flame, and celestial spells.")),
+            F(3, "Healing Light / Bonus Cantrips", "A pool of d6 healing dice as a Bonus Action; gain Light, Sacred Flame, and celestial spells."))
+            with { GrantedSpells = ["Cure Wounds", "Guiding Bolt", "Lesser Restoration", "Flaming Sphere", "Daylight", "Revivify", "Wall of Fire", "Flame Strike", "Greater Restoration"] },
         Sc("warlock-fiend", "Fiend Patron", "warlock",
-            F(3, "Dark One's Blessing / Fiend Spells", "Gain temp HP when you drop a foe; fiendish always-prepared spells (Burning Hands, Command...).")),
+            F(3, "Dark One's Blessing / Fiend Spells", "Gain temp HP when you drop a foe; fiendish always-prepared spells (Burning Hands, Command...)."))
+            with { GrantedSpells = ["Burning Hands", "Command", "Blindness/Deafness", "Scorching Ray", "Fireball", "Stinking Cloud", "Wall of Fire", "Flame Strike"] },
         Sc("warlock-greatoldone", "Great Old One Patron", "warlock",
-            F(3, "Awakened Mind / Psychic Spells", "Telepathy with creatures; gain Dissonant Whispers, Tasha's Hideous Laughter, and other mind spells.")),
+            F(3, "Awakened Mind / Psychic Spells", "Telepathy with creatures; gain Dissonant Whispers, Tasha's Hideous Laughter, and other mind spells."))
+            with { GrantedSpells = ["Tasha's Hideous Laughter", "Detect Thoughts", "Hold Person", "Dominate Beast", "Dominate Person", "Telekinesis"] },
 
         // ── Wizard ──
         Sc("wiz-abjurer", "Abjurer", "wizard",
