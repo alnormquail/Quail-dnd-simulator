@@ -187,6 +187,15 @@ Belqorel, and Wally appear in the Party Hub but not the Guide.
 - Character Guide quick-reference with a session tracker (HP, spell-slot pips,
   sorcery points) and Wild Magic info for Winnie; Kennyth panel added.
 
+### Session 2026-06-12 (part 20) — Guide: full mechanics + click-to-roll
+
+- "On Your Turn" items now show the **full mechanical line** for attacks/spells
+  (+to-hit OR DC + save ability, plus damage dice/type), via `ActionDetail`.
+- Made attack/spell items **clickable to roll**: reuses the Play-mode
+  `DiceService` (d20 + mod with crit-doubling on nat 20; damage parsing) and
+  logs to the shared `RollLogService` (so rolls also appear in Play mode). A
+  result banner shows the to-hit + damage (or save DC + damage) inline.
+
 ### Session 2026-06-12 (part 19) — Party features on the Stats tab
 
 - Added a `Feat(...)` helper and a `Features` list to each party member

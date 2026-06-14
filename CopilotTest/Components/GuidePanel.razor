@@ -1,3 +1,6 @@
+@inject CopilotTest.Services.DiceService Dice
+@inject CopilotTest.Services.RollLogService Log
+
 @if (Hero != null && GuideData.TryGetValue(Hero.Id, out var guide))
 {
         <div class="guide-panel">
@@ -30,13 +33,24 @@
 
             <!-- On Your Turn (action economy) -->
             <div class="guide-section">
-                <h3>⏱️ On Your Turn</h3>
+                <h3>⏱️ On Your Turn <span class="guide-skill-legend">tap an attack/spell 🎲 to roll</span></h3>
+                @if (lastRoll != null)
+                {
+                    <div class="roll-result">@lastRoll <button class="roll-clear" @onclick="() => lastRoll = null">✕</button></div>
+                }
                 <div class="turn-grid">
                     <div class="turn-col turn-action">
                         <div class="turn-col-head">⚔️ Action <span class="turn-col-sub">one per turn</span></div>
                         @foreach (var t in TurnItemsFor(Hero, guide, "Action"))
                         {
-                            <div class="turn-item @(t.Highlight ? "feat" : "")"><span class="turn-name">@t.Name</span><span class="turn-detail">@t.Detail</span></div>
+                            @if (t.Action != null && IsRollable(t.Action))
+                            {
+                                <button type="button" class="turn-item rollable @(t.Highlight ? "feat" : "")" @onclick="() => RollAction(t.Action)"><span class="turn-name">@t.Name <span class="roll-die">🎲</span></span><span class="turn-detail">@t.Detail</span></button>
+                            }
+                            else
+                            {
+                                <div class="turn-item @(t.Highlight ? "feat" : "")"><span class="turn-name">@t.Name</span><span class="turn-detail">@t.Detail</span></div>
+                            }
                         }
                         <div class="turn-item muted"><span class="turn-name">Standard</span><span class="turn-detail">Dash · Disengage · Dodge · Help · Hide · Ready · Search · Shove · Grapple</span></div>
                     </div>
@@ -47,7 +61,14 @@
                         {
                             @foreach (var t in bonus)
                             {
+                                @if (t.Action != null && IsRollable(t.Action))
+                            {
+                                <button type="button" class="turn-item rollable @(t.Highlight ? "feat" : "")" @onclick="() => RollAction(t.Action)"><span class="turn-name">@t.Name <span class="roll-die">🎲</span></span><span class="turn-detail">@t.Detail</span></button>
+                            }
+                            else
+                            {
                                 <div class="turn-item @(t.Highlight ? "feat" : "")"><span class="turn-name">@t.Name</span><span class="turn-detail">@t.Detail</span></div>
+                            }
                             }
                         }
                         else
@@ -59,7 +80,14 @@
                         <div class="turn-col-head">🛡️ Reaction <span class="turn-col-sub">one per round</span></div>
                         @foreach (var t in TurnItemsFor(Hero, guide, "Reaction"))
                         {
-                            <div class="turn-item @(t.Highlight ? "feat" : "")"><span class="turn-name">@t.Name</span><span class="turn-detail">@t.Detail</span></div>
+                            @if (t.Action != null && IsRollable(t.Action))
+                            {
+                                <button type="button" class="turn-item rollable @(t.Highlight ? "feat" : "")" @onclick="() => RollAction(t.Action)"><span class="turn-name">@t.Name <span class="roll-die">🎲</span></span><span class="turn-detail">@t.Detail</span></button>
+                            }
+                            else
+                            {
+                                <div class="turn-item @(t.Highlight ? "feat" : "")"><span class="turn-name">@t.Name</span><span class="turn-detail">@t.Detail</span></div>
+                            }
                         }
                         <div class="turn-item muted"><span class="turn-name">Opportunity Attack</span><span class="turn-detail">when an enemy leaves your reach</span></div>
                     </div>
@@ -70,7 +98,14 @@
                         @{ var other = TurnItemsFor(Hero, guide, "Other"); }
                         @foreach (var t in other)
                         {
-                            <div class="turn-item @(t.Highlight ? "feat" : "")"><span class="turn-name">@t.Name</span><span class="turn-detail">@t.Detail</span></div>
+                            @if (t.Action != null && IsRollable(t.Action))
+                            {
+                                <button type="button" class="turn-item rollable @(t.Highlight ? "feat" : "")" @onclick="() => RollAction(t.Action)"><span class="turn-name">@t.Name <span class="roll-die">🎲</span></span><span class="turn-detail">@t.Detail</span></button>
+                            }
+                            else
+                            {
+                                <div class="turn-item @(t.Highlight ? "feat" : "")"><span class="turn-name">@t.Name</span><span class="turn-detail">@t.Detail</span></div>
+                            }
                         }
                     </div>
                 </div>
@@ -456,6 +491,7 @@
         if (Hero != null && Hero.Id != _lastId)
         {
             _lastId = Hero.Id;
+            lastRoll = null;
             ResetTracker(Hero);
         }
     }
@@ -519,7 +555,7 @@
     };
 
     // ── "On Your Turn" action-economy breakdown ──────────────────────────────
-    private record TurnItem(string Name, string Detail, bool Highlight = false);
+    private record TurnItem(string Name, string Detail, bool Highlight = false, CombatAction? Action = null);
 
     /// <summary>Map a spell's casting time to an action-economy bucket.</summary>
     private static string CastingBucket(string castingTime)
@@ -531,6 +567,20 @@
         return "Other";
     }
 
+    /// <summary>Full mechanical line for an attack/spell action.</summary>
+    private static string ActionDetail(CombatAction a)
+    {
+        var dmg = string.IsNullOrEmpty(a.DamageDice) ? "" :
+            $"{a.DamageDice}{(a.DamageBonus != 0 ? FormatBonus(a.DamageBonus) : "")} {a.DamageType}".Trim();
+        if (a.SaveDC > 0)
+            return $"DC {a.SaveDC} {a.SaveAbility} save" + (dmg.Length > 0 ? $" · {dmg}" : "");
+        return $"{FormatBonus(a.AttackBonus)} to hit" + (dmg.Length > 0 ? $" · {dmg}" : "");
+    }
+
+    /// <summary>True if an action has something to roll (attack and/or damage).</summary>
+    private static bool IsRollable(CombatAction a) =>
+        a.AttackBonus != 0 || a.SaveDC > 0 || !string.IsNullOrEmpty(a.DamageDice);
+
     /// <summary>Build the per-bucket turn breakdown from weapons, spells, and class features.</summary>
     private List<TurnItem> TurnItemsFor(Character c, CharacterGuideEntry guide, string bucket)
     {
@@ -538,28 +588,16 @@
 
         // Weapon attacks are the Attack action.
         if (bucket == "Action")
-        {
             foreach (var a in c.Actions.Where(a => a.ActionType == ActionType.Attack))
-            {
-                var dmg = string.IsNullOrEmpty(a.DamageDice) ? "" :
-                    $"{a.DamageDice}{(a.DamageBonus != 0 ? FormatBonus(a.DamageBonus) : "")} {a.DamageType}";
-                items.Add(new($"⚔ {a.DisplayName}", $"{FormatBonus(a.AttackBonus)} to hit · {dmg}".Trim(' ', '·')));
-            }
-        }
+                items.Add(new($"⚔ {a.DisplayName}", ActionDetail(a), Action: a));
 
         // Spells, bucketed by casting time. Enrich with save/attack from a matching action.
         foreach (var s in c.Spells.Where(s => CastingBucket(s.CastingTime) == bucket).OrderBy(s => s.Level).ThenBy(s => s.Name))
         {
             var match = c.Actions.FirstOrDefault(a => a.Name == s.Name);
             var lvl = s.Level == 0 ? "Cantrip" : $"L{s.Level}";
-            string detail;
-            if (match != null && match.SaveDC > 0)
-                detail = $"{lvl} · DC {match.SaveDC} {match.SaveAbility} · {match.DamageDice} {match.DamageType}".TrimEnd(' ', '·');
-            else if (match != null && match.AttackBonus != 0)
-                detail = $"{lvl} · {FormatBonus(match.AttackBonus)} · {match.DamageDice} {match.DamageType}".TrimEnd(' ', '·');
-            else
-                detail = $"{lvl} · {s.Range}".TrimEnd(' ', '·');
-            items.Add(new($"✦ {s.Name}", detail));
+            var detail = match != null ? $"{lvl} · {ActionDetail(match)}" : $"{lvl} · {s.Range}".TrimEnd(' ', '·');
+            items.Add(new($"✦ {s.Name}", detail, Action: match));
         }
 
         // Curated class-feature options.
@@ -568,6 +606,33 @@
                 items.Add(new($"★ {t.Name}", t.Detail, Highlight: true));
 
         return items;
+    }
+
+    // ── Dice rolling (reuses the Play-mode DiceService + RollLogService) ───────
+    private string? lastRoll;
+
+    private void RollAction(CombatAction a)
+    {
+        if (Hero == null || !IsRollable(a)) return;
+        var who = Hero.Name;
+
+        if (a.SaveDC > 0)
+        {
+            // Save-based: enemy makes the save; we roll the damage.
+            var dmg = Dice.RollDamage(a.DamageDice, a.DamageBonus);
+            lastRoll = $"🎲 {a.Name}: enemy makes a DC {a.SaveDC} {a.SaveAbility} save — {dmg.Total} {a.DamageType} on a fail ({dmg.Detail})";
+            Log.Add(new RollEntry(DateTime.Now, who, $"{a.Name} (save DC {a.SaveDC})", dmg.Detail, dmg.Total, RollKind.Damage, false, false));
+        }
+        else
+        {
+            // Attack: roll to-hit, then damage (doubling dice on a natural 20).
+            var hit = Dice.RollD20(a.AttackBonus);
+            var dmg = Dice.RollDamage(a.DamageDice, a.DamageBonus, hit.IsCrit);
+            var critText = hit.IsCrit ? " — CRIT!" : hit.IsFumble ? " — nat 1!" : "";
+            lastRoll = $"🎲 {a.Name}: to hit {hit.Total} ({hit.Detail}){critText} · damage {dmg.Total} ({dmg.Detail})";
+            Log.Add(new RollEntry(DateTime.Now, who, $"{a.Name} attack", hit.Detail, hit.Total, RollKind.Attack, hit.IsCrit, hit.IsFumble));
+            Log.Add(new RollEntry(DateTime.Now, who, $"{a.Name} damage", dmg.Detail, dmg.Total, RollKind.Damage, hit.IsCrit, false));
+        }
     }
 
     private static bool HasSpells(Character c) =>
