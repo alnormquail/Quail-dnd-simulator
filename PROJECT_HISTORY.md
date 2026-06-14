@@ -187,6 +187,17 @@ Belqorel, and Wally appear in the Party Hub but not the Guide.
 - Character Guide quick-reference with a session tracker (HP, spell-slot pips,
   sorcery points) and Wild Magic info for Winnie; Kennyth panel added.
 
+### Session 2026-06-12 (part 18) — Guide as a sheet tab (shared component)
+
+- Extracted the entire guide panel into a reusable **`Components/GuidePanel.razor`**
+  component (`Hero` parameter, own tracker state, `HasGuide(id)` static check).
+- `CharacterGuide.razor` is now a thin page: selector grid + `<GuidePanel>`.
+- Added a **📖 Guide tab** to the character sheet (next to Stats/Spells/
+  Inventory/Profile) rendering `<GuidePanel Hero="character" />` — so on a phone
+  a player just opens their character and taps Guide (no separate page or
+  character-picking step, which is what was breaking on mobile).
+- Characters without a written guide entry get a graceful fallback message.
+
 ### Session 2026-06-12 (part 17) — LAN access for phones
 
 - Added a **`lan`** launch profile (`Properties/launchSettings.json`) that binds

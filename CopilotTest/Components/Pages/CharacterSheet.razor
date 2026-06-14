@@ -63,6 +63,7 @@ else
         <button class="sheet-tab @(activeTab == "spells" ? "active" : "")" @onclick='() => activeTab = "spells"'>Spells</button>
         <button class="sheet-tab @(activeTab == "inventory" ? "active" : "")" @onclick='() => activeTab = "inventory"'>Inventory</button>
         <button class="sheet-tab @(activeTab == "profile" ? "active" : "")" @onclick='() => activeTab = "profile"'>Profile</button>
+        <button class="sheet-tab @(activeTab == "guide" ? "active" : "")" @onclick='() => activeTab = "guide"'>📖 Guide</button>
     </div>
 
     @* ══════════════════════════ STATS TAB ══════════════════════════ *@
@@ -762,6 +763,14 @@ else
                     else { <div class="profile-text notes-text">@(string.IsNullOrEmpty(character.Notes) ? "—" : character.Notes)</div> }
                 </div>
             </div>
+        </div>
+    }
+
+    @* ══════════════════════════ GUIDE TAB ══════════════════════════ *@
+    @if (activeTab == "guide")
+    {
+        <div class="sheet-tab-content">
+            <GuidePanel Hero="character" />
         </div>
     }
 
