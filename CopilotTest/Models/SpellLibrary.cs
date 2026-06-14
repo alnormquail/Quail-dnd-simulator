@@ -448,5 +448,7 @@ public static class SpellLibrary
             "Open a 20-ft sphere of cold void. A creature starting its turn there takes 2d6 cold; a creature ending its turn there makes a DEX save or takes 2d6 acid. The area is Darkness and difficult terrain."),
         new("Sending", 3, "Divination", ["bard", "cleric", "wizard", "sorcerer"], "1 action", "Unlimited", "V, S, M", "1 round", false, false,
             "Send a short message of 25 words or less to a creature you're familiar with, anywhere on the same plane; it can reply in kind."),
+        new("Hellish Rebuke", 1, "Evocation", ["warlock", "sorcerer", "paladin"], "1 reaction", "60 ft", "V, S", "Instantaneous", false, false,
+            "Reaction when a creature you can see damages you: it makes a DEX save, taking 2d10 fire on a fail (half on success). +1d10 per slot above 1st."),
     ];
 }

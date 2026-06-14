@@ -187,6 +187,16 @@ Belqorel, and Wally appear in the Party Hub but not the Guide.
 - Character Guide quick-reference with a session tracker (HP, spell-slot pips,
   sorcery points) and Wild Magic info for Winnie; Kennyth panel added.
 
+### Session 2026-06-12 (part 26) — Homebrew Oathbreaker paladin
+
+- Added **Oathbreaker** as a paladin subclass, adapted to the 2024 chassis
+  (Channel Divinity: Control Undead / Dreadful Aspect at 3; Aura of Hate at 7;
+  Supernatural Resistance at 15; Dread Lord at 20), tagged Source =
+  "Homebrew (2024-adapted)".
+- Oath spells: Hellish Rebuke, Inflict Wounds, Crown of Madness, Darkness,
+  Bestow Curse, Blight, Confusion, Dominate Person — added **Hellish Rebuke** to
+  the spell library to complete the list.
+
 ### Session 2026-06-12 (part 25) — Fill missing subclass spells
 
 - Added Arms of Hadar, Hunger of Hadar, and Sending to the spell library — the

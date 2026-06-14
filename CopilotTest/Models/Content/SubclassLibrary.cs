@@ -177,6 +177,12 @@ public static class SubclassLibrary
             F(15, "Stormy Waters", "Creatures take damage and are knocked prone when they enter or leave your reach."),
             F(20, "Mythic Swashbuckler", "Climb/jump/swim freely, attack at advantage, and impose disadvantage in response."))
             with { Source = "Spelljammer (AAG)", GrantedSpells = ["Fog Cloud", "Gust of Wind", "Misty Step", "Water Breathing", "Wind Wall", "Water Walk"] },
+        Sc("pal-oathbreaker", "Oathbreaker", "paladin",
+            F(3, "Oathbreaker Spells / Channel Divinity", "Always-prepared oath spells. Channel Divinity options: Control Undead (command an undead, CHA save) and Dreadful Aspect (radiate fear in a 30-ft emanation, WIS save or Frightened)."),
+            F(7, "Aura of Hate", "You and any Fiends and Undead within 10 ft of you add your Charisma modifier to melee weapon damage."),
+            F(15, "Supernatural Resistance", "You have resistance to nonmagical bludgeoning, piercing, and slashing damage."),
+            F(20, "Dread Lord", "As a Bonus Action, wreathe yourself in shadow for 1 minute: dim the area, make spectral attacks, give attackers disadvantage, and summon shadow strikes (1/long rest)."))
+            with { Source = "Homebrew (2024-adapted)", GrantedSpells = ["Hellish Rebuke", "Inflict Wounds", "Crown of Madness", "Darkness", "Bestow Curse", "Blight", "Confusion", "Dominate Person"] },
 
         // ── Ranger ──
         Sc("ranger-beastmaster", "Beast Master", "ranger",
