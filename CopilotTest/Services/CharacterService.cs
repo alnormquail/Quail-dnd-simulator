@@ -58,6 +58,17 @@ public class CharacterService
 
     public void Update(Character character)
     {
+        // Common case: the caller passed an entity this context is already
+        // tracking (loaded via GetById in the same Blazor circuit). Its in-memory
+        // changes — added/removed children and edited scalars — are already
+        // tracked, so just persist. (The delete-all-then-re-add path below would
+        // try to re-INSERT rows that still exist → UNIQUE constraint failure.)
+        if (_db.Entry(character).State != EntityState.Detached)
+        {
+            _db.SaveChanges();
+            return;
+        }
+
         var existing = _db.Characters
             .Include(c => c.Actions)
             .Include(c => c.Spells)

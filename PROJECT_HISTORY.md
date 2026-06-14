@@ -187,6 +187,17 @@ Belqorel, and Wally appear in the Party Hub but not the Guide.
 - Character Guide quick-reference with a session tracker (HP, spell-slot pips,
   sorcery points) and Wild Magic info for Winnie; Kennyth panel added.
 
+### Session 2026-06-12 (part 27) — Fix level-up save crash (UNIQUE constraint)
+
+- `CharacterService.Update` did delete-all-then-re-add on child collections,
+  which fails when the passed character is the EF-tracked instance (the normal
+  case here): it re-INSERTs rows that still exist → `UNIQUE constraint failed:
+  CharacterFeatures.Id`, surfacing as a hung "Apply Level Up" (Korran 4→5).
+- Fix: if the character is already tracked, just `SaveChanges()` (its in-memory
+  adds/removes/edits are tracked). The delete-and-re-add path is kept only for
+  genuinely detached graphs. This also makes content swaps persist more cleanly
+  (no more regenerating child-row Ids on every save).
+
 ### Session 2026-06-12 (part 26) — Homebrew Oathbreaker paladin
 
 - Added **Oathbreaker** as a paladin subclass, adapted to the 2024 chassis
