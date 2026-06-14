@@ -2269,11 +2269,8 @@ button.item-equip-dot { cursor: pointer; }
 @media (max-width: 600px) {
     .wizard-asi-grid { grid-template-columns: 1fr; }
     .modal-box { padding: 16px; }
-    .phone-frame { display: none; }
-    .phone-stage::after {
-        content: "You're already on a phone-sized screen — just browse the app directly! 📱";
-        color: var(--text-dim);
-    }
+    /* Let the preview frame scroll into view rather than vanish on small screens */
+    .phone-stage { overflow-x: auto; justify-content: flex-start; }
 }
 
 /* ============================================================

@@ -14,7 +14,7 @@
     <div class="phone-toolbar">
         <div class="form-field">
             <label>Page</label>
-            <select class="form-input" @bind="selectedUrl">
+            <select class="form-input" value="@selectedUrl" @onchange="OnPageChanged">
                 <option value="/">⚔️ Combat</option>
                 <option value="/characters">📚 Party Hub</option>
                 <option value="/character-guide">📖 Character Guide</option>
@@ -33,7 +33,14 @@
             </select>
         </div>
         <button class="btn btn-action" @onclick="Reload">↻ Reload</button>
+        <a class="btn btn-primary" href="@selectedUrl" target="_blank" rel="noopener">Open ↗ (clickable)</a>
     </div>
+
+    <p class="phone-tip">
+        The frame below is a <strong>visual preview</strong> of the mobile layout. To actually tap and
+        navigate, use <strong>Open ↗</strong> (opens the page in its own tab) — or open the page on your
+        phone over wifi. Inside this embedded frame, links/buttons won't respond.
+    </p>
 
     <div class="phone-stage">
         <div class="phone-frame" style="width:@(Width + 24)px">
@@ -45,8 +52,6 @@
             <div class="phone-home-bar"></div>
         </div>
     </div>
-
-    <p class="phone-tip">💡 Everything inside the frame is the real app — you can tap, scroll, and use the trackers just like on a phone.</p>
 </div>
 
 @code {
@@ -61,6 +66,12 @@
     protected override void OnInitialized()
     {
         characters = CharacterService.GetPCs();
+    }
+
+    private void OnPageChanged(ChangeEventArgs e)
+    {
+        selectedUrl = e.Value?.ToString() ?? "/character-guide";
+        reloadToken++;   // force the iframe to re-navigate cleanly
     }
 
     private void Reload() => reloadToken++;
