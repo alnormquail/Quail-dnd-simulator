@@ -95,7 +95,8 @@ public static class SubclassLibrary
             F(3, "Circle of the Land Spells / Land's Aid", "Bonus prepared spells by terrain; expend Wild Shape for a 10-ft AoE that harms foes and heals an ally (2d6)."),
             F(6, "Natural Recovery", "Recover spell slots on a short rest (1/long rest) and always have a terrain spell prepared."),
             F(10, "Nature's Ward", "Immunity to Poisoned; resistance to your terrain's damage type."),
-            F(14, "Nature's Sanctuary", "Create a 15-ft protective zone granting cover and resistance.")),
+            F(14, "Nature's Sanctuary", "Create a 15-ft protective zone granting cover and resistance."))
+            with { GrantedSpells = ["Fog Cloud", "Spike Growth", "Sleet Storm", "Call Lightning", "Freedom of Movement"] },
         Sc("druid-moon", "Circle of the Moon", "druid",
             F(3, "Circle Forms", "Wild Shape into stronger beasts (CR up to your level/3) as a Bonus Action; tougher forms."),
             F(6, "Improved Circle Forms", "Add your WIS modifier to Wild Shape HP and make its attacks magical."),
@@ -105,7 +106,8 @@ public static class SubclassLibrary
             F(3, "Wrath of the Sea", "Wild Shape to emanate a damaging aura (CON save, cold/lightning) that can push foes."),
             F(6, "Aquatic Affinity", "Swim speed and bigger aura."),
             F(10, "Stormborn", "Fly speed and resistance to cold, lightning, thunder while the aura is up."),
-            F(14, "Oceanic Gift", "Share the aura with an ally.")),
+            F(14, "Oceanic Gift", "Share the aura with an ally."))
+            with { GrantedSpells = ["Fog Cloud", "Gust of Wind", "Lightning Bolt", "Water Breathing", "Ice Storm"] },
         Sc("druid-stars", "Circle of the Stars", "druid",
             F(3, "Star Map / Starry Form", "Wild Shape into a constellation: Archer (ranged damage), Chalice (healing), or Dragon (concentration/checks)."),
             F(6, "Cosmic Omen", "Reaction to add or subtract a d6 from rolls near you."),
@@ -180,9 +182,11 @@ public static class SubclassLibrary
         Sc("ranger-beastmaster", "Beast Master", "ranger",
             F(3, "Primal Companion", "Summon a Beast of the Land, Sea, or Sky that acts on your turn and scales with you.")),
         Sc("ranger-fey", "Fey Wanderer", "ranger",
-            F(3, "Dreadful Strikes / Fey Wanderer Spells", "Your weapon attacks deal extra psychic damage; gain Charm Person and fey magic.")),
+            F(3, "Dreadful Strikes / Fey Wanderer Spells", "Your weapon attacks deal extra psychic damage; gain Charm Person and fey magic."))
+            with { GrantedSpells = ["Charm Person", "Misty Step", "Dispel Magic", "Dimension Door"] },
         Sc("ranger-gloom", "Gloom Stalker", "ranger",
-            F(3, "Dread Ambusher / Umbral Sight", "Extra attack and speed on your first turn; invisible in darkness to darkvision.")),
+            F(3, "Dread Ambusher / Umbral Sight", "Extra attack and speed on your first turn; invisible in darkness to darkvision."))
+            with { GrantedSpells = ["Disguise Self", "Fear", "Greater Invisibility"] },
         Sc("ranger-hunter", "Hunter", "ranger",
             F(3, "Hunter's Prey", "Choose Colossus Slayer (+1d8 vs hurt foes), Giant Killer, or Horde Breaker.")),
 
@@ -212,15 +216,18 @@ public static class SubclassLibrary
         Sc("sorc-aberrant", "Aberrant Sorcery", "sorcerer",
             F(3, "Telepathic Speech / Aberrant Sorcery Spells", "Telepathy with a creature; always-prepared psionic spells (Arms of Hadar, Detect Thoughts...)."),
             F(6, "Psionic Sorcery", "Cast your subclass spells with Sorcery Points instead of slots, subtly."),
-            F(14, "Revelation in Flesh", "Spend Sorcery Points for flight, swim, see invisibility, or squeeze through gaps.")),
+            F(14, "Revelation in Flesh", "Spend Sorcery Points for flight, swim, see invisibility, or squeeze through gaps."))
+            with { GrantedSpells = ["Arms of Hadar", "Calm Emotions", "Detect Thoughts", "Hunger of Hadar", "Sending", "Telekinesis"] },
         Sc("sorc-clockwork", "Clockwork Sorcery", "sorcerer",
             F(3, "Restore Balance / Clockwork Spells", "Reaction to cancel advantage or disadvantage on a roll; order-themed spells (Aid, Protection from Evil and Good...)."),
             F(6, "Bastion of Law", "Spend Sorcery Points to create a ward absorbing damage (d8 dice)."),
-            F(14, "Trance of Order", "Attacks against you can't crit; treat your d20 rolls of 9 or lower as 10.")),
+            F(14, "Trance of Order", "Attacks against you can't crit; treat your d20 rolls of 9 or lower as 10."))
+            with { GrantedSpells = ["Aid", "Lesser Restoration", "Protection from Evil and Good", "Dispel Magic", "Protection from Energy", "Freedom of Movement", "Greater Restoration"] },
         Sc("sorc-draconic", "Draconic Sorcery", "sorcerer",
             F(3, "Draconic Resilience / Draconic Spells", "+1 HP per level and base AC 13 + DEX; dragon-themed always-prepared spells."),
             F(6, "Elemental Affinity", "Add CHA to one damage roll of your ancestry's type; spend a point for resistance."),
-            F(14, "Dragon Wings", "Sprout wings for a flying speed.")),
+            F(14, "Dragon Wings", "Sprout wings for a flying speed."))
+            with { GrantedSpells = ["Alter Self", "Command", "Dragon's Breath", "Fear", "Fly", "Slow"] },
         Sc("sorc-wildmagic", "Wild Magic Sorcery", "sorcerer",
             F(3, "Wild Magic Surge / Tides of Chaos", "Trigger chaotic d100 surges when you cast; once per long rest gain Advantage on a roll (recharges by surging)."),
             F(6, "Bend Luck", "Reaction: spend 2 Sorcery Points to add or subtract 1d4 from any creature's d20 roll."),

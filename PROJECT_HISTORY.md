@@ -187,6 +187,15 @@ Belqorel, and Wally appear in the Party Hub but not the Guide.
 - Character Guide quick-reference with a session tracker (HP, spell-slot pips,
   sorcery points) and Wild Magic info for Winnie; Kennyth panel added.
 
+### Session 2026-06-12 (part 24) — Remaining subclass spell lists
+
+- Added `GrantedSpells` for Sorcerer (Aberrant/Clockwork/Draconic), Druid
+  (Land/Sea), and Ranger (Fey Wanderer/Gloom Stalker). 20 subclasses now grant
+  spells. Subclasses that grant *player-chosen* spells (Wizard, Eldritch Knight,
+  Arcane Trickster, Bard Magical Secrets) intentionally have none. A few listed
+  spells aren't in the SRD library yet (e.g. Arms/Hunger of Hadar, Sending) and
+  are safely skipped by `GrantSubclassSpells` until added.
+
 ### Session 2026-06-12 (part 23) — More subclass spells + magic-item library
 
 - Seeded `GrantedSpells` for the **Cleric domains** (Life/Light/Trickery/War)
