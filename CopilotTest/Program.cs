@@ -9,7 +9,9 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 var dbPath = Path.Combine(builder.Environment.ContentRootPath, "dnd-party.db");
-builder.Services.AddDbContext<DndDbContext>(opt =>
+// Factory (not a scoped DbContext): each operation creates a fresh, short-lived
+// context — avoids one long-lived context per Blazor circuit accumulating stale state.
+builder.Services.AddDbContextFactory<DndDbContext>(opt =>
     opt.UseSqlite($"Data Source={dbPath}"));
 
 builder.Services.AddScoped<DndApiService>();
@@ -28,7 +30,8 @@ var app = builder.Build();
 // Ensure DB exists and seed party members on first run
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<DndDbContext>();
+    var dbFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<DndDbContext>>();
+    using var db = dbFactory.CreateDbContext();
     db.Database.EnsureCreated();
 
     // EnsureCreated never alters existing databases, so add tables introduced
