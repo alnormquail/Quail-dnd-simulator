@@ -17,8 +17,7 @@
             <select class="form-input" value="@selectedUrl" @onchange="OnPageChanged">
                 <option value="/">⚔️ Combat</option>
                 <option value="/characters">📚 Party Hub</option>
-                <option value="/character-guide">📖 Character Guide</option>
-                @foreach (var c in characters)
+@foreach (var c in characters)
                 {
                     <option value="@($"/characters/{c.Id}")">📄 @c.Name's Sheet</option>
                 }
@@ -56,7 +55,7 @@
 
 @code {
     private List<Character> characters = new();
-    private string selectedUrl = "/character-guide";
+    private string selectedUrl = "/characters";
     private string selectedDevice = "15";
     private int reloadToken = 0;
 
@@ -70,7 +69,7 @@
 
     private void OnPageChanged(ChangeEventArgs e)
     {
-        selectedUrl = e.Value?.ToString() ?? "/character-guide";
+        selectedUrl = e.Value?.ToString() ?? "/characters";
         reloadToken++;   // force the iframe to re-navigate cleanly
     }
 
