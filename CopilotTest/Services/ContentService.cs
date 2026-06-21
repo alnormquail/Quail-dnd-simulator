@@ -118,7 +118,7 @@ public class ContentService
     private void RemoveBackgroundContributions(Character character, BackgroundData background)
     {
         character.Features.RemoveAll(f => f.Source == background.Name);
-        character.AbilityGrants.RemoveAll(g => g.Source == background.Name);
+        RemoveAbilityGrants(character, background.Name);
         foreach (var skill in background.SkillProficiencies)
         {
             var match = character.Skills.FirstOrDefault(
@@ -336,7 +336,7 @@ public class ContentService
     {
         var source = FeatSource(featName);
         character.Features.RemoveAll(f => f.Source == source);
-        character.AbilityGrants.RemoveAll(g => g.Source == source);
+        RemoveAbilityGrants(character, source);
     }
 
     private static string FeatSource(string featName) => $"Feat: {featName}";
@@ -366,6 +366,18 @@ public class ContentService
             CharacterId = character.Id, Ability = ability, Amount = amount, Source = source,
         });
         SetAbility(character, ability, GetAbility(character, ability) + amount);
+    }
+
+    /// <summary>
+    /// Reverse every ability grant from a source: subtract the points it added
+    /// back out of the actual scores, THEN drop the grant records. Adding a grant
+    /// bumps the score, so removal must undo both halves or scores inflate on swap.
+    /// </summary>
+    private static void RemoveAbilityGrants(Character character, string source)
+    {
+        foreach (var g in character.AbilityGrants.Where(g => g.Source == source).ToList())
+            SetAbility(character, g.Ability, GetAbility(character, g.Ability) - g.Amount);
+        character.AbilityGrants.RemoveAll(g => g.Source == source);
     }
 
     private static void AddSkillIfMissing(Character character, Skill skill)

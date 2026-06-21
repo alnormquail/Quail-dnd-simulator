@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Throwaway test harness for the Quail D&D Simulator. References the main app
+    project so it can drive the real services (CharacterService, ContentService)
+    and EF Core DbContext against a temporary SQLite database. Run with
+    "dotnet run" from inside the QuailTests folder.
+    Safe to delete at any time; it never touches the real dnd-party.db.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <!-- The app is a Web SDK project, so loading its assembly needs the ASP.NET shared framework. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../CopilotTest/CopilotTest.csproj" />
+  </ItemGroup>
+
+</Project>
