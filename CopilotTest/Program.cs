@@ -12,7 +12,8 @@ var dbPath = Path.Combine(builder.Environment.ContentRootPath, "dnd-party.db");
 // Factory (not a scoped DbContext): each operation creates a fresh, short-lived
 // context — avoids one long-lived context per Blazor circuit accumulating stale state.
 builder.Services.AddDbContextFactory<DndDbContext>(opt =>
-    opt.UseSqlite($"Data Source={dbPath}"));
+    opt.UseSqlite($"Data Source={dbPath}")
+       .AddInterceptors(new SqlitePragmaInterceptor()));
 
 builder.Services.AddScoped<DndApiService>();
 builder.Services.AddScoped<CharacterService>();
@@ -33,6 +34,11 @@ using (var scope = app.Services.CreateScope())
     var dbFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<DndDbContext>>();
     using var db = dbFactory.CreateDbContext();
     db.Database.EnsureCreated();
+
+    // Switch the database to Write-Ahead Logging so readers don't block the
+    // writer (and vice versa) — important once the whole party is connected at
+    // once. WAL is a persistent property of the file, so setting it once sticks.
+    db.Database.ExecuteSqlRaw("PRAGMA journal_mode=WAL;");
 
     // EnsureCreated never alters existing databases, so add tables introduced
     // after first release by hand (schema must match the EF model exactly).
