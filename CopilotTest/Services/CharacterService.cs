@@ -16,6 +16,14 @@ public class CharacterService
 
     public CharacterService(IDbContextFactory<DndDbContext> factory) => _factory = factory;
 
+    // Each character has SEVEN child collections. Loading them with a single
+    // multi-Include query makes EF emit one giant JOIN whose row count is the
+    // PRODUCT of every collection's size (e.g. 4 actions × 8 spells × 17 items ×
+    // 7 skills × 3 slots × 6 features ≈ 68k rows for one character) — all of
+    // which EF must transfer and then de-duplicate back into ~45 objects.
+    // AsSplitQuery emits one small query per collection instead, so the same
+    // load fetches ~45 rows total. Huge win since this path runs on every page
+    // load AND after every edit.
     private static IQueryable<Character> WithChildren(DndDbContext db) =>
         db.Characters
           .Include(c => c.Actions)
@@ -24,7 +32,8 @@ public class CharacterService
           .Include(c => c.Skills)
           .Include(c => c.SpellSlots)
           .Include(c => c.Features)
-          .Include(c => c.AbilityGrants);
+          .Include(c => c.AbilityGrants)
+          .AsSplitQuery();
 
     public List<Character> GetAll()
     {
