@@ -609,6 +609,120 @@ Section("9. Combat scenarios — full encounters, balance, advantage, death save
     }
 }
 
+// ───────────────────────── 10. Real characters & status effects ─────────────────────────
+Section("10. Real party characters, status effects in combat, and rage");
+{
+    Combatant Mk(string name, CombatantType type, int hp, int ac, int atk, string dice, int dmgBonus, int dex = 10) =>
+        new()
+        {
+            Id = Guid.NewGuid(), Name = name, Type = type,
+            MaxHitPoints = hp, CurrentHitPoints = hp, ArmorClass = ac, Dexterity = dex,
+            Actions = { new CombatAction { Name = "Strike", ActionType = ActionType.Attack, AttackBonus = atk, DamageDice = dice, DamageBonus = dmgBonus, DamageType = DamageType.Slashing } },
+        };
+
+    // ── A. The actual preloaded party fights a boss ──
+    try
+    {
+        var party = PreloadedCharacters.All.Where(c => c.Type == CombatantType.PC && c.Actions.Count > 0).Take(4).ToList();
+        Check(party.Count >= 2, "preloaded party members carry real combat actions");
+        var e = new CombatEngineService(svc);
+        foreach (var t in party) e.AddCombatant(t.ToCombatant());
+        e.AddCombatant(Mk("Adult Dragon", CombatantType.Monster, 220, 18, 11, "2d10", 6, 12));
+        foreach (var pc in e.SnapshotCombatants().Where(c => c.Type == CombatantType.PC))
+            Check(pc.Actions.Count > 0 && pc.MaxHitPoints > 0, $"{pc.Name} entered combat with {pc.Actions.Count} actions, {pc.MaxHitPoints} HP");
+        e.StartCombat();
+        int g = 0; while (e.State == CombatState.Active && g < 60) { e.SimulateRound(); g++; }
+        Check(e.State != CombatState.Active, "real-party encounter terminates");
+        var survivors = e.SnapshotCombatants().Where(c => !c.IsDead && c.CurrentHitPoints > 0).Select(c => c.Name).ToList();
+        Note($"Real party ({string.Join(", ", party.Select(p => p.Name))}) vs Adult Dragon: {e.CurrentRound} rounds → survivors: {(survivors.Count > 0 ? string.Join(", ", survivors) : "nobody")}");
+    }
+    catch (Exception ex) { Check(false, $"real-party combat EXCEPTION — {ex.GetType().Name}: {ex.Message}"); }
+
+    // ── B. Incapacitating conditions skip the turn; others don't ──
+    {
+        var e = new CombatEngineService(svc);
+        var striker = Mk("Striker", CombatantType.PC, 40, 18, 12, "1d10", 5, 16);
+        var dummy = Mk("Practice Dummy", CombatantType.Monster, 100000, 1, 0, "1d4", 0);
+        dummy.Actions.Clear();   // can't fight back, so any HP loss is purely the striker acting
+        e.AddCombatant(striker); e.AddCombatant(dummy);
+        e.StartCombat();
+
+        foreach (var cond in new[] { Condition.Stunned, Condition.Paralyzed, Condition.Incapacitated })
+        {
+            striker.Conditions.Clear();
+            e.ToggleCondition(striker.Id, cond);
+            var before = dummy.CurrentHitPoints;
+            e.SimulateRound();
+            Check(dummy.CurrentHitPoints == before, $"a {cond} combatant deals no damage (turn skipped)");
+        }
+
+        // Non-incapacitating condition: tracked, but the combatant still acts.
+        striker.Conditions.Clear();
+        e.ToggleCondition(striker.Id, Condition.Poisoned);
+        var hp = dummy.CurrentHitPoints;
+        e.SimulateRound();
+        Check(dummy.CurrentHitPoints < hp, "a Poisoned combatant still acts (non-incapacitating)");
+        Check(striker.Conditions.Contains(Condition.Poisoned), "conditions persist across rounds until removed");
+        e.ToggleCondition(striker.Id, Condition.Poisoned);
+        Check(!striker.Conditions.Contains(Condition.Poisoned), "toggling a condition off clears it");
+        Note("Status effects: Stunned/Paralyzed/Incapacitated skip the turn; others (Poisoned, Prone, Restrained, …) are tracked for the DM but don't auto-change rolls");
+    }
+
+    // ── C. Rage: resistance halves physical damage, and adds melee damage ──
+    {
+        // Resistance — same ogre attack on the same barbarian, raging vs not (AC 1 = always lands).
+        var e = new CombatEngineService(svc);
+        var barb = Mk("Grog", CombatantType.PC, 100, 1, 6, "1d12", 4, 12);
+        barb.IsBarbarianClass = true; barb.RageBonus = 2;
+        var ogre = Mk("Ogre", CombatantType.Monster, 100, 15, 6, "2d8", 6, 8);
+        e.AddCombatant(ogre); e.AddCombatant(barb);
+        e.StartCombat();
+        for (int i = 0; i < 12 && e.CurrentCombatant?.Id != ogre.Id; i++) e.NextTurn();
+
+        int DamageTo(bool raging, int n)
+        {
+            barb.IsRaging = raging; int total = 0;
+            for (int i = 0; i < n; i++) { barb.CurrentHitPoints = 1_000_000; e.DmActOnCurrent(ogre.Actions[0], barb); total += 1_000_000 - barb.CurrentHitPoints; }
+            return total;
+        }
+        int normalDmg = DamageTo(false, 500);
+        int ragedDmg  = DamageTo(true, 500);
+        Check(ragedDmg < normalDmg * 0.7, $"rage roughly halves physical damage taken (raging {ragedDmg} vs normal {normalDmg})");
+        Note($"rage resistance: 500 hits dealt {normalDmg} normally, {ragedDmg} while raging (~{(double)ragedDmg / normalDmg:P0})");
+
+        // Melee bonus — the barbarian's own physical hits gain +RageBonus while raging.
+        var e2 = new CombatEngineService(svc);
+        var grog2 = Mk("Grog2", CombatantType.PC, 80, 15, 12, "1d12", 4, 14);
+        grog2.IsBarbarianClass = true; grog2.RageBonus = 2;
+        var sack = Mk("Sandbag", CombatantType.Monster, 1_000_000, 1, 0, "1d4", 0); sack.Actions.Clear();
+        e2.AddCombatant(grog2); e2.AddCombatant(sack);
+        e2.StartCombat();
+        for (int i = 0; i < 12 && e2.CurrentCombatant?.Id != grog2.Id; i++) e2.NextTurn();
+        int Dealt(bool raging, int n)
+        {
+            grog2.IsRaging = raging; int total = 0;
+            for (int i = 0; i < n; i++) { var b = sack.CurrentHitPoints; e2.DmActOnCurrent(grog2.Actions[0], sack); total += b - sack.CurrentHitPoints; }
+            return total;
+        }
+        int plain = Dealt(false, 500);
+        int raged = Dealt(true, 500);
+        Check(raged > plain, $"raging barbarian deals more melee damage (raging {raged} vs normal {plain})");
+        Note($"rage melee bonus: 500 swings dealt {plain} normally, {raged} while raging");
+    }
+
+    // ── D. Downing a PC vs a monster behaves differently ──
+    {
+        var e = new CombatEngineService(svc);
+        var pc = Mk("Hero", CombatantType.PC, 20, 10, 5, "1d8", 3);
+        var beast = Mk("Beast", CombatantType.Monster, 20, 10, 5, "1d8", 3);
+        e.AddCombatant(pc); e.AddCombatant(beast); e.StartCombat();
+        e.AdjustHp(pc.Id, -1000);
+        Check(pc.IsUnconscious && !pc.IsDead, "a PC dropped to 0 falls unconscious (not dead) and can roll death saves");
+        e.AdjustHp(beast.Id, -1000);
+        Check(beast.IsDead, "a monster dropped to 0 is defeated outright");
+    }
+}
+
 // ───────────────────────── report ─────────────────────────
 Console.WriteLine($"\n────────────────────────────────────────");
 Console.WriteLine($"Checks run : {checks}");
