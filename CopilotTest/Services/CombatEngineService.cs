@@ -408,36 +408,74 @@ public class CombatEngineService
 
     /// <summary>
     /// A player takes one of their character's actions against a target. Server-side
-    /// gate: only succeeds when it is that character's turn. Returns false if rejected.
+    /// gate: only succeeds when it is that character's turn. Does NOT end the turn —
+    /// the actor may take an action, a bonus action, extra attacks, etc., then call
+    /// <see cref="EndTurn"/>. Returns false if rejected.
     /// </summary>
-    public bool PlayerAction(Guid actingCharId, CombatAction action, Combatant target)
+    public bool PlayerAction(Guid actingCharId, CombatAction action, Combatant target,
+                             AdvantageMode mode = AdvantageMode.Normal)
     {
         lock (_gate)
         {
             if (!IsCurrentTurn(actingCharId)) return false;
             var attacker = CurrentCombatant;
             if (attacker == null) return false;
-
-            if (action.IsLimited)
-                action.UsesRemaining = Math.Max(0, action.UsesRemaining - 1);
-
-            switch (action.ActionType)
-            {
-                case ActionType.Attack:
-                case ActionType.SpellAttack:
-                    PerformAttackRoll(attacker, target, action);
-                    break;
-                case ActionType.Spell:
-                    PerformSpellSave(attacker, target, action);
-                    break;
-                default:
-                    AddLog(CurrentRound, attacker.Name, $"uses {action.Name}: {action.Description}", LogEntryType.Info);
-                    break;
-            }
-            AdvanceTurn(ActiveCombatants);
+            ExecuteAction(attacker, action, target, mode);
         }
         OnStateChanged?.Invoke();
         return true;
+    }
+
+    /// <summary>
+    /// The DM takes an action for the CURRENT combatant — used to run monsters and any
+    /// character no player has claimed. The UI only offers this for unclaimed combatants.
+    /// Like <see cref="PlayerAction"/>, it does not end the turn.
+    /// </summary>
+    public bool DmActOnCurrent(CombatAction action, Combatant target, AdvantageMode mode = AdvantageMode.Normal)
+    {
+        lock (_gate)
+        {
+            if (State != CombatState.Active) return false;
+            var attacker = CurrentCombatant;
+            if (attacker == null) return false;
+            ExecuteAction(attacker, action, target, mode);
+        }
+        OnStateChanged?.Invoke();
+        return true;
+    }
+
+    /// <summary>A player ends their own turn (gated). The DM uses <see cref="NextTurn"/>.</summary>
+    public void EndTurn(Guid actingCharId)
+    {
+        lock (_gate)
+        {
+            if (!IsCurrentTurn(actingCharId)) return;
+            var active = ActiveCombatants;
+            if (active.Count == 0) return;
+            AdvanceTurn(active);
+        }
+        OnStateChanged?.Invoke();
+    }
+
+    /// <summary>Resolve one action by the attacker against a target (no turn advance).</summary>
+    private void ExecuteAction(Combatant attacker, CombatAction action, Combatant target, AdvantageMode mode)
+    {
+        if (action.IsLimited)
+            action.UsesRemaining = Math.Max(0, action.UsesRemaining - 1);
+
+        switch (action.ActionType)
+        {
+            case ActionType.Attack:
+            case ActionType.SpellAttack:
+                PerformAttackRoll(attacker, target, action, mode);
+                break;
+            case ActionType.Spell:
+                PerformSpellSave(attacker, target, action);
+                break;
+            default:
+                AddLog(CurrentRound, attacker.Name, $"uses {action.Name}: {action.Description}", LogEntryType.Info);
+                break;
+        }
     }
 
     /// <summary>Manual HP change: positive heals, negative deals damage.</summary>
@@ -651,14 +689,16 @@ public class CombatEngineService
         return usable.OrderByDescending(ExpectedDmg).First();
     }
 
-    private void PerformAttackRoll(Combatant attacker, Combatant target, CombatAction action)
+    private void PerformAttackRoll(Combatant attacker, Combatant target, CombatAction action,
+                                   AdvantageMode mode = AdvantageMode.Normal)
     {
         int rageDmgBonus = (attacker.IsRaging && attacker.RageBonus > 0
                             && action.ActionType == ActionType.Attack) ? attacker.RageBonus : 0;
 
-        var result = ResolveAttackRoll(action, target, rageDmgBonus);
+        var result = ResolveAttackRoll(action, target, rageDmgBonus, mode);
         var critTag = result.CriticalHit ? " 💥 CRITICAL HIT!" : result.CriticalMiss ? " 😬 CRITICAL MISS!" : "";
-        var rollDesc = $"[d20: {result.AttackRoll}] Total: {result.TotalAttackRoll} vs AC {target.ArmorClass}";
+        var advTag = mode == AdvantageMode.Advantage ? " (adv)" : mode == AdvantageMode.Disadvantage ? " (disadv)" : "";
+        var rollDesc = $"[d20: {result.AttackRoll}{advTag}] Total: {result.TotalAttackRoll} vs AC {target.ArmorClass}";
         var dmgType = action.DamageType != DamageType.None ? $" {action.DamageType}" : "";
 
         if (result.Hit)
@@ -711,9 +751,15 @@ public class CombatEngineService
         _ => 0
     };
 
-    public AttackResult ResolveAttackRoll(CombatAction action, Combatant target, int extraDamageBonus = 0)
+    public AttackResult ResolveAttackRoll(CombatAction action, Combatant target, int extraDamageBonus = 0,
+                                          AdvantageMode mode = AdvantageMode.Normal)
     {
-        var attackRoll = RollD20();
+        var attackRoll = mode switch
+        {
+            AdvantageMode.Advantage    => Math.Max(RollD20(), RollD20()),
+            AdvantageMode.Disadvantage => Math.Min(RollD20(), RollD20()),
+            _                          => RollD20(),
+        };
         var totalAttack = attackRoll + action.AttackBonus;
         var isCritHit = attackRoll == 20;
         var isCritMiss = attackRoll == 1;

@@ -17,6 +17,9 @@ public enum DamageType
 
 public enum AbilityScore { Strength, Dexterity, Constitution, Intelligence, Wisdom, Charisma }
 
+/// <summary>How an attack's d20 is rolled — set per attack at the DM's discretion.</summary>
+public enum AdvantageMode { Normal, Advantage, Disadvantage }
+
 public class CombatAction
 {
     public Guid Id { get; set; } = Guid.NewGuid();

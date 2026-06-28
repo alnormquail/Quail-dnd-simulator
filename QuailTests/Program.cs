@@ -390,17 +390,29 @@ Section("8. Live combat engine — turn gating, manual controls, conditions, dea
         // Gating: acting as someone whose turn it ISN'T is rejected.
         Check(!engine.PlayerAction(goblin.Id, hero.Actions[0], hero), "player action rejected when not your turn");
 
-        // Hero acts on their turn → accepted, turn advances off the hero.
-        var ok = engine.PlayerAction(hero.Id, hero.Actions[0], goblin);
-        Check(ok, "player action accepted on your turn");
-        Check(engine.CurrentCombatant?.Id != hero.Id, "turn advanced after the hero acted");
-        Check(engine.SnapshotLog().Count > 0, "the action was recorded in the combat log");
+        // Hero acts on their turn — accepted, and the turn does NOT auto-advance,
+        // so they can still take a bonus action / extra attack.
+        Check(engine.PlayerAction(hero.Id, hero.Actions[0], goblin), "player action accepted on your turn");
+        Check(engine.CurrentCombatant?.Id == hero.Id, "turn does NOT auto-advance after one action");
+        Check(engine.PlayerAction(hero.Id, hero.Actions[0], goblin, AdvantageMode.Advantage),
+              "a second action (extra attack / bonus action) is allowed, with advantage");
+        Check(engine.SnapshotLog().Count > 0, "actions recorded in the combat log");
 
-        // Manual HP: damage then heal.
+        // Explicit End Turn advances off the hero.
+        engine.EndTurn(hero.Id);
+        Check(engine.CurrentCombatant?.Id != hero.Id, "EndTurn advances past the hero");
+
+        // DM drives the monster (an unclaimed combatant) on its turn.
+        for (int i = 0; i < 10 && engine.CurrentCombatant?.Id != goblin.Id; i++) engine.NextTurn();
+        if (engine.CurrentCombatant?.Id == goblin.Id)
+            Check(engine.DmActOnCurrent(goblin.Actions[0], hero), "DM acts for the monster on its turn");
+
+        // Manual HP: damage then heal (relative — the hero may have taken a hit above).
+        var hpBefore = hero.CurrentHitPoints;
         engine.AdjustHp(hero.Id, -5);
-        Check(hero.CurrentHitPoints == 25, "AdjustHp applies damage (30→25)");
+        Check(hero.CurrentHitPoints == Math.Max(0, hpBefore - 5), "AdjustHp applies damage");
         engine.AdjustHp(hero.Id, 3);
-        Check(hero.CurrentHitPoints == 28, "AdjustHp heals (25→28)");
+        Check(hero.CurrentHitPoints == Math.Max(0, hpBefore - 5) + 3, "AdjustHp heals");
 
         // Conditions toggle on/off.
         engine.ToggleCondition(hero.Id, Condition.Poisoned);
