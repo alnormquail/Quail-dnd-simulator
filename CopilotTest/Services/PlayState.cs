@@ -2,18 +2,8 @@ using CopilotTest.Models;
 
 namespace CopilotTest.Services;
 
-public enum RestKind { Short, Long }
-
-/// <summary>A consumable resource pool (Rage, Lay on Hands, Bardic Inspiration, ...).</summary>
-public class ResourcePool
-{
-    public string Name { get; set; } = "";
-    public int Current { get; set; }
-    public int Max { get; set; }
-    public string? Note { get; set; }            // e.g. "d8", "HP pool"
-    public RestKind RestoreOn { get; set; } = RestKind.Long;
-    public bool UsePips => Max > 0 && Max <= 6;   // small pools show as clickable pips
-}
+// RestKind and ResourcePool now live in Models/CombatResources.cs so the
+// Combatant model can carry pools for live, shared combat.
 
 /// <summary>Live, in-session play state for one character (current HP, slots used, pools).</summary>
 public class LiveResources

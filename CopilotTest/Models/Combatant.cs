@@ -56,6 +56,14 @@ public class Combatant
     // Conditions
     public HashSet<Condition> Conditions { get; set; } = new();
 
+    // ── Live, shared combat resources ───────────────────────────────────────
+    /// <summary>Whether this combatant still has its reaction this round (reset each round).</summary>
+    public bool ReactionAvailable { get; set; } = true;
+    /// <summary>Spell-slot tiers and how many are spent this encounter (synced to all viewers).</summary>
+    public List<SpellSlotState> SpellSlots { get; set; } = new();
+    /// <summary>Class resource pools (Lay on Hands, Bardic Inspiration, ...) for live tracking.</summary>
+    public List<ResourcePool> Pools { get; set; } = new();
+
     // ── Barbarian Rage ──────────────────────────────────────────────────────
     /// <summary>True if this character has the Barbarian Rage feature.</summary>
     public bool IsBarbarianClass { get; set; } = false;

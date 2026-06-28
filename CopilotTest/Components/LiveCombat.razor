@@ -1,0 +1,271 @@
+@using CopilotTest.Models
+@using CopilotTest.Services
+@inject CombatEngineService Combat
+@inject PlayerSeat Seat
+@implements IDisposable
+
+<div class="live-combat">
+
+    @* ── Setup (DM builds the encounter; players wait) ──────────────────── *@
+    @if (Combat.State == CombatState.Setup)
+    {
+        @if (IsDm)
+        {
+            <div class="lc-panel">
+                <div class="lc-row">
+                    <button class="btn btn-action" @onclick="() => Combat.NewEncounter()">↻ Load Party</button>
+                    <button class="btn btn-start" disabled="@(Combatants.Count < 2)" @onclick="() => Combat.StartCombat()">⚔️ Start Combat</button>
+                </div>
+                <p class="lc-hint">Load the party, add monsters below, then Start Combat. Needs at least 2 combatants.</p>
+            </div>
+            <AddCombatantForm />
+            <div class="lc-panel">
+                <h3>In the encounter (@Combatants.Count)</h3>
+                @foreach (var c in Combatants)
+                {
+                    <div class="lc-init-row">
+                        <span>@TypeIcon(c) <strong>@c.Name</strong> <span class="lc-dim">@c.ClassDisplay</span></span>
+                        <button class="btn btn-reset btn-sm" @onclick="() => Combat.RemoveCombatant(c.Id)">✕</button>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="lc-panel lc-waiting">
+                <h3>⏳ Waiting for the DM to start combat…</h3>
+                <p class="lc-hint">You're seated as <strong>@Seat.Label</strong>. The encounter will appear here the moment it begins.</p>
+            </div>
+        }
+    }
+    else
+    {
+        @* ── Active / Finished encounter ───────────────────────────────── *@
+        <div class="lc-panel lc-status-bar">
+            <div>
+                <span class="lc-round">Round @Combat.CurrentRound</span>
+                @if (Combat.State == CombatState.Finished)
+                {
+                    <span class="lc-turn">🏁 Combat over</span>
+                }
+                else
+                {
+                    <span class="lc-turn">▶ @Combat.CurrentCombatant?.Name's turn</span>
+                }
+            </div>
+            @if (IsDm && Combat.State == CombatState.Active)
+            {
+                <div class="lc-row">
+                    <button class="btn btn-action" @onclick="() => Combat.NextTurn()">⏭ Next Turn</button>
+                    <button class="btn btn-reset" @onclick="() => Combat.EndCombat()">🏁 End</button>
+                </div>
+            }
+        </div>
+
+        @* Initiative order *@
+        <div class="lc-panel">
+            <h3>Initiative</h3>
+            @foreach (var c in Combatants)
+            {
+                var isCurrent = Combat.State == CombatState.Active && Combat.CurrentCombatant?.Id == c.Id;
+                var isMe = MyId == c.Id;
+                <div class="lc-init-row @(isCurrent ? "lc-current" : "") @(c.CurrentHitPoints <= 0 ? "lc-down" : "")">
+                    <div class="lc-init-main">
+                        <span class="lc-init-num">@(c.Initiative)</span>
+                        <span>@TypeIcon(c) <strong>@c.Name</strong>@(isMe ? " (you)" : "")</span>
+                        @if (!c.ReactionAvailable)
+                        {
+                            <span class="lc-dim" title="Reaction used">⚡︎</span>
+                        }
+                    </div>
+                    <div class="lc-init-status">
+                        @if (CanSeeExactHp(c))
+                        {
+                            <span class="lc-hp">@c.HpDisplay</span>
+                        }
+                        else
+                        {
+                            <span class="lc-hp">@c.StatusDisplay</span>
+                        }
+                    </div>
+                    @if (c.Conditions.Any() || c.IsRaging)
+                    {
+                        <div class="lc-conditions">
+                            @if (c.IsRaging)
+                            {
+                                <span class="lc-cond">🔥 Raging</span>
+                            }
+                            @foreach (var cond in c.Conditions)
+                            {
+                                <span class="lc-cond">@cond</span>
+                            }
+                        </div>
+                    }
+
+                    @* DM per-combatant controls *@
+                    @if (IsDm && Combat.State == CombatState.Active)
+                    {
+                        <div class="lc-dm-controls">
+                            <button class="btn btn-sm btn-reset" @onclick="() => Combat.AdjustHp(c.Id, -5)">-5</button>
+                            <button class="btn btn-sm btn-reset" @onclick="() => Combat.AdjustHp(c.Id, -1)">-1</button>
+                            <button class="btn btn-sm btn-action" @onclick="() => Combat.AdjustHp(c.Id, 1)">+1</button>
+                            <button class="btn btn-sm btn-action" @onclick="() => Combat.AdjustHp(c.Id, 5)">+5</button>
+                            <select class="form-input lc-cond-select" @onchange="(e) => OnToggleCondition(c.Id, e)">
+                                <option value="">+ condition…</option>
+                                @foreach (var cond in AllConditions)
+                                {
+                                    <option value="@cond">@(c.Conditions.Contains(cond) ? "✓ " : "")@cond</option>
+                                }
+                            </select>
+                            @if (c.Type == CombatantType.PC && c.IsUnconscious)
+                            {
+                                <button class="btn btn-sm" @onclick="() => Combat.RollDeathSaveFor(c.Id)">🎲 Death save (@c.DeathSaveSuccesses✓/@c.DeathSaveFailures✗)</button>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        @* ── The player's own character panel ──────────────────────────── *@
+        @if (Me != null)
+        {
+            <div class="lc-panel lc-me">
+                <h3>@Me.Name — @Me.HpDisplay</h3>
+
+                @if (Combat.State == CombatState.Active && Me.IsUnconscious)
+                {
+                    <div class="lc-row">
+                        <strong>You're down!</strong>
+                        <button class="btn btn-start" @onclick="() => Combat.RollDeathSaveFor(Me.Id)">🎲 Roll Death Save</button>
+                        <span>@Me.DeathSaveSuccesses ✓ / @Me.DeathSaveFailures ✗</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="lc-row lc-self-actions">
+                        @if (Me.IsBarbarianClass && !Me.IsRaging && Me.RageUsesRemaining > 0)
+                        {
+                            <button class="btn btn-action" @onclick="() => Combat.EnterRage(Me)">🔥 Rage (@Me.RageUsesRemaining left)</button>
+                        }
+                        @if (Me.ReactionAvailable)
+                        {
+                            <button class="btn btn-sm" @onclick="() => Combat.UseReaction(Me.Id)">⚡ Use Reaction</button>
+                        }
+                        else
+                        {
+                            <span class="lc-dim">Reaction used</span>
+                        }
+                    </div>
+
+                    @if (Me.SpellSlots.Any())
+                    {
+                        <div class="lc-slots">
+                            @foreach (var slot in Me.SpellSlots)
+                            {
+                                <div class="lc-slot-row">
+                                    <span class="lc-dim">Lvl @slot.Level</span>
+                                    @for (int i = 1; i <= slot.Max; i++)
+                                    {
+                                        var pip = i;
+                                        var used = pip <= slot.Used;
+                                        <button class="lc-pip @(used ? "lc-pip-used" : "")"
+                                                @onclick="() => Combat.SetSlotUsed(Me.Id, slot.Level, used ? pip - 1 : pip)"></button>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    @if (Me.Pools.Any())
+                    {
+                        <div class="lc-pools">
+                            @foreach (var pool in Me.Pools)
+                            {
+                                <span class="lc-pool">@pool.Name: @pool.Current/@pool.Max@(pool.Note is not null ? $" ({pool.Note})" : "")</span>
+                            }
+                        </div>
+                    }
+                }
+
+                @* Attack panel — only on your turn *@
+                @if (IsMyTurn && !Me.IsUnconscious)
+                {
+                    <div class="lc-attack">
+                        <h4>Your turn — choose a target, then an action</h4>
+                        <div class="lc-targets">
+                            @foreach (var t in Targets)
+                            {
+                                <button class="btn btn-sm @(selectedTargetId == t.Id ? "btn-start" : "btn-reset")"
+                                        @onclick="() => selectedTargetId = t.Id">@t.Name (@t.StatusDisplay)</button>
+                            }
+                        </div>
+                        @if (!Targets.Any())
+                        {
+                            <p class="lc-hint">No valid targets.</p>
+                        }
+                        <div class="lc-actions">
+                            @foreach (var action in Me.Actions.Where(a => a.CanUse))
+                            {
+                                <button class="btn btn-action" disabled="@(selectedTargetId == null)"
+                                        @onclick="() => DoAction(action)">@action.DisplayName</button>
+                            }
+                        </div>
+                    </div>
+                }
+                else if (Combat.State == CombatState.Active && !Me.IsUnconscious)
+                {
+                    <p class="lc-hint">Waiting — it's <strong>@Combat.CurrentCombatant?.Name</strong>'s turn.</p>
+                }
+            </div>
+        }
+
+        <CombatLogPanel />
+    }
+</div>
+
+@code {
+    private Guid? selectedTargetId;
+
+    private bool IsDm => Seat.Role == SeatRole.Dm;
+    private Guid? MyId => Seat.CharacterId;
+    private Combatant? Me => MyId.HasValue ? Combat.Find(MyId.Value) : null;
+    private bool IsMyTurn => MyId.HasValue && Combat.IsCurrentTurn(MyId.Value);
+
+    private IReadOnlyList<Combatant> Combatants => Combat.SnapshotCombatants();
+    private List<Combatant> Targets => Combat.GetCurrentTargets();
+
+    private static readonly Condition[] AllConditions =
+        Enum.GetValues<Condition>().Where(c => c != Condition.None).ToArray();
+
+    // Monster HP is hidden from players/spectators; PCs are visible to all (table sees each other).
+    private bool CanSeeExactHp(Combatant c) => IsDm || c.Type != CombatantType.Monster;
+
+    private void DoAction(CombatAction action)
+    {
+        if (!MyId.HasValue || selectedTargetId == null) return;
+        var target = Combatants.FirstOrDefault(c => c.Id == selectedTargetId);
+        if (target == null) return;
+        Combat.PlayerAction(MyId.Value, action, target);
+        selectedTargetId = null;
+    }
+
+    private void OnToggleCondition(Guid id, ChangeEventArgs e)
+    {
+        var val = e.Value?.ToString();
+        if (string.IsNullOrEmpty(val)) return;
+        if (Enum.TryParse<Condition>(val, out var cond))
+            Combat.ToggleCondition(id, cond);
+    }
+
+    private static string TypeIcon(Combatant c) => c.Type switch
+    {
+        CombatantType.Monster => "👹",
+        CombatantType.NPC => "🧑",
+        _ => "🛡️"
+    };
+
+    protected override void OnInitialized() => Combat.OnStateChanged += OnChanged;
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => Combat.OnStateChanged -= OnChanged;
+}

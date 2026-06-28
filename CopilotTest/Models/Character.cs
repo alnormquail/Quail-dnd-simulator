@@ -144,54 +144,62 @@ public class Character
     }
 
     /// <summary>Creates a fresh runtime Combatant from this character template.</summary>
-    public Combatant ToCombatant() => new()
+    public Combatant ToCombatant()
     {
-        Id               = Id,
-        Name             = Name,
-        Type             = Type,
-        CharacterClass   = CharacterClass,
-        CharacterLevel   = CharacterLevel,
-        Strength         = Strength,
-        Dexterity        = Dexterity,
-        Constitution     = Constitution,
-        Intelligence     = Intelligence,
-        Wisdom           = Wisdom,
-        Charisma         = Charisma,
-        MaxHitPoints     = MaxHitPoints,
-        CurrentHitPoints = MaxHitPoints,
-        TemporaryHitPoints = 0,
-        ArmorClass       = ArmorClass,
-        Speed            = Speed,
-        ProficiencyBonus = ProficiencyBonus,
-        Initiative       = 0,
-        InitiativeRoll   = 0,
-        IsDead           = false,
-        DeathSaveSuccesses = 0,
-        DeathSaveFailures  = 0,
-        Conditions       = new HashSet<Condition>(),
-        IsBarbarianClass  = IsBarbarianClass,
-        RageBonus         = RageBonus,
-        RageUsesPerDay    = RageUsesPerDay,
-        RageUsesRemaining = RageUsesPerDay,
-        IsRaging          = false,
-        Actions = Actions.Select(a => new CombatAction
+        var combatant = new Combatant
         {
-            Id           = a.Id,
-            Name         = a.Name,
-            ActionType   = a.ActionType,
-            AttackBonus  = a.AttackBonus,
-            DamageDice   = a.DamageDice,
-            DamageBonus  = a.DamageBonus,
-            DamageType   = a.DamageType,
-            SaveDC       = a.SaveDC,
-            SaveAbility  = a.SaveAbility,
-            SpellLevel   = a.SpellLevel,
-            Range        = a.Range,
-            Description  = a.Description,
-            UsesPerDay   = a.UsesPerDay,
-            UsesRemaining = a.UsesPerDay
-        }).ToList()
-    };
+            Id               = Id,
+            Name             = Name,
+            Type             = Type,
+            CharacterClass   = CharacterClass,
+            CharacterLevel   = CharacterLevel,
+            Strength         = Strength,
+            Dexterity        = Dexterity,
+            Constitution     = Constitution,
+            Intelligence     = Intelligence,
+            Wisdom           = Wisdom,
+            Charisma         = Charisma,
+            MaxHitPoints     = MaxHitPoints,
+            CurrentHitPoints = MaxHitPoints,
+            TemporaryHitPoints = 0,
+            ArmorClass       = ArmorClass,
+            Speed            = Speed,
+            ProficiencyBonus = ProficiencyBonus,
+            Initiative       = 0,
+            InitiativeRoll   = 0,
+            IsDead           = false,
+            DeathSaveSuccesses = 0,
+            DeathSaveFailures  = 0,
+            Conditions       = new HashSet<Condition>(),
+            IsBarbarianClass  = IsBarbarianClass,
+            RageBonus         = RageBonus,
+            RageUsesPerDay    = RageUsesPerDay,
+            RageUsesRemaining = RageUsesPerDay,
+            IsRaging          = false,
+            SpellSlots = SpellSlots
+                .Select(s => new SpellSlotState { Level = s.Level, Max = s.MaxSlots, Used = s.UsedSlots })
+                .OrderBy(s => s.Level).ToList(),
+            Actions = Actions.Select(a => new CombatAction
+            {
+                Id           = a.Id,
+                Name         = a.Name,
+                ActionType   = a.ActionType,
+                AttackBonus  = a.AttackBonus,
+                DamageDice   = a.DamageDice,
+                DamageBonus  = a.DamageBonus,
+                DamageType   = a.DamageType,
+                SaveDC       = a.SaveDC,
+                SaveAbility  = a.SaveAbility,
+                SpellLevel   = a.SpellLevel,
+                Range        = a.Range,
+                Description  = a.Description,
+                UsesPerDay   = a.UsesPerDay,
+                UsesRemaining = a.UsesPerDay
+            }).ToList()
+        };
+        combatant.Pools = CombatResources.BuildPools(combatant);
+        return combatant;
+    }
 
     /// <summary>Creates a Character from a runtime Combatant (for saving newly created PCs to the roster).</summary>
     public static Character FromCombatant(Combatant c) => new()

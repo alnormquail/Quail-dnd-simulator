@@ -354,6 +354,84 @@ Section("7. Edge cases");
     }
 }
 
+// ───────────────────────── 8. Live combat engine (shared multiplayer) ─────────────────────────
+Section("8. Live combat engine — turn gating, manual controls, conditions, death saves");
+{
+    try
+    {
+        var engine = new CombatEngineService(svc);
+
+        var hero = new Combatant
+        {
+            Id = Guid.NewGuid(), Name = "TestHero", Type = CombatantType.PC,
+            MaxHitPoints = 30, CurrentHitPoints = 30, ArmorClass = 12, Dexterity = 16,
+            Actions = { new CombatAction { Name = "Sword", ActionType = ActionType.Attack, AttackBonus = 12, DamageDice = "1d8", DamageBonus = 3, DamageType = DamageType.Slashing } },
+            SpellSlots = { new SpellSlotState { Level = 1, Max = 3, Used = 0 } },
+        };
+        var goblin = new Combatant
+        {
+            Id = Guid.NewGuid(), Name = "Goblin", Type = CombatantType.Monster,
+            MaxHitPoints = 200, CurrentHitPoints = 200, ArmorClass = 1, Dexterity = 8,
+            Actions = { new CombatAction { Name = "Club", ActionType = ActionType.Attack, AttackBonus = 0, DamageDice = "1d4", DamageBonus = 0 } },
+        };
+
+        engine.AddCombatant(hero);
+        engine.AddCombatant(goblin);
+        engine.StartCombat();
+
+        Check(engine.State == CombatState.Active, "combat starts Active with a monster present");
+        Check(engine.CurrentCombatant != null, "there is a current combatant after StartCombat");
+        Check(engine.SnapshotCombatants().All(c => c.ReactionAvailable), "everyone starts with their reaction");
+
+        // Advance until it's the hero's turn (cap iterations).
+        for (int i = 0; i < 10 && engine.CurrentCombatant?.Id != hero.Id; i++) engine.NextTurn();
+        Check(engine.CurrentCombatant?.Id == hero.Id, "NextTurn advances to the hero's turn");
+
+        // Gating: acting as someone whose turn it ISN'T is rejected.
+        Check(!engine.PlayerAction(goblin.Id, hero.Actions[0], hero), "player action rejected when not your turn");
+
+        // Hero acts on their turn → accepted, turn advances off the hero.
+        var ok = engine.PlayerAction(hero.Id, hero.Actions[0], goblin);
+        Check(ok, "player action accepted on your turn");
+        Check(engine.CurrentCombatant?.Id != hero.Id, "turn advanced after the hero acted");
+        Check(engine.SnapshotLog().Count > 0, "the action was recorded in the combat log");
+
+        // Manual HP: damage then heal.
+        engine.AdjustHp(hero.Id, -5);
+        Check(hero.CurrentHitPoints == 25, "AdjustHp applies damage (30→25)");
+        engine.AdjustHp(hero.Id, 3);
+        Check(hero.CurrentHitPoints == 28, "AdjustHp heals (25→28)");
+
+        // Conditions toggle on/off.
+        engine.ToggleCondition(hero.Id, Condition.Poisoned);
+        Check(hero.Conditions.Contains(Condition.Poisoned), "condition added");
+        engine.ToggleCondition(hero.Id, Condition.Poisoned);
+        Check(!hero.Conditions.Contains(Condition.Poisoned), "condition removed");
+
+        // Live spell-slot tracking.
+        engine.SetSlotUsed(hero.Id, 1, 2);
+        Check(hero.SpellSlots.First(s => s.Level == 1).Used == 2, "spell slot marked used (live)");
+
+        // Reaction spend.
+        engine.UseReaction(goblin.Id);
+        Check(!goblin.ReactionAvailable, "reaction marked spent");
+
+        // Death saves: down the hero, roll one, expect a recorded result.
+        engine.AdjustHp(hero.Id, -1000);
+        Check(hero.IsUnconscious, "hero is unconscious at 0 HP");
+        engine.RollDeathSaveFor(hero.Id);
+        Check(hero.DeathSaveSuccesses + hero.DeathSaveFailures > 0 || hero.CurrentHitPoints > 0,
+              "a death save was recorded (or a natural 20 revived)");
+
+        engine.EndCombat();
+        Check(engine.State == CombatState.Finished, "DM EndCombat finishes the encounter");
+    }
+    catch (Exception ex)
+    {
+        Check(false, $"live combat EXCEPTION — {ex.GetType().Name}: {ex.Message}");
+    }
+}
+
 // ───────────────────────── report ─────────────────────────
 Console.WriteLine($"\n────────────────────────────────────────");
 Console.WriteLine($"Checks run : {checks}");

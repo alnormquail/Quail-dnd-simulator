@@ -16,10 +16,19 @@ builder.Services.AddDbContextFactory<DndDbContext>(opt =>
        .AddInterceptors(new SqlitePragmaInterceptor()));
 
 builder.Services.AddScoped<DndApiService>();
-builder.Services.AddScoped<CharacterService>();
-builder.Services.AddScoped<CombatEngineService>();
+// CharacterService is stateless (holds only the singleton DbContext factory), so it
+// can be a singleton — required because the singleton CombatEngineService depends on it.
+builder.Services.AddSingleton<CharacterService>();
+// Combat is now SHARED across all players' circuits so the DM and players see one
+// live encounter. Singleton + internal locking (see CombatEngineService._gate).
+builder.Services.AddSingleton<CombatEngineService>();
 builder.Services.AddScoped<PdfImportService>();
 builder.Services.AddScoped<ContentService>();
+
+// Shared table-seat registry (who is DM / which character is claimed).
+builder.Services.AddSingleton<SeatRegistry>();
+// This browser's chosen seat (per circuit).
+builder.Services.AddScoped<PlayerSeat>();
 
 // Play-mode services (dice roller, per-session roll log, live play state)
 builder.Services.AddScoped<DiceService>();

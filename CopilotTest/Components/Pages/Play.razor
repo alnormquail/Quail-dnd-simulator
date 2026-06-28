@@ -1,0 +1,98 @@
+@page "/play"
+@using CopilotTest.Components
+@using CopilotTest.Models
+@using CopilotTest.Services
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+@rendermode InteractiveServer
+@inject CombatEngineService Combat
+@inject SeatRegistry Seats
+@inject PlayerSeat Seat
+@implements IDisposable
+
+<PageTitle>Live Combat</PageTitle>
+
+<div class="app-container">
+    <header class="app-header">
+        <h1>🎲 Live Combat</h1>
+        <p class="subtitle">Everyone at the table shares one live encounter</p>
+    </header>
+
+    @if (Seat.IsUnclaimed)
+    {
+        <div class="lobby lc-panel">
+            <h2>Take your seat</h2>
+
+            <div class="lobby-section">
+                <button class="btn btn-start" @onclick="ClaimDm">
+                    🎩 I'm the DM@(Seats.DmTaken ? " (already claimed — join as co-DM)" : "")
+                </button>
+            </div>
+
+            <div class="lobby-section">
+                <h3>I'm playing…</h3>
+                <div class="lobby-grid">
+                    @foreach (var pc in PartyPcs)
+                    {
+                        var claimed = Seats.IsClaimed(pc.Id);
+                        <button class="btn @(claimed ? "btn-reset" : "btn-action")" disabled="@claimed"
+                                @onclick="() => ClaimCharacter(pc)">
+                            @pc.Name <span class="lc-dim">@pc.ClassDisplay</span>@(claimed ? " — taken" : "")
+                        </button>
+                    }
+                </div>
+            </div>
+
+            <div class="lobby-section">
+                <button class="btn btn-reset" @onclick="() => Seat.SetSpectator()">👀 Just spectating</button>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="lc-seatbar">
+            <span>Seated as <strong>@Seat.Label</strong></span>
+            <button class="btn btn-sm btn-reset" @onclick="LeaveSeat">Switch seat</button>
+        </div>
+        <LiveCombat />
+    }
+</div>
+
+@code {
+    private IReadOnlyList<Character> PartyPcs => Combat.SavedRoster;
+
+    protected override void OnInitialized()
+    {
+        Seats.OnChanged += OnChanged;
+        Combat.OnStateChanged += OnChanged;
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    private void ClaimDm()
+    {
+        Seats.ClaimDm();
+        Seat.SetDm();
+    }
+
+    private void ClaimCharacter(Character pc)
+    {
+        if (Seats.ClaimCharacter(pc.Id, pc.Name))
+            Seat.SetPlayer(pc.Id, pc.Name);
+        // else: someone claimed it a moment ago; the live-updating lobby will show it taken.
+    }
+
+    private void LeaveSeat()
+    {
+        if (Seat.Role == SeatRole.Player && Seat.CharacterId.HasValue)
+            Seats.ReleaseCharacter(Seat.CharacterId.Value);
+        else if (Seat.Role == SeatRole.Dm)
+            Seats.ReleaseDm();
+        Seat.Clear();
+    }
+
+    public void Dispose()
+    {
+        Seats.OnChanged -= OnChanged;
+        Combat.OnStateChanged -= OnChanged;
+    }
+}

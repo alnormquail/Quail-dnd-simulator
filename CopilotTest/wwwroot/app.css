@@ -2737,3 +2737,66 @@ button.turn-item.rollable:hover .roll-die { opacity: 1; }
     cursor: pointer; font-size: 1rem; flex: none;
 }
 .roll-clear:hover { color: var(--text); }
+
+/* ── Live multiplayer combat (/play) ─────────────────────────────────────── */
+.live-combat { display: flex; flex-direction: column; gap: 12px; }
+.lc-panel {
+    background: var(--bg-panel); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px;
+}
+.lc-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.lc-hint { color: var(--text-dim); font-size: 0.85rem; margin: 8px 0 0; }
+.lc-dim { color: var(--text-dim); font-size: 0.85rem; }
+.btn-sm { padding: 4px 8px; font-size: 0.8rem; }
+
+.lc-seatbar {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 8px 14px; margin-bottom: 12px;
+}
+
+.lobby h2 { margin-top: 0; }
+.lobby-section { margin: 14px 0; }
+.lobby-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
+
+.lc-status-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.lc-round { font-weight: 700; margin-right: 10px; }
+.lc-turn { color: var(--gold); font-weight: 700; }
+
+.lc-init-row {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    padding: 8px 10px; border-bottom: 1px solid var(--border);
+}
+.lc-init-row:last-child { border-bottom: none; }
+.lc-init-main { display: flex; align-items: center; gap: 8px; flex: 1 1 200px; }
+.lc-init-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 26px; height: 26px; border-radius: 50%;
+    background: var(--bg-card); border: 1px solid var(--border); font-size: 0.8rem;
+}
+.lc-current { background: rgba(255,163,0,0.12); border-left: 3px solid var(--gold); }
+.lc-down { opacity: 0.6; }
+.lc-hp { font-variant-numeric: tabular-nums; }
+.lc-conditions { display: flex; gap: 4px; flex-wrap: wrap; flex-basis: 100%; }
+.lc-cond {
+    font-size: 0.72rem; padding: 1px 6px; border-radius: 10px;
+    background: var(--purple); color: var(--text);
+}
+.lc-dm-controls { display: flex; gap: 4px; flex-wrap: wrap; flex-basis: 100%; margin-top: 4px; }
+.lc-cond-select { padding: 3px 6px; font-size: 0.78rem; width: auto; }
+
+.lc-me { border-color: var(--gold); }
+.lc-self-actions { margin: 8px 0; }
+.lc-slots { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+.lc-slot-row { display: flex; align-items: center; gap: 6px; }
+.lc-pip {
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 2px solid var(--gold); background: transparent; cursor: pointer; padding: 0;
+}
+.lc-pip-used { background: var(--gold); }
+.lc-pools { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0; }
+.lc-pool { font-size: 0.8rem; color: var(--text-dim); }
+
+.lc-attack { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); }
+.lc-targets, .lc-actions { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+.lc-waiting h3 { margin-top: 0; }

@@ -8,6 +8,11 @@ public class CombatEngineService
     private readonly CharacterService _characterService;
     private List<Combatant> _lastEncounterMonsters = new();
 
+    // This service is now a SINGLETON shared by every connected player's circuit,
+    // so mutations from different circuits can interleave. All public mutators
+    // (and the snapshot reads the live UI renders from) take this lock.
+    private readonly object _gate = new();
+
     public List<Combatant> Combatants { get; private set; } = new();
     public List<CombatLog> Log { get; private set; } = new();
     public CombatState State { get; private set; } = CombatState.Setup;
@@ -40,13 +45,13 @@ public class CombatEngineService
 
     public void AddCombatant(Combatant combatant)
     {
-        Combatants.Add(combatant);
+        lock (_gate) { Combatants.Add(combatant); }
         OnStateChanged?.Invoke();
     }
 
     public void RemoveCombatant(Guid id)
     {
-        Combatants.RemoveAll(c => c.Id == id);
+        lock (_gate) { Combatants.RemoveAll(c => c.Id == id); }
         OnStateChanged?.Invoke();
     }
 
@@ -72,8 +77,11 @@ public class CombatEngineService
     {
         var template = SavedRoster.FirstOrDefault(r => r.Id == rosterId);
         if (template == null) return;
-        if (Combatants.Any(c => c.Id == rosterId)) return;
-        Combatants.Add(template.ToCombatant());
+        lock (_gate)
+        {
+            if (Combatants.Any(c => c.Id == rosterId)) return;
+            Combatants.Add(template.ToCombatant());
+        }
         OnStateChanged?.Invoke();
     }
 
@@ -185,6 +193,7 @@ public class CombatEngineService
             var roll = RollD20();
             c.InitiativeRoll = roll;
             c.Initiative = roll + c.DexterityModifier;
+            c.ReactionAvailable = true;   // everyone starts the fight with their reaction
         }
 
         Combatants = Combatants
@@ -376,6 +385,178 @@ public class CombatEngineService
         OnStateChanged?.Invoke();
     }
 
+    // ── Live multiplayer entry points (shared singleton; thread-guarded) ─────
+
+    public Combatant? Find(Guid id) => Combatants.FirstOrDefault(c => c.Id == id);
+
+    /// <summary>True when it is the given character's turn in an active encounter.</summary>
+    public bool IsCurrentTurn(Guid charId) =>
+        State == CombatState.Active && CurrentCombatant?.Id == charId;
+
+    /// <summary>Advance to the next turn (DM control).</summary>
+    public void NextTurn()
+    {
+        lock (_gate)
+        {
+            if (State != CombatState.Active) return;
+            var active = ActiveCombatants;
+            if (active.Count == 0) return;
+            AdvanceTurn(active);
+        }
+        OnStateChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// A player takes one of their character's actions against a target. Server-side
+    /// gate: only succeeds when it is that character's turn. Returns false if rejected.
+    /// </summary>
+    public bool PlayerAction(Guid actingCharId, CombatAction action, Combatant target)
+    {
+        lock (_gate)
+        {
+            if (!IsCurrentTurn(actingCharId)) return false;
+            var attacker = CurrentCombatant;
+            if (attacker == null) return false;
+
+            if (action.IsLimited)
+                action.UsesRemaining = Math.Max(0, action.UsesRemaining - 1);
+
+            switch (action.ActionType)
+            {
+                case ActionType.Attack:
+                case ActionType.SpellAttack:
+                    PerformAttackRoll(attacker, target, action);
+                    break;
+                case ActionType.Spell:
+                    PerformSpellSave(attacker, target, action);
+                    break;
+                default:
+                    AddLog(CurrentRound, attacker.Name, $"uses {action.Name}: {action.Description}", LogEntryType.Info);
+                    break;
+            }
+            AdvanceTurn(ActiveCombatants);
+        }
+        OnStateChanged?.Invoke();
+        return true;
+    }
+
+    /// <summary>Manual HP change: positive heals, negative deals damage.</summary>
+    public void AdjustHp(Guid id, int delta)
+    {
+        lock (_gate)
+        {
+            var c = Combatants.FirstOrDefault(x => x.Id == id);
+            if (c == null) return;
+            if (delta >= 0)
+            {
+                if (c.CurrentHitPoints <= 0 && c.Type == CombatantType.PC && delta > 0)
+                { c.DeathSaveSuccesses = 0; c.DeathSaveFailures = 0; }   // brought back up
+                c.CurrentHitPoints = Math.Min(c.MaxHitPoints, c.CurrentHitPoints + delta);
+                AddLog(CurrentRound, c.Name, $"heals {delta} → {c.HpDisplay} HP", LogEntryType.Info);
+            }
+            else
+            {
+                ApplyDamage(c, -delta);
+            }
+        }
+        OnStateChanged?.Invoke();
+    }
+
+    public void SetTempHp(Guid id, int temp)
+    {
+        lock (_gate)
+        {
+            var c = Combatants.FirstOrDefault(x => x.Id == id);
+            if (c == null) return;
+            c.TemporaryHitPoints = Math.Max(0, temp);
+            AddLog(CurrentRound, c.Name, $"gains {c.TemporaryHitPoints} temporary HP", LogEntryType.Info);
+        }
+        OnStateChanged?.Invoke();
+    }
+
+    public void ToggleCondition(Guid id, Condition condition)
+    {
+        lock (_gate)
+        {
+            var c = Combatants.FirstOrDefault(x => x.Id == id);
+            if (c == null) return;
+            if (c.Conditions.Remove(condition))
+                AddLog(CurrentRound, c.Name, $"is no longer {condition}", LogEntryType.Condition);
+            else
+            {
+                c.Conditions.Add(condition);
+                AddLog(CurrentRound, c.Name, $"is now {condition}", LogEntryType.Condition);
+            }
+        }
+        OnStateChanged?.Invoke();
+    }
+
+    /// <summary>Roll a death save for a downed PC (player- or DM-triggered).</summary>
+    public void RollDeathSaveFor(Guid id)
+    {
+        lock (_gate)
+        {
+            var c = Combatants.FirstOrDefault(x => x.Id == id);
+            if (c == null || c.Type != CombatantType.PC || !c.IsUnconscious) return;
+            PerformDeathSave(c);
+        }
+        OnStateChanged?.Invoke();
+    }
+
+    /// <summary>Spend a reaction (tracked + logged; the DM adjudicates the effect).</summary>
+    public void UseReaction(Guid id)
+    {
+        lock (_gate)
+        {
+            var c = Combatants.FirstOrDefault(x => x.Id == id);
+            if (c == null || !c.ReactionAvailable) return;
+            c.ReactionAvailable = false;
+            AddLog(CurrentRound, c.Name, "uses their reaction.", LogEntryType.Info);
+        }
+        OnStateChanged?.Invoke();
+    }
+
+    /// <summary>Set how many spell slots of a level are spent (live, shared).</summary>
+    public void SetSlotUsed(Guid id, int level, int used)
+    {
+        lock (_gate)
+        {
+            var slot = Combatants.FirstOrDefault(x => x.Id == id)?.SpellSlots.FirstOrDefault(s => s.Level == level);
+            if (slot == null) return;
+            slot.Used = Math.Clamp(used, 0, slot.Max);
+        }
+        OnStateChanged?.Invoke();
+    }
+
+    /// <summary>Set a class resource pool's current value (live, shared).</summary>
+    public void SetPoolCurrent(Guid id, string poolName, int current)
+    {
+        lock (_gate)
+        {
+            var pool = Combatants.FirstOrDefault(x => x.Id == id)?.Pools.FirstOrDefault(p => p.Name == poolName);
+            if (pool == null) return;
+            pool.Current = Math.Clamp(current, 0, pool.Max);
+        }
+        OnStateChanged?.Invoke();
+    }
+
+    /// <summary>End the encounter immediately (DM).</summary>
+    public void EndCombat()
+    {
+        lock (_gate)
+        {
+            if (State == CombatState.Setup) return;
+            EndAllRages();
+            State = CombatState.Finished;
+            AddLog(CurrentRound, "Combat", "🏁 The DM ends the encounter.", LogEntryType.RoundStart);
+        }
+        OnStateChanged?.Invoke();
+    }
+
+    /// <summary>Snapshot reads so the live UI can enumerate safely while others mutate.</summary>
+    public IReadOnlyList<Combatant> SnapshotCombatants() { lock (_gate) { return Combatants.ToList(); } }
+    public IReadOnlyList<CombatLog> SnapshotLog() { lock (_gate) { return Log.ToList(); } }
+
     private void AdvanceTurn(List<Combatant> active)
     {
         CurrentTurnIndex++;
@@ -393,6 +574,7 @@ public class CombatEngineService
             {
                 CurrentRound++;
                 CurrentTurnIndex = 0;
+                foreach (var c in Combatants) c.ReactionAvailable = true;   // reactions refresh each round
                 AddLog(CurrentRound, "Combat", $"━━━ Round {CurrentRound} ━━━", LogEntryType.RoundStart);
             }
         }
@@ -718,13 +900,17 @@ public class CombatEngineService
 
     private void AddLog(int round, string actor, string message, LogEntryType type)
     {
-        Log.Add(new CombatLog
+        // Re-entrant: callers already holding _gate are fine (Monitor is recursive).
+        lock (_gate)
         {
-            Round = round,
-            ActorName = actor,
-            Message = message,
-            EntryType = type
-        });
+            Log.Add(new CombatLog
+            {
+                Round = round,
+                ActorName = actor,
+                Message = message,
+                EntryType = type
+            });
+        }
     }
 
     public string GetEntryIcon(LogEntryType type) => type switch
