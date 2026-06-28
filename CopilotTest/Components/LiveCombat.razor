@@ -89,7 +89,7 @@
                             <span class="lc-hp">@c.StatusDisplay</span>
                         }
                     </div>
-                    @if (c.Conditions.Any() || c.IsRaging)
+                    @if (c.Conditions.Any() || c.IsRaging || c.Effects.Any())
                     {
                         <div class="lc-conditions">
                             @if (c.IsRaging)
@@ -99,6 +99,16 @@
                             @foreach (var cond in c.Conditions)
                             {
                                 <span class="lc-cond">@cond</span>
+                            }
+                            @foreach (var fx in c.Effects)
+                            {
+                                <span class="lc-effect">
+                                    ✨ @fx.Label
+                                    @if (IsDm)
+                                    {
+                                        <button class="lc-effect-x" title="Remove" @onclick="() => Combat.RemoveEffect(c.Id, fx.Id)">✕</button>
+                                    }
+                                </span>
                             }
                         </div>
                     }
@@ -127,6 +137,34 @@
                 </div>
             }
         </div>
+
+        @* ── DM: apply a timed effect (auto-expires) ───────────────────────── *@
+        @if (IsDm && Combat.State == CombatState.Active)
+        {
+            <div class="lc-panel">
+                <h3>Apply a timed effect</h3>
+                <div class="lc-row">
+                    <select class="form-input" @bind="fxTargetId">
+                        <option value="">Who…</option>
+                        @foreach (var c in Combatants)
+                        {
+                            <option value="@c.Id">@c.Name</option>
+                        }
+                    </select>
+                    <input class="form-input" style="width:140px" placeholder="Effect (e.g. Hex)" @bind="fxName" />
+                    <select class="form-input lc-cond-select" @bind="fxCondition">
+                        <option value="">no condition</option>
+                        @foreach (var cond in AllConditions)
+                        {
+                            <option value="@cond">imposes @cond</option>
+                        }
+                    </select>
+                    <input class="form-input" type="number" min="1" style="width:64px" @bind="fxRounds" /> <span class="lc-dim">rounds</span>
+                    <button class="btn btn-sm btn-action" @onclick="ApplyEffect">+ Add</button>
+                </div>
+                <p class="lc-hint">Effects count down at the start of each round and clear themselves (and any condition they impose) when they expire.</p>
+            </div>
+        }
 
         @* ── Action panel: shown to whoever controls the current combatant ─ *@
         @if (Actor != null && Combat.State == CombatState.Active && !Actor.IsUnconscious)
@@ -247,6 +285,12 @@
     private Guid? selectedTargetId;
     private AdvantageMode advMode = AdvantageMode.Normal;
 
+    // DM "apply a timed effect" form state.
+    private string fxTargetId = "";
+    private string fxName = "";
+    private string fxCondition = "";
+    private int fxRounds = 3;
+
     private bool IsDm => Seat.Role == SeatRole.Dm;
     private Guid? MyId => Seat.CharacterId;
     private Combatant? Me => MyId.HasValue ? Combat.Find(MyId.Value) : null;
@@ -296,6 +340,21 @@
         else if (IsDm) Combat.NextTurn();
         selectedTargetId = null;
         advMode = AdvantageMode.Normal;
+    }
+
+    private void ApplyEffect()
+    {
+        if (!Guid.TryParse(fxTargetId, out var tid) || string.IsNullOrWhiteSpace(fxName)) return;
+        Condition? cond = Enum.TryParse<Condition>(fxCondition, out var cc) && cc != Condition.None ? cc : null;
+        Combat.AddEffect(tid, new ActiveEffect
+        {
+            Name = fxName.Trim(),
+            Source = "DM",
+            Condition = cond,
+            RoundsRemaining = Math.Max(1, fxRounds),
+        });
+        fxName = "";
+        fxCondition = "";
     }
 
     private void OnToggleCondition(Guid id, ChangeEventArgs e)

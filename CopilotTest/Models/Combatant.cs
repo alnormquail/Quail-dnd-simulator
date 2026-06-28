@@ -56,6 +56,10 @@ public class Combatant
     // Conditions
     public HashSet<Condition> Conditions { get; set; } = new();
 
+    /// <summary>Timed, source-tagged effects (spells/conditions with durations). The
+    /// engine mirrors any condition an effect imposes into <see cref="Conditions"/>.</summary>
+    public List<ActiveEffect> Effects { get; set; } = new();
+
     // ── Live, shared combat resources ───────────────────────────────────────
     /// <summary>Whether this combatant still has its reaction this round (reset each round).</summary>
     public bool ReactionAvailable { get; set; } = true;

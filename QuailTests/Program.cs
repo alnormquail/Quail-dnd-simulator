@@ -723,6 +723,69 @@ Section("10. Real party characters, status effects in combat, and rage");
     }
 }
 
+// ───────────────────────── 11. Active-effects foundation (durations) ─────────────────────────
+Section("11. Active effects — durations auto-expire, conditions mirror, concentration drops");
+{
+    Combatant Mk(string name, CombatantType type) => new()
+    {
+        Id = Guid.NewGuid(), Name = name, Type = type, MaxHitPoints = 30, CurrentHitPoints = 30,
+        ArmorClass = 14, Dexterity = 12,
+        Actions = { new CombatAction { Name = "Hit", ActionType = ActionType.Attack, AttackBonus = 5, DamageDice = "1d8", DamageBonus = 2 } },
+    };
+    void AdvanceOneRound(CombatEngineService eng)
+    {
+        int r = eng.CurrentRound, guard = 0;
+        while (eng.CurrentRound == r && eng.State == CombatState.Active && guard++ < 30) eng.NextTurn();
+    }
+
+    var e = new CombatEngineService(svc);
+    var caster = Mk("Cleric", CombatantType.PC);
+    var foe = Mk("Bandit", CombatantType.Monster);
+    e.AddCombatant(caster); e.AddCombatant(foe);
+    e.StartCombat();   // round 1
+
+    // Duration auto-expiry: a 2-round effect lasts rounds 1–2 and is gone by round 3.
+    e.AddEffect(caster.Id, new ActiveEffect { Name = "Bless", Source = "Cleric", RoundsRemaining = 2 });
+    Check(caster.Effects.Any(x => x.Name == "Bless"), "timed effect applied");
+    AdvanceOneRound(e);
+    Check(caster.Effects.Any(x => x.Name == "Bless"), "2-round effect still present in round 2");
+    AdvanceOneRound(e);
+    Check(!caster.Effects.Any(x => x.Name == "Bless"), "effect auto-expired by round 3");
+
+    // An effect that imposes a condition mirrors it into Conditions, and expiry clears it.
+    e.AddEffect(foe.Id, new ActiveEffect { Name = "Ensnaring Strike", Condition = Condition.Restrained, RoundsRemaining = 1, Source = "Ranger" });
+    Check(foe.Conditions.Contains(Condition.Restrained), "effect mirrors its condition into the Conditions set");
+    AdvanceOneRound(e);
+    Check(!foe.Conditions.Contains(Condition.Restrained) && !foe.Effects.Any(x => x.Name == "Ensnaring Strike"),
+          "an expiring effect clears the condition it imposed");
+
+    // Manual removal clears the condition too.
+    e.AddEffect(foe.Id, new ActiveEffect { Name = "Hold Person", Condition = Condition.Paralyzed, RoundsRemaining = 10 });
+    Check(foe.Conditions.Contains(Condition.Paralyzed), "Hold Person paralyzes the target");
+    e.RemoveEffect(foe.Id, foe.Effects.First(x => x.Name == "Hold Person").Id);
+    Check(!foe.Conditions.Contains(Condition.Paralyzed), "removing the effect clears its condition");
+
+    // Two effects imposing the same condition: it persists until the last one is gone.
+    e.AddEffect(foe.Id, new ActiveEffect { Name = "Web", Condition = Condition.Restrained, RoundsRemaining = 10 });
+    e.AddEffect(foe.Id, new ActiveEffect { Name = "Grasp", Condition = Condition.Restrained, RoundsRemaining = 10 });
+    e.RemoveEffect(foe.Id, foe.Effects.First(x => x.Name == "Web").Id);
+    Check(foe.Conditions.Contains(Condition.Restrained), "condition persists while another effect still imposes it");
+    e.RemoveEffect(foe.Id, foe.Effects.First(x => x.Name == "Grasp").Id);
+    Check(!foe.Conditions.Contains(Condition.Restrained), "condition clears once the last imposing effect ends");
+
+    // Concentration: a sustained effect drops when the caster loses concentration.
+    e.AddEffect(foe.Id, new ActiveEffect { Name = "Hex", RoundsRemaining = 10, FromConcentration = true, ConcentratorId = caster.Id, Source = "Cleric" });
+    Check(foe.Effects.Any(x => x.Name == "Hex"), "concentration effect applied to a target");
+    e.DropConcentration(caster.Id);
+    Check(!foe.Effects.Any(x => x.Name == "Hex"), "concentration effects drop when the caster loses concentration");
+
+    // Indefinite effects never expire on their own.
+    e.AddEffect(caster.Id, new ActiveEffect { Name = "Mage Armor", RoundsRemaining = -1 });
+    AdvanceOneRound(e); AdvanceOneRound(e);
+    Check(caster.Effects.Any(x => x.Name == "Mage Armor"), "indefinite effect (-1 rounds) never auto-expires");
+    Note("Active-effects foundation: round-based durations, condition mirroring, and concentration linkage all hold");
+}
+
 // ───────────────────────── report ─────────────────────────
 Console.WriteLine($"\n────────────────────────────────────────");
 Console.WriteLine($"Checks run : {checks}");

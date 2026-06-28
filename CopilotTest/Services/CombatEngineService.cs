@@ -529,6 +529,90 @@ public class CombatEngineService
         OnStateChanged?.Invoke();
     }
 
+    // ── Active effects (timed, source-tagged; the durations layer) ───────────
+
+    /// <summary>Apply a timed effect to a combatant. If it imposes a condition,
+    /// that condition is mirrored into the combatant's Conditions set.</summary>
+    public void AddEffect(Guid combatantId, ActiveEffect effect)
+    {
+        lock (_gate)
+        {
+            var c = Combatants.FirstOrDefault(x => x.Id == combatantId);
+            if (c == null) return;
+            c.Effects.Add(effect);
+            if (effect.Condition is { } cond && cond != Condition.None)
+                c.Conditions.Add(cond);
+            var dur = effect.IsIndefinite ? "" : $" ({effect.RoundsRemaining} rounds)";
+            var src = string.IsNullOrEmpty(effect.Source) ? "" : $" [from {effect.Source}]";
+            AddLog(CurrentRound, c.Name, $"gains {effect.Name}{dur}{src}", LogEntryType.Condition);
+        }
+        OnStateChanged?.Invoke();
+    }
+
+    /// <summary>Remove a specific effect, clearing its condition if nothing else imposes it.</summary>
+    public void RemoveEffect(Guid combatantId, Guid effectId)
+    {
+        lock (_gate)
+        {
+            var c = Combatants.FirstOrDefault(x => x.Id == combatantId);
+            var eff = c?.Effects.FirstOrDefault(e => e.Id == effectId);
+            if (c == null || eff == null) return;
+            c.Effects.Remove(eff);
+            ClearConditionIfOrphaned(c, eff.Condition);
+            AddLog(CurrentRound, c.Name, $"loses {eff.Name}", LogEntryType.Condition);
+        }
+        OnStateChanged?.Invoke();
+    }
+
+    /// <summary>End all effects sustained by a caster's concentration (called when it drops).</summary>
+    public void DropConcentration(Guid concentratorId)
+    {
+        lock (_gate)
+        {
+            foreach (var c in Combatants)
+            {
+                var dropped = c.Effects.Where(e => e.FromConcentration && e.ConcentratorId == concentratorId).ToList();
+                foreach (var e in dropped)
+                {
+                    c.Effects.Remove(e);
+                    ClearConditionIfOrphaned(c, e.Condition);
+                }
+                if (dropped.Count > 0)
+                    AddLog(CurrentRound, c.Name, $"{string.Join(", ", dropped.Select(d => d.Name))} ends (concentration lost)", LogEntryType.Condition);
+            }
+        }
+        OnStateChanged?.Invoke();
+    }
+
+    /// <summary>Tick every timed effect down one round and expire those that reach zero.
+    /// Called at the start of each new round.</summary>
+    private void TickEffects()
+    {
+        foreach (var c in Combatants)
+        {
+            var expired = new List<ActiveEffect>();
+            foreach (var e in c.Effects)
+            {
+                if (e.IsIndefinite) continue;
+                e.RoundsRemaining--;
+                if (e.RoundsRemaining <= 0) expired.Add(e);
+            }
+            foreach (var e in expired)
+            {
+                c.Effects.Remove(e);
+                ClearConditionIfOrphaned(c, e.Condition);
+                AddLog(CurrentRound, c.Name, $"{e.Name} wears off", LogEntryType.Condition);
+            }
+        }
+    }
+
+    /// <summary>Drop a condition from a combatant once no remaining effect imposes it.</summary>
+    private static void ClearConditionIfOrphaned(Combatant c, Condition? condition)
+    {
+        if (condition is { } cond && cond != Condition.None && !c.Effects.Any(e => e.Condition == cond))
+            c.Conditions.Remove(cond);
+    }
+
     /// <summary>Roll a death save for a downed PC (player- or DM-triggered).</summary>
     public void RollDeathSaveFor(Guid id)
     {
@@ -613,6 +697,7 @@ public class CombatEngineService
                 CurrentRound++;
                 CurrentTurnIndex = 0;
                 foreach (var c in Combatants) c.ReactionAvailable = true;   // reactions refresh each round
+                TickEffects();   // timed effects count down / expire at the start of each round
                 AddLog(CurrentRound, "Combat", $"━━━ Round {CurrentRound} ━━━", LogEntryType.RoundStart);
             }
         }
