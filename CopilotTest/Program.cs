@@ -87,6 +87,7 @@ using (var scope = app.Services.CreateScope())
     AddColumnIfMissing(db, "Characters", "BackgroundKey", "TEXT NOT NULL DEFAULT ''");
     AddColumnIfMissing(db, "Characters", "SubclassKey", "TEXT NOT NULL DEFAULT ''");
     AddColumnIfMissing(db, "Spells", "Source", "TEXT NOT NULL DEFAULT ''");
+    AddColumnIfMissing(db, "CombatActions", "RequiresConcentration", "INTEGER NOT NULL DEFAULT 0");
 
     var chars = scope.ServiceProvider.GetRequiredService<CharacterService>();
     chars.SeedIfEmpty();
