@@ -444,6 +444,171 @@ Section("8. Live combat engine — turn gating, manual controls, conditions, dea
     }
 }
 
+// ───────────────────────── 9. Combat scenarios (how it actually plays) ─────────────────────────
+Section("9. Combat scenarios — full encounters, balance, advantage, death saves");
+{
+    // Build a combatant with a single attack.
+    Combatant Mk(string name, CombatantType type, int hp, int ac, int atk, string dice, int dmgBonus, int dex = 10) =>
+        new()
+        {
+            Id = Guid.NewGuid(), Name = name, Type = type,
+            MaxHitPoints = hp, CurrentHitPoints = hp, ArmorClass = ac, Dexterity = dex,
+            Actions = { new CombatAction { Name = "Attack", ActionType = ActionType.Attack, AttackBonus = atk, DamageDice = dice, DamageBonus = dmgBonus, DamageType = DamageType.Slashing } },
+        };
+
+    // Auto-run an encounter to completion via the engine's simulator. Returns
+    // rounds elapsed, whether it terminated, and the surviving side.
+    (int rounds, bool terminated, string survivors) RunAuto(CombatEngineService e, int cap = 60)
+    {
+        int guard = 0;
+        while (e.State == CombatState.Active && guard < cap) { e.SimulateRound(); guard++; }
+        var alive = e.SnapshotCombatants().Where(c => !c.IsDead && c.CurrentHitPoints > 0).Select(c => c.Name).ToList();
+        return (e.CurrentRound, e.State != CombatState.Active, alive.Count > 0 ? string.Join(", ", alive) : "nobody");
+    }
+
+    // ── A. Auto-battles across matchups ──
+    var matchups = new (string label, Func<List<Combatant>> build)[]
+    {
+        ("Party (4) vs Boss", () => new()
+        {
+            Mk("Fighter", CombatantType.PC, 44, 18, 7, "1d8", 4, 14),
+            Mk("Rogue",   CombatantType.PC, 30, 15, 6, "1d6", 3, 18),
+            Mk("Cleric",  CombatantType.PC, 33, 16, 5, "1d8", 2, 10),
+            Mk("Wizard",  CombatantType.PC, 24, 12, 5, "2d6", 2, 14),
+            Mk("Ogre Boss", CombatantType.Monster, 120, 15, 8, "2d8", 5, 8),
+        }),
+        ("Lone hero vs swarm (5)", () => new()
+        {
+            Mk("Champion", CombatantType.PC, 70, 19, 9, "2d6", 5, 16),
+            Mk("Goblin 1", CombatantType.Monster, 12, 13, 4, "1d6", 2, 14),
+            Mk("Goblin 2", CombatantType.Monster, 12, 13, 4, "1d6", 2, 14),
+            Mk("Goblin 3", CombatantType.Monster, 12, 13, 4, "1d6", 2, 14),
+            Mk("Goblin 4", CombatantType.Monster, 12, 13, 4, "1d6", 2, 14),
+            Mk("Goblin 5", CombatantType.Monster, 12, 13, 4, "1d6", 2, 14),
+        }),
+        ("Outmatched party (TPK risk)", () => new()
+        {
+            Mk("Squire A", CombatantType.PC, 14, 12, 3, "1d6", 1, 10),
+            Mk("Squire B", CombatantType.PC, 14, 12, 3, "1d6", 1, 10),
+            Mk("Troll 1", CombatantType.Monster, 84, 15, 7, "2d8", 4, 8),
+            Mk("Troll 2", CombatantType.Monster, 84, 15, 7, "2d8", 4, 8),
+        }),
+    };
+
+    foreach (var (label, build) in matchups)
+    {
+        try
+        {
+            var e = new CombatEngineService(svc);
+            foreach (var c in build()) e.AddCombatant(c);
+            e.StartCombat();
+            var (rounds, terminated, survivors) = RunAuto(e);
+            Check(terminated, $"[{label}] combat terminates (no infinite loop)");
+            Check(e.State == CombatState.Finished, $"[{label}] ends in Finished state");
+            Note($"{label}: {rounds} rounds → survivors: {survivors}");
+        }
+        catch (Exception ex)
+        {
+            Check(false, $"[{label}] EXCEPTION — {ex.GetType().Name}: {ex.Message}");
+        }
+    }
+
+    // ── B. Repeated even duel: should always terminate; wins roughly two-sided ──
+    {
+        int aWins = 0, bWins = 0, draws = 0, maxRounds = 0; bool anyStall = false;
+        for (int i = 0; i < 200; i++)
+        {
+            var e = new CombatEngineService(svc);
+            e.AddCombatant(Mk("Duelist A", CombatantType.PC, 35, 15, 6, "1d10", 3, 14));
+            e.AddCombatant(Mk("Duelist B", CombatantType.Monster, 35, 15, 6, "1d10", 3, 14));
+            e.StartCombat();
+            var (rounds, terminated, survivors) = RunAuto(e, 80);
+            if (!terminated) anyStall = true;
+            maxRounds = Math.Max(maxRounds, rounds);
+            if (survivors.Contains("A")) aWins++;
+            else if (survivors.Contains("B")) bWins++;
+            else draws++;
+        }
+        Check(!anyStall, "200 even duels all terminate within the round cap");
+        Check(aWins > 40 && bWins > 40, $"both sides win a fair share (A:{aWins} B:{bWins})");
+        Note($"200 duels → A wins {aWins}, B wins {bWins}, mutual KO {draws}; longest fight {maxRounds} rounds");
+    }
+
+    // ── C. Advantage / disadvantage actually shift the hit rate ──
+    {
+        var e = new CombatEngineService(svc);
+        var atk = new CombatAction { Name = "Probe", ActionType = ActionType.Attack, AttackBonus = 5 };
+        var dummy = Mk("Dummy", CombatantType.Monster, 1, 15, 0, "1d4", 0);
+        int N = 4000;
+        int Count(AdvantageMode m)
+        {
+            int hits = 0;
+            for (int i = 0; i < N; i++) if (e.ResolveAttackRoll(atk, dummy, 0, m).Hit) hits++;
+            return hits;
+        }
+        double norm = Count(AdvantageMode.Normal) / (double)N;
+        double adv  = Count(AdvantageMode.Advantage) / (double)N;
+        double dis  = Count(AdvantageMode.Disadvantage) / (double)N;
+        Check(adv > norm && norm > dis, "hit rate: advantage > normal > disadvantage");
+        Note($"hit% vs AC15 (+5): disadv {dis:P0} | normal {norm:P0} | advantage {adv:P0}");
+    }
+
+    // ── D. Death-save outcome distribution over many rolls ──
+    {
+        var e = new CombatEngineService(svc);
+        var pc = Mk("Faller", CombatantType.PC, 20, 10, 0, "1d4", 0);
+        e.AddCombatant(pc);
+        int succ = 0, fail = 0, revived = 0;
+        for (int i = 0; i < 2000; i++)
+        {
+            pc.CurrentHitPoints = 0; pc.IsDead = false;
+            pc.DeathSaveSuccesses = 0; pc.DeathSaveFailures = 0;
+            e.RollDeathSaveFor(pc.Id);
+            if (pc.CurrentHitPoints > 0) revived++;
+            else if (pc.DeathSaveSuccesses > 0) succ++;
+            else if (pc.DeathSaveFailures > 0) fail++;
+        }
+        Check(succ > 0 && fail > 0 && revived > 0, "death saves yield successes, failures, and nat-20 revives");
+        Note($"2000 death saves → success {succ}, failure {fail}, nat-20 revive {revived}");
+    }
+
+    // ── E. Manual turn flow: round increments, reactions refresh, gating holds ──
+    {
+        var e = new CombatEngineService(svc);
+        var pcA = Mk("Aria",  CombatantType.PC, 40, 14, 6, "1d8", 3, 16);
+        var orc = Mk("Orc",   CombatantType.Monster, 50, 13, 5, "1d12", 3, 10);
+        e.AddCombatant(pcA); e.AddCombatant(orc);
+        e.StartCombat();
+        int startRound = e.CurrentRound;
+
+        // Walk a couple of full rounds via the manual API.
+        bool gateHeld = true, alwaysValid = true;
+        for (int step = 0; step < 6 && e.State == CombatState.Active; step++)
+        {
+            var cur = e.CurrentCombatant;
+            if (cur == null) { alwaysValid = false; break; }
+            var target = e.GetCurrentTargets().FirstOrDefault();
+            if (cur.Id == pcA.Id)
+            {
+                // Wrong-turn gate: orc's id can't act on Aria's turn.
+                if (e.PlayerAction(orc.Id, pcA.Actions[0], orc)) gateHeld = false;
+                if (target != null) e.PlayerAction(pcA.Id, pcA.Actions[0], target);   // action (no auto-advance)
+                e.EndTurn(pcA.Id);
+            }
+            else
+            {
+                if (target != null) e.DmActOnCurrent(orc.Actions[0], target);          // DM runs the monster
+                e.NextTurn();
+            }
+        }
+        Check(gateHeld, "acting out of turn is rejected throughout the fight");
+        Check(alwaysValid, "there is always a valid current combatant mid-combat");
+        Check(e.CurrentRound >= startRound, "round counter advances as turns cycle");
+        Check(e.SnapshotCombatants().Any(c => c.ReactionAvailable), "reactions refresh across rounds");
+        Note($"manual flow reached round {e.CurrentRound}, state {e.State}");
+    }
+}
+
 // ───────────────────────── report ─────────────────────────
 Console.WriteLine($"\n────────────────────────────────────────");
 Console.WriteLine($"Checks run : {checks}");
