@@ -641,6 +641,26 @@ public class CombatEngineService
             c.Conditions.Remove(cond);
     }
 
+    /// <summary>Toggle a damage-type modifier (resistance/immunity/vulnerability) on a combatant.</summary>
+    public void ToggleDamageMod(Guid id, DamageType type, DamageMod mod)
+    {
+        lock (_gate)
+        {
+            var c = Combatants.FirstOrDefault(x => x.Id == id);
+            if (c == null || type == DamageType.None) return;
+            var set = mod switch
+            {
+                DamageMod.Resistance => c.Resistances,
+                DamageMod.Immunity => c.Immunities,
+                _ => c.Vulnerabilities,
+            };
+            var on = set.Add(type);
+            if (!on) set.Remove(type);
+            AddLog(CurrentRound, c.Name, $"{mod} to {type} turned {(on ? "on" : "off")}", LogEntryType.Info);
+        }
+        OnStateChanged?.Invoke();
+    }
+
     /// <summary>Roll a death save for a downed PC (player- or DM-triggered).</summary>
     public void RollDeathSaveFor(Guid id)
     {
@@ -911,10 +931,32 @@ public class CombatEngineService
 
     private void ApplyDamage(Combatant target, int damage, DamageType damageType = DamageType.None)
     {
-        if (target.IsRaging && damageType is DamageType.Slashing or DamageType.Piercing or DamageType.Bludgeoning)
+        // Typed damage runs through immunity / resistance / vulnerability. Untyped
+        // damage (DamageType.None, e.g. a manual DM adjustment) is taken as-is.
+        if (damageType != DamageType.None)
         {
-            damage = Math.Max(1, damage / 2);
-            AddLog(CurrentRound, target.Name, $"🔥 Rage resistance halves physical damage → {damage}", LogEntryType.Info);
+            if (target.Immunities.Contains(damageType))
+            {
+                AddLog(CurrentRound, target.Name, $"is immune to {damageType} — takes no damage", LogEntryType.Info);
+                return;
+            }
+
+            bool physical = damageType is DamageType.Slashing or DamageType.Piercing or DamageType.Bludgeoning;
+            bool resistant = target.Resistances.Contains(damageType) || (target.IsRaging && physical);
+            bool vulnerable = target.Vulnerabilities.Contains(damageType);
+
+            if (resistant && !vulnerable)
+            {
+                damage = Math.Max(1, damage / 2);
+                var why = (target.IsRaging && physical && !target.Resistances.Contains(damageType)) ? "🔥 Rage resistance" : "Resistance";
+                AddLog(CurrentRound, target.Name, $"{why} halves {damageType} damage → {damage}", LogEntryType.Info);
+            }
+            else if (vulnerable && !resistant)
+            {
+                damage *= 2;
+                AddLog(CurrentRound, target.Name, $"is vulnerable to {damageType} — damage doubled → {damage}", LogEntryType.Info);
+            }
+            // resistant && vulnerable cancel out — damage unchanged.
         }
 
         if (target.TemporaryHitPoints > 0)

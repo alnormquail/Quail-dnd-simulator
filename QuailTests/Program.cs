@@ -832,6 +832,49 @@ Section("12. Conditions drive advantage/disadvantage; incapacitated combatants c
     Note("Conditions now auto-set advantage/disadvantage, and incapacitating conditions block live actions");
 }
 
+// ───────────────────────── 13. Resistance / immunity / vulnerability ─────────────────────────
+Section("13. Damage resistance, immunity, vulnerability (and rage doesn't stack)");
+{
+    var e = new CombatEngineService(svc);
+    var caster = new Combatant
+    {
+        Id = Guid.NewGuid(), Name = "Mage", Type = CombatantType.PC, MaxHitPoints = 40, CurrentHitPoints = 40, ArmorClass = 14, Dexterity = 14,
+        Actions =
+        {
+            new CombatAction { Name = "Firebolt", ActionType = ActionType.Attack, AttackBonus = 20, DamageDice = "2d6", DamageType = DamageType.Fire,     Range = "120 ft" },
+            new CombatAction { Name = "Slash",    ActionType = ActionType.Attack, AttackBonus = 20, DamageDice = "2d6", DamageType = DamageType.Slashing, Range = "5 ft"   },
+        },
+    };
+    var target = new Combatant { Id = Guid.NewGuid(), Name = "Dummy", Type = CombatantType.Monster, MaxHitPoints = 1_000_000, CurrentHitPoints = 1_000_000, ArmorClass = 1, Dexterity = 8 };
+    e.AddCombatant(caster); e.AddCombatant(target); e.StartCombat();
+    for (int i = 0; i < 10 && e.CurrentCombatant?.Id != caster.Id; i++) e.NextTurn();
+
+    int Damage(Action setup, int n, int actIdx)
+    {
+        target.Resistances.Clear(); target.Immunities.Clear(); target.Vulnerabilities.Clear(); target.IsRaging = false;
+        setup();
+        int total = 0;
+        for (int i = 0; i < n; i++) { target.CurrentHitPoints = 1_000_000; e.DmActOnCurrent(caster.Actions[actIdx], target); total += 1_000_000 - target.CurrentHitPoints; }
+        return total;
+    }
+
+    int normal = Damage(() => { }, 600, 0);
+    int resist = Damage(() => target.Resistances.Add(DamageType.Fire), 600, 0);
+    int immune = Damage(() => target.Immunities.Add(DamageType.Fire), 600, 0);
+    int vuln   = Damage(() => target.Vulnerabilities.Add(DamageType.Fire), 600, 0);
+    Check(immune == 0, "immunity negates all damage of that type");
+    Check(resist < normal * 0.7, $"resistance roughly halves damage ({resist} vs {normal})");
+    Check(vuln > normal * 1.5, $"vulnerability roughly doubles damage ({vuln} vs {normal})");
+    Note($"Fire vs AC1: normal {normal}, resistant {resist} (~{(double)resist / normal:P0}), immune {immune}, vulnerable {vuln} (~{(double)vuln / normal:P0})");
+
+    int normalPhys = Damage(() => { }, 600, 1);
+    int ragedPhys  = Damage(() => target.IsRaging = true, 600, 1);
+    Check(ragedPhys < normalPhys * 0.7, "rage still halves physical damage (regression)");
+    int ragedResist = Damage(() => { target.IsRaging = true; target.Resistances.Add(DamageType.Slashing); }, 600, 1);
+    Check(ragedResist > normalPhys * 0.35 && ragedResist < normalPhys * 0.7, "rage + resistance don't stack — still one halving, not a quarter");
+    Note($"Slashing: normal {normalPhys}, raging {ragedPhys}, raging+resistant {ragedResist} (one halving, not two)");
+}
+
 // ───────────────────────── report ─────────────────────────
 Console.WriteLine($"\n────────────────────────────────────────");
 Console.WriteLine($"Checks run : {checks}");

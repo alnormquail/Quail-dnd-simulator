@@ -112,6 +112,14 @@
                             }
                         </div>
                     }
+                    @if (c.Immunities.Any() || c.Resistances.Any() || c.Vulnerabilities.Any())
+                    {
+                        <div class="lc-conditions">
+                            @foreach (var t in c.Immunities) { <span class="lc-cond" title="Immune">🛡️ @t</span> }
+                            @foreach (var t in c.Resistances) { <span class="lc-cond" title="Resistant">½ @t</span> }
+                            @foreach (var t in c.Vulnerabilities) { <span class="lc-cond" title="Vulnerable">×2 @t</span> }
+                        </div>
+                    }
 
                     @* DM per-combatant controls *@
                     @if (IsDm && Combat.State == CombatState.Active)
@@ -163,6 +171,29 @@
                     <button class="btn btn-sm btn-action" @onclick="ApplyEffect">+ Add</button>
                 </div>
                 <p class="lc-hint">Effects count down at the start of each round and clear themselves (and any condition they impose) when they expire.</p>
+            </div>
+
+            <div class="lc-panel">
+                <h3>Damage modifiers</h3>
+                <div class="lc-row">
+                    <select class="form-input" @bind="dmTargetId">
+                        <option value="">Who…</option>
+                        @foreach (var c in Combatants)
+                        {
+                            <option value="@c.Id">@c.Name</option>
+                        }
+                    </select>
+                    <select class="form-input lc-cond-select" @bind="dmType">
+                        @foreach (var t in DamageTypes)
+                        {
+                            <option value="@t">@t</option>
+                        }
+                    </select>
+                    <button class="btn btn-sm btn-reset" @onclick="() => ToggleDmg(DamageMod.Resistance)">½ Resist</button>
+                    <button class="btn btn-sm btn-reset" @onclick="() => ToggleDmg(DamageMod.Immunity)">🛡️ Immune</button>
+                    <button class="btn btn-sm btn-action" @onclick="() => ToggleDmg(DamageMod.Vulnerability)">×2 Vulnerable</button>
+                </div>
+                <p class="lc-hint">Toggle a type on the chosen combatant: resistance halves it, immunity negates it, vulnerability doubles it.</p>
             </div>
         }
 
@@ -301,6 +332,17 @@
     private string fxName = "";
     private string fxCondition = "";
     private int fxRounds = 3;
+
+    // DM damage-modifier editor state.
+    private string dmTargetId = "";
+    private DamageType dmType = DamageType.Fire;
+    private static readonly DamageType[] DamageTypes =
+        Enum.GetValues<DamageType>().Where(t => t != DamageType.None).ToArray();
+
+    private void ToggleDmg(DamageMod mod)
+    {
+        if (Guid.TryParse(dmTargetId, out var id)) Combat.ToggleDamageMod(id, dmType, mod);
+    }
 
     private bool IsDm => Seat.Role == SeatRole.Dm;
     private Guid? MyId => Seat.CharacterId;

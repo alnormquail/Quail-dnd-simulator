@@ -1,5 +1,8 @@
 namespace CopilotTest.Models;
 
+/// <summary>Which damage-modifier bucket a toggle targets.</summary>
+public enum DamageMod { Resistance, Immunity, Vulnerability }
+
 public class Combatant
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -59,6 +62,11 @@ public class Combatant
     /// <summary>Timed, source-tagged effects (spells/conditions with durations). The
     /// engine mirrors any condition an effect imposes into <see cref="Conditions"/>.</summary>
     public List<ActiveEffect> Effects { get; set; } = new();
+
+    // ── Damage modifiers (applied in CombatEngineService.ApplyDamage) ───────
+    public HashSet<DamageType> Resistances { get; set; } = new();     // half damage
+    public HashSet<DamageType> Immunities { get; set; } = new();      // no damage
+    public HashSet<DamageType> Vulnerabilities { get; set; } = new(); // double damage
 
     // ── Live, shared combat resources ───────────────────────────────────────
     /// <summary>Whether this combatant still has its reaction this round (reset each round).</summary>
