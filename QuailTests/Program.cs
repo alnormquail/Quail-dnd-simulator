@@ -786,6 +786,52 @@ Section("11. Active effects — durations auto-expire, conditions mirror, concen
     Note("Active-effects foundation: round-based durations, condition mirroring, and concentration linkage all hold");
 }
 
+// ───────────────────────── 12. Conditions → advantage; incapacitation gate ─────────────────────────
+Section("12. Conditions drive advantage/disadvantage; incapacitated combatants can't act");
+{
+    Combatant C(string name, params Condition[] conds)
+    {
+        var c = new Combatant { Id = Guid.NewGuid(), Name = name, Type = CombatantType.PC, MaxHitPoints = 20, CurrentHitPoints = 20 };
+        foreach (var x in conds) c.Conditions.Add(x);
+        return c;
+    }
+    var melee  = new CombatAction { Name = "Sword", Range = "5 ft",   ActionType = ActionType.Attack };
+    var ranged = new CombatAction { Name = "Bow",   Range = "120 ft", ActionType = ActionType.Attack };
+    AdvantageMode M(Combatant a, Combatant t, CombatAction act, AdvantageMode man = AdvantageMode.Normal)
+        => CombatRules.ResolveAdvantage(a, t, act, man).Mode;
+
+    Check(M(C("A"), C("T"), melee) == AdvantageMode.Normal, "no conditions → normal roll");
+    Check(M(C("A"), C("T", Condition.Restrained), melee) == AdvantageMode.Advantage, "attack vs Restrained target → advantage");
+    Check(M(C("A"), C("T", Condition.Stunned), melee) == AdvantageMode.Advantage, "attack vs Stunned target → advantage");
+    Check(M(C("A", Condition.Poisoned), C("T"), melee) == AdvantageMode.Disadvantage, "Poisoned attacker → disadvantage");
+    Check(M(C("A", Condition.Poisoned), C("T", Condition.Restrained), melee) == AdvantageMode.Normal, "advantage + disadvantage cancel → normal");
+    Check(M(C("A"), C("T", Condition.Prone), melee) == AdvantageMode.Advantage, "melee vs Prone target → advantage");
+    Check(M(C("A"), C("T", Condition.Prone), ranged) == AdvantageMode.Disadvantage, "ranged vs Prone target → disadvantage");
+    Check(M(C("A", Condition.Invisible), C("T"), melee) == AdvantageMode.Advantage, "Invisible attacker → advantage");
+    Check(M(C("A"), C("T", Condition.Invisible), melee) == AdvantageMode.Disadvantage, "attacking an unseen (Invisible) target → disadvantage");
+    Check(M(C("A"), C("T"), melee, AdvantageMode.Advantage) == AdvantageMode.Advantage, "DM manual advantage applies on its own");
+    Check(M(C("A"), C("T", Condition.Restrained), melee, AdvantageMode.Disadvantage) == AdvantageMode.Normal, "manual disadvantage cancels a condition's advantage");
+
+    // Live-play incapacitation gate.
+    Combatant Mk(string name, CombatantType type) => new()
+    {
+        Id = Guid.NewGuid(), Name = name, Type = type, MaxHitPoints = 40, CurrentHitPoints = 40, ArmorClass = 14, Dexterity = 14,
+        Actions = { new CombatAction { Name = "Strike", ActionType = ActionType.Attack, AttackBonus = 6, DamageDice = "1d8", DamageBonus = 3, Range = "5 ft" } },
+    };
+    var e = new CombatEngineService(svc);
+    var hero = Mk("Hero", CombatantType.PC);
+    var foe = Mk("Foe", CombatantType.Monster);
+    e.AddCombatant(hero); e.AddCombatant(foe); e.StartCombat();
+    for (int i = 0; i < 10 && e.CurrentCombatant?.Id != hero.Id; i++) e.NextTurn();
+
+    e.ToggleCondition(hero.Id, Condition.Stunned);
+    Check(CombatEngineService.IsIncapacitated(hero), "a Stunned combatant counts as incapacitated");
+    Check(!e.PlayerAction(hero.Id, hero.Actions[0], foe), "a Stunned combatant's action is rejected in live play");
+    e.ToggleCondition(hero.Id, Condition.Stunned);
+    Check(e.PlayerAction(hero.Id, hero.Actions[0], foe), "after the Stun clears, the action is accepted");
+    Note("Conditions now auto-set advantage/disadvantage, and incapacitating conditions block live actions");
+}
+
 // ───────────────────────── report ─────────────────────────
 Console.WriteLine($"\n────────────────────────────────────────");
 Console.WriteLine($"Checks run : {checks}");

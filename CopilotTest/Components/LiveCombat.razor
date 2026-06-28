@@ -166,8 +166,19 @@
             </div>
         }
 
+        @* ── Incapacitated: the controlled combatant can't act this turn ──── *@
+        @if (Actor != null && Combat.State == CombatState.Active && !Actor.IsUnconscious
+             && CombatEngineService.IsIncapacitated(Actor))
+        {
+            <div class="lc-panel lc-me">
+                <h4>@Actor.Name can't act — @IncapLabel(Actor)</h4>
+                <p class="lc-hint">Incapacitating conditions block actions, bonus actions, and reactions.</p>
+                <button class="btn btn-start" @onclick="EndCurrentTurn">✓ End Turn</button>
+            </div>
+        }
+
         @* ── Action panel: shown to whoever controls the current combatant ─ *@
-        @if (Actor != null && Combat.State == CombatState.Active && !Actor.IsUnconscious)
+        else if (Actor != null && Combat.State == CombatState.Active && !Actor.IsUnconscious)
         {
             <div class="lc-panel lc-me lc-attack">
                 <h4>
@@ -363,6 +374,14 @@
         if (string.IsNullOrEmpty(val)) return;
         if (Enum.TryParse<Condition>(val, out var cond))
             Combat.ToggleCondition(id, cond);
+    }
+
+    private static string IncapLabel(Combatant c)
+    {
+        var conds = c.Conditions
+            .Where(x => x is Condition.Stunned or Condition.Paralyzed or Condition.Incapacitated or Condition.Unconscious)
+            .ToList();
+        return conds.Count > 0 ? string.Join(", ", conds) : "incapacitated";
     }
 
     private static string TypeIcon(Combatant c) => c.Type switch

@@ -415,15 +415,22 @@ public class CombatEngineService
     public bool PlayerAction(Guid actingCharId, CombatAction action, Combatant target,
                              AdvantageMode mode = AdvantageMode.Normal)
     {
+        bool ok = false;
         lock (_gate)
         {
             if (!IsCurrentTurn(actingCharId)) return false;
             var attacker = CurrentCombatant;
             if (attacker == null) return false;
-            ExecuteAction(attacker, action, target, mode);
+            if (IsIncapacitated(attacker))
+                AddLog(CurrentRound, attacker.Name, $"can't act — {IncapReason(attacker)}.", LogEntryType.Condition);
+            else
+            {
+                ExecuteAction(attacker, action, target, mode);
+                ok = true;
+            }
         }
         OnStateChanged?.Invoke();
-        return true;
+        return ok;
     }
 
     /// <summary>
@@ -433,15 +440,36 @@ public class CombatEngineService
     /// </summary>
     public bool DmActOnCurrent(CombatAction action, Combatant target, AdvantageMode mode = AdvantageMode.Normal)
     {
+        bool ok = false;
         lock (_gate)
         {
             if (State != CombatState.Active) return false;
             var attacker = CurrentCombatant;
             if (attacker == null) return false;
-            ExecuteAction(attacker, action, target, mode);
+            if (IsIncapacitated(attacker))
+                AddLog(CurrentRound, attacker.Name, $"can't act — {IncapReason(attacker)}.", LogEntryType.Condition);
+            else
+            {
+                ExecuteAction(attacker, action, target, mode);
+                ok = true;
+            }
         }
         OnStateChanged?.Invoke();
-        return true;
+        return ok;
+    }
+
+    /// <summary>A combatant that can't take actions this turn (incapacitating conditions).</summary>
+    public static bool IsIncapacitated(Combatant c) =>
+        c.Conditions.Contains(Condition.Incapacitated) || c.Conditions.Contains(Condition.Paralyzed)
+        || c.Conditions.Contains(Condition.Stunned) || c.Conditions.Contains(Condition.Unconscious)
+        || (c.Type == CombatantType.PC && c.IsUnconscious);
+
+    private static string IncapReason(Combatant c)
+    {
+        if (c.Type == CombatantType.PC && c.IsUnconscious) return "Unconscious";
+        foreach (var x in new[] { Condition.Paralyzed, Condition.Stunned, Condition.Incapacitated, Condition.Unconscious })
+            if (c.Conditions.Contains(x)) return x.ToString();
+        return "incapacitated";
     }
 
     /// <summary>A player ends their own turn (gated). The DM uses <see cref="NextTurn"/>.</summary>
@@ -780,10 +808,14 @@ public class CombatEngineService
         int rageDmgBonus = (attacker.IsRaging && attacker.RageBonus > 0
                             && action.ActionType == ActionType.Attack) ? attacker.RageBonus : 0;
 
-        var result = ResolveAttackRoll(action, target, rageDmgBonus, mode);
+        // Auto-derive advantage/disadvantage from conditions, folding in the DM's manual choice.
+        var (effMode, advReason) = CombatRules.ResolveAdvantage(attacker, target, action, mode);
+
+        var result = ResolveAttackRoll(action, target, rageDmgBonus, effMode);
         var critTag = result.CriticalHit ? " 💥 CRITICAL HIT!" : result.CriticalMiss ? " 😬 CRITICAL MISS!" : "";
-        var advTag = mode == AdvantageMode.Advantage ? " (adv)" : mode == AdvantageMode.Disadvantage ? " (disadv)" : "";
-        var rollDesc = $"[d20: {result.AttackRoll}{advTag}] Total: {result.TotalAttackRoll} vs AC {target.ArmorClass}";
+        var advTag = effMode == AdvantageMode.Advantage ? " (adv)" : effMode == AdvantageMode.Disadvantage ? " (disadv)" : "";
+        var reasonTag = string.IsNullOrEmpty(advReason) ? "" : $" [{advReason}]";
+        var rollDesc = $"[d20: {result.AttackRoll}{advTag}{reasonTag}] Total: {result.TotalAttackRoll} vs AC {target.ArmorClass}";
         var dmgType = action.DamageType != DamageType.None ? $" {action.DamageType}" : "";
 
         if (result.Hit)
