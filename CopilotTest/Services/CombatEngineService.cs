@@ -504,6 +504,13 @@ public class CombatEngineService
                 AddLog(CurrentRound, attacker.Name, $"uses {action.Name}: {action.Description}", LogEntryType.Info);
                 break;
         }
+
+        if (action.RequiresConcentration)
+        {
+            if (!string.IsNullOrEmpty(attacker.ConcentratingOn)) DropConcentrationCore(attacker);
+            attacker.ConcentratingOn = action.Name;
+            AddLog(CurrentRound, attacker.Name, $"is now concentrating on {action.Name}", LogEntryType.Info);
+        }
     }
 
     /// <summary>Manual HP change: positive heals, negative deals damage.</summary>
@@ -592,25 +599,66 @@ public class CombatEngineService
         OnStateChanged?.Invoke();
     }
 
-    /// <summary>End all effects sustained by a caster's concentration (called when it drops).</summary>
+    /// <summary>End a caster's concentration and all effects it sustains.</summary>
     public void DropConcentration(Guid concentratorId)
     {
         lock (_gate)
         {
-            foreach (var c in Combatants)
-            {
-                var dropped = c.Effects.Where(e => e.FromConcentration && e.ConcentratorId == concentratorId).ToList();
-                foreach (var e in dropped)
-                {
-                    c.Effects.Remove(e);
-                    ClearConditionIfOrphaned(c, e.Condition);
-                }
-                if (dropped.Count > 0)
-                    AddLog(CurrentRound, c.Name, $"{string.Join(", ", dropped.Select(d => d.Name))} ends (concentration lost)", LogEntryType.Condition);
-            }
+            var caster = Combatants.FirstOrDefault(x => x.Id == concentratorId);
+            if (caster != null) DropConcentrationCore(caster);
         }
         OnStateChanged?.Invoke();
     }
+
+    private void DropConcentrationCore(Combatant caster)
+    {
+        caster.ConcentratingOn = null;
+        foreach (var c in Combatants)
+        {
+            var dropped = c.Effects.Where(e => e.FromConcentration && e.ConcentratorId == caster.Id).ToList();
+            foreach (var e in dropped)
+            {
+                c.Effects.Remove(e);
+                ClearConditionIfOrphaned(c, e.Condition);
+            }
+            if (dropped.Count > 0)
+                AddLog(CurrentRound, c.Name, $"{string.Join(", ", dropped.Select(d => d.Name))} ends (concentration lost)", LogEntryType.Condition);
+        }
+    }
+
+    /// <summary>Mark a combatant as concentrating on a spell (or clear it with null/empty).</summary>
+    public void SetConcentration(Guid id, string? spellName)
+    {
+        lock (_gate)
+        {
+            var c = Combatants.FirstOrDefault(x => x.Id == id);
+            if (c == null) return;
+            if (!string.IsNullOrEmpty(c.ConcentratingOn)) DropConcentrationCore(c);
+            c.ConcentratingOn = string.IsNullOrWhiteSpace(spellName) ? null : spellName.Trim();
+            if (c.ConcentratingOn != null)
+                AddLog(CurrentRound, c.Name, $"is now concentrating on {c.ConcentratingOn}", LogEntryType.Info);
+        }
+        OnStateChanged?.Invoke();
+    }
+
+    /// <summary>CON save (DC = max(10, ½ damage)) to keep concentration; drops the spell on a fail.</summary>
+    private void ConcentrationCheck(Combatant c, int damageTaken)
+    {
+        if (string.IsNullOrEmpty(c.ConcentratingOn) || damageTaken <= 0) return;
+        int dc = Math.Max(10, damageTaken / 2);
+        int roll = RollD20();
+        int total = roll + c.ConstitutionModifier;
+        var rollText = $"CON save {roll}{Signed(c.ConstitutionModifier)}={total} vs DC {dc}";
+        if (total >= dc)
+            AddLog(CurrentRound, c.Name, $"holds concentration on {c.ConcentratingOn} ({rollText})", LogEntryType.DeathSave);
+        else
+        {
+            AddLog(CurrentRound, c.Name, $"💥 loses concentration on {c.ConcentratingOn}! ({rollText})", LogEntryType.Condition);
+            DropConcentrationCore(c);
+        }
+    }
+
+    private static string Signed(int n) => n >= 0 ? $"+{n}" : n.ToString();
 
     /// <summary>Tick every timed effect down one round and expire those that reach zero.
     /// Called at the start of each new round.</summary>
@@ -959,6 +1007,9 @@ public class CombatEngineService
             // resistant && vulnerable cancel out — damage unchanged.
         }
 
+        // Damage "taken" for a concentration check is measured before temp HP soaks it.
+        int taken = damage;
+
         if (target.TemporaryHitPoints > 0)
         {
             var absorbed = Math.Min(target.TemporaryHitPoints, damage);
@@ -974,6 +1025,7 @@ public class CombatEngineService
 
         if (target.CurrentHitPoints <= 0)
         {
+            if (!string.IsNullOrEmpty(target.ConcentratingOn)) DropConcentrationCore(target);   // going down ends concentration
             if (target.Type == CombatantType.PC)
                 AddLog(CurrentRound, target.Name, $"😵 falls unconscious and must make death saving throws!", LogEntryType.Kill);
             else
@@ -981,6 +1033,10 @@ public class CombatEngineService
                 target.IsDead = true;
                 AddLog(CurrentRound, target.Name, $"💀 is defeated!", LogEntryType.Kill);
             }
+        }
+        else if (!string.IsNullOrEmpty(target.ConcentratingOn))
+        {
+            ConcentrationCheck(target, taken);
         }
     }
 

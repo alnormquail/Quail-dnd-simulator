@@ -48,6 +48,9 @@ public class CombatAction
     public int UsesPerDay { get; set; } = 0;   // 0 = unlimited
     public int UsesRemaining { get; set; } = 0;
 
+    /// <summary>True for spells that require concentration (using this sets the caster's concentration).</summary>
+    public bool RequiresConcentration { get; set; } = false;
+
     public bool IsLimited => UsesPerDay > 0;
     public bool CanUse => !IsLimited || UsesRemaining > 0;
 

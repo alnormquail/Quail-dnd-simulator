@@ -120,6 +120,18 @@
                             @foreach (var t in c.Vulnerabilities) { <span class="lc-cond" title="Vulnerable">×2 @t</span> }
                         </div>
                     }
+                    @if (!string.IsNullOrEmpty(c.ConcentratingOn))
+                    {
+                        <div class="lc-conditions">
+                            <span class="lc-effect" title="Concentrating">
+                                🧠 @c.ConcentratingOn
+                                @if (IsDm || MyId == c.Id)
+                                {
+                                    <button class="lc-effect-x" title="Drop concentration" @onclick="() => Combat.DropConcentration(c.Id)">✕</button>
+                                }
+                            </span>
+                        </div>
+                    }
 
                     @* DM per-combatant controls *@
                     @if (IsDm && Combat.State == CombatState.Active)
@@ -169,6 +181,7 @@
                     </select>
                     <input class="form-input" type="number" min="1" style="width:64px" @bind="fxRounds" /> <span class="lc-dim">rounds</span>
                     <button class="btn btn-sm btn-action" @onclick="ApplyEffect">+ Add</button>
+                    <button class="btn btn-sm" @onclick="SetConcFromForm" title="Mark the chosen combatant concentrating on the typed name">🧠 Concentrate</button>
                 </div>
                 <p class="lc-hint">Effects count down at the start of each round and clear themselves (and any condition they impose) when they expire.</p>
             </div>
@@ -282,6 +295,19 @@
                         }
                     </div>
 
+                    <div class="lc-row">
+                        @if (string.IsNullOrEmpty(Me.ConcentratingOn))
+                        {
+                            <input class="form-input" style="width:150px" placeholder="Concentrating on…" @bind="concInput" />
+                            <button class="btn btn-sm btn-action" @onclick="SetMyConcentration">🧠 Concentrate</button>
+                        }
+                        else
+                        {
+                            <span>🧠 Concentrating: <strong>@Me.ConcentratingOn</strong></span>
+                            <button class="btn btn-sm btn-reset" @onclick="() => Combat.DropConcentration(Me.Id)">Drop</button>
+                        }
+                    </div>
+
                     @if (Me.SpellSlots.Any())
                     {
                         <div class="lc-slots">
@@ -342,6 +368,27 @@
     private void ToggleDmg(DamageMod mod)
     {
         if (Guid.TryParse(dmTargetId, out var id)) Combat.ToggleDamageMod(id, dmType, mod);
+    }
+
+    // Concentration controls.
+    private string concInput = "";
+
+    private void SetMyConcentration()
+    {
+        if (Me != null && !string.IsNullOrWhiteSpace(concInput))
+        {
+            Combat.SetConcentration(Me.Id, concInput);
+            concInput = "";
+        }
+    }
+
+    private void SetConcFromForm()
+    {
+        if (Guid.TryParse(fxTargetId, out var id) && !string.IsNullOrWhiteSpace(fxName))
+        {
+            Combat.SetConcentration(id, fxName);
+            fxName = "";
+        }
     }
 
     private bool IsDm => Seat.Role == SeatRole.Dm;

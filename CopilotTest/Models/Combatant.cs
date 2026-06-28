@@ -68,6 +68,10 @@ public class Combatant
     public HashSet<DamageType> Immunities { get; set; } = new();      // no damage
     public HashSet<DamageType> Vulnerabilities { get; set; } = new(); // double damage
 
+    /// <summary>Name of the spell this combatant is concentrating on, or null. Taking
+    /// damage triggers a CON save to keep it; dropping to 0 HP ends it.</summary>
+    public string? ConcentratingOn { get; set; }
+
     // ── Live, shared combat resources ───────────────────────────────────────
     /// <summary>Whether this combatant still has its reaction this round (reset each round).</summary>
     public bool ReactionAvailable { get; set; } = true;

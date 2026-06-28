@@ -875,6 +875,64 @@ Section("13. Damage resistance, immunity, vulnerability (and rage doesn't stack)
     Note($"Slashing: normal {normalPhys}, raging {ragedPhys}, raging+resistant {ragedResist} (one halving, not two)");
 }
 
+// ───────────────────────── 14. Concentration ─────────────────────────
+Section("14. Concentration — damage triggers a CON save that can drop the spell");
+{
+    Combatant Mk(string name, CombatantType type, int con = 10) => new()
+    {
+        Id = Guid.NewGuid(), Name = name, Type = type, MaxHitPoints = 100, CurrentHitPoints = 100,
+        ArmorClass = 14, Dexterity = 12, Constitution = con,
+        Actions = { new CombatAction { Name = "Hit", ActionType = ActionType.Attack, AttackBonus = 6, DamageDice = "1d8", DamageBonus = 2, Range = "5 ft" } },
+    };
+    var e = new CombatEngineService(svc);
+    var mage = Mk("Mage", CombatantType.PC, con: 14);   // CON +2
+    var foe = Mk("Brute", CombatantType.Monster);
+    e.AddCombatant(mage); e.AddCombatant(foe); e.StartCombat();
+
+    e.SetConcentration(mage.Id, "Hold Person");
+    Check(mage.ConcentratingOn == "Hold Person", "concentration can be set");
+
+    // DC scales with damage: big hits break it far more often than small ones.
+    int Drops(int dmg, int trials)
+    {
+        int drops = 0;
+        for (int i = 0; i < trials; i++)
+        {
+            mage.CurrentHitPoints = 100; mage.ConcentratingOn = "Spell";
+            e.AdjustHp(mage.Id, -dmg);                       // untyped damage → CON save
+            if (string.IsNullOrEmpty(mage.ConcentratingOn)) drops++;
+        }
+        return drops;
+    }
+    int dropsHigh = Drops(40, 400);   // DC 20 vs +2 → mostly drops
+    int dropsLow  = Drops(6, 400);    // DC 10 vs +2 → sometimes drops
+    Check(dropsHigh > dropsLow, $"bigger hits break concentration more often (40dmg:{dropsHigh} > 6dmg:{dropsLow})");
+    Check(dropsHigh > 0 && dropsHigh < 400, "a big hit usually but not always drops concentration");
+    Check(dropsLow > 0, "even small hits can drop concentration");
+    Note($"concentration saves: 40-dmg dropped {dropsHigh}/400, 6-dmg dropped {dropsLow}/400");
+
+    // Manual drop.
+    mage.CurrentHitPoints = 100; e.SetConcentration(mage.Id, "Bless");
+    e.DropConcentration(mage.Id);
+    Check(mage.ConcentratingOn == null, "concentration can be dropped manually");
+
+    // Using a concentration-flagged action sets concentration automatically.
+    for (int i = 0; i < 10 && e.CurrentCombatant?.Id != mage.Id; i++) e.NextTurn();
+    var hex = new CombatAction { Name = "Hex", ActionType = ActionType.Other, RequiresConcentration = true, Range = "60 ft" };
+    mage.Actions.Add(hex);
+    e.DmActOnCurrent(hex, foe);
+    Check(mage.ConcentratingOn == "Hex", "using a concentration action auto-sets concentration");
+
+    // A concentration-linked effect ends when the caster goes down (0 HP ends concentration).
+    mage.CurrentHitPoints = 100; e.SetConcentration(mage.Id, "Hold Person");
+    e.AddEffect(foe.Id, new ActiveEffect { Name = "Hold Person", Condition = Condition.Paralyzed, FromConcentration = true, ConcentratorId = mage.Id, RoundsRemaining = 10 });
+    Check(foe.Conditions.Contains(Condition.Paralyzed), "concentration spell paralyzes its target");
+    e.AdjustHp(mage.Id, -500);   // drops the caster to 0
+    Check(string.IsNullOrEmpty(mage.ConcentratingOn), "falling to 0 HP ends concentration");
+    Check(!foe.Conditions.Contains(Condition.Paralyzed) && !foe.Effects.Any(x => x.Name == "Hold Person"),
+          "the spell's effect on the target ends when the caster's concentration is lost");
+}
+
 // ───────────────────────── report ─────────────────────────
 Console.WriteLine($"\n────────────────────────────────────────");
 Console.WriteLine($"Checks run : {checks}");
