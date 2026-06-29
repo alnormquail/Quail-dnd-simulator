@@ -229,6 +229,22 @@
                     @(IsMyTurn ? "Your turn" : $"You control {Actor.Name}") — choose a target &amp; action
                 </h4>
 
+                @{ var abilities = AdvantageAbilitiesFor(Actor); }
+                @if (abilities.Any())
+                {
+                    <div class="lc-row">
+                        <span class="lc-dim">Abilities:</span>
+                        @foreach (var ab in abilities)
+                        {
+                            var active = Actor.Effects.Any(e => e.Name == ab.Name);
+                            <button class="btn btn-sm @(active ? "btn-start" : "btn-reset")" title="@ab.Blurb"
+                                    @onclick="() => Combat.ToggleAdvantageAbility(Actor.Id, ab.Name)">
+                                @(active ? "✓ " : "")@ab.Name
+                            </button>
+                        }
+                    </div>
+                }
+
                 <div class="lc-row">
                     <span class="lc-dim">Roll:</span>
                     <button class="btn btn-sm @(advMode == AdvantageMode.Normal ? "btn-start" : "btn-reset")"
@@ -463,6 +479,16 @@
         if (string.IsNullOrEmpty(val)) return;
         if (Enum.TryParse<Condition>(val, out var cond))
             Combat.ToggleCondition(id, cond);
+    }
+
+    // Known standing-advantage abilities this combatant actually has (by feature name).
+    private static List<AdvantageAbility> AdvantageAbilitiesFor(Combatant c)
+    {
+        var result = new List<AdvantageAbility>();
+        foreach (var f in c.Features)
+            if (CombatRules.AdvantageAbilities.TryGetValue(f.Name, out var a) && !result.Contains(a))
+                result.Add(a);
+        return result;
     }
 
     private static string IncapLabel(Combatant c)

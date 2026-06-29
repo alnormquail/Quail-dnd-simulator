@@ -657,10 +657,11 @@ Section("10. Real party characters, status effects in combat, and rage");
         }
 
         // Non-incapacitating condition: tracked, but the combatant still acts.
+        // Run several rounds so a single unlucky natural-1 miss can't make this flaky.
         striker.Conditions.Clear();
         e.ToggleCondition(striker.Id, Condition.Poisoned);
         var hp = dummy.CurrentHitPoints;
-        e.SimulateRound();
+        for (int i = 0; i < 5; i++) e.SimulateRound();
         Check(dummy.CurrentHitPoints < hp, "a Poisoned combatant still acts (non-incapacitating)");
         Check(striker.Conditions.Contains(Condition.Poisoned), "conditions persist across rounds until removed");
         e.ToggleCondition(striker.Id, Condition.Poisoned);
@@ -931,6 +932,73 @@ Section("14. Concentration — damage triggers a CON save that can drop the spel
     Check(string.IsNullOrEmpty(mage.ConcentratingOn), "falling to 0 HP ends concentration");
     Check(!foe.Conditions.Contains(Condition.Paralyzed) && !foe.Effects.Any(x => x.Name == "Hold Person"),
           "the spell's effect on the target ends when the caster's concentration is lost");
+}
+
+// ───────────────────────── 15. Standing-advantage abilities (Reckless, Innate Sorcery) ─────────────────────────
+Section("15. Standing-advantage abilities — Reckless Attack & Innate Sorcery");
+{
+    Combatant P(string name, params ActiveEffect[] fx)
+    {
+        var c = new Combatant { Id = Guid.NewGuid(), Name = name, Type = CombatantType.PC, MaxHitPoints = 30, CurrentHitPoints = 30 };
+        c.Effects.AddRange(fx);
+        return c;
+    }
+    ActiveEffect Reckless() => new() { Name = "Reckless Attack", AdvantageOnOwnAttacks = true, AdvantageToAttackers = true, AppliesTo = AttackKind.Melee, RoundsRemaining = 1 };
+    ActiveEffect Innate()   => new() { Name = "Innate Sorcery", AdvantageOnOwnAttacks = true, AppliesTo = AttackKind.Spell, RoundsRemaining = 10 };
+
+    var melee   = new CombatAction { Name = "Greataxe", ActionType = ActionType.Attack,      Range = "5 ft"   };
+    var ranged  = new CombatAction { Name = "Javelin",  ActionType = ActionType.Attack,      Range = "120 ft" };
+    var spellAt = new CombatAction { Name = "Firebolt", ActionType = ActionType.SpellAttack, Range = "120 ft" };
+    AdvantageMode M(Combatant a, Combatant t, CombatAction act) => CombatRules.ResolveAdvantage(a, t, act, AdvantageMode.Normal).Mode;
+
+    // Reckless Attack.
+    Check(M(P("Korran", Reckless()), P("Foe"), melee) == AdvantageMode.Advantage, "Reckless: the bearer's melee attack gets advantage");
+    Check(M(P("Korran", Reckless()), P("Foe"), ranged) == AdvantageMode.Normal, "Reckless does not boost the bearer's ranged attacks");
+    Check(M(P("Enemy"), P("Korran", Reckless()), melee) == AdvantageMode.Advantage, "Reckless: attacks against the bearer have advantage");
+
+    // Innate Sorcery.
+    Check(M(P("Winnie", Innate()), P("Foe"), spellAt) == AdvantageMode.Advantage, "Innate Sorcery: the bearer's spell attack gets advantage");
+    Check(M(P("Winnie", Innate()), P("Foe"), melee) == AdvantageMode.Normal, "Innate Sorcery does not boost melee attacks");
+    Check(M(P("Enemy"), P("Winnie", Innate()), melee) == AdvantageMode.Normal, "Innate Sorcery gives attackers no advantage against the bearer");
+
+    // Features carried into combat + the engine toggle.
+    var ch = new Character { Name = "Korran", CharacterClass = "Barbarian", CharacterLevel = 4, Type = CombatantType.PC };
+    ch.Features.Add(new CharacterFeature { Name = "Reckless Attack", Description = "Attack with advantage…", LevelGained = 2 });
+    Check(ch.ToCombatant().Features.Any(f => f.Name == "Reckless Attack"), "ToCombatant carries features into the encounter");
+
+    Combatant Mk(string name, CombatantType type, params string[] features)
+    {
+        var c = new Combatant
+        {
+            Id = Guid.NewGuid(), Name = name, Type = type, MaxHitPoints = 50, CurrentHitPoints = 50, ArmorClass = 14, Dexterity = 14,
+            Actions = { new CombatAction { Name = "Greataxe", ActionType = ActionType.Attack, AttackBonus = 7, DamageDice = "1d12", DamageBonus = 4, Range = "5 ft" } },
+        };
+        foreach (var fn in features) c.Features.Add(new CharacterFeature { Name = fn });
+        return c;
+    }
+    void AdvanceOneRound(CombatEngineService eng)
+    {
+        int r = eng.CurrentRound, guard = 0;
+        while (eng.CurrentRound == r && eng.State == CombatState.Active && guard++ < 30) eng.NextTurn();
+    }
+
+    var e = new CombatEngineService(svc);
+    var korran = Mk("Korran", CombatantType.PC, "Reckless Attack");
+    var foe = Mk("Bandit", CombatantType.Monster);
+    e.AddCombatant(korran); e.AddCombatant(foe); e.StartCombat();
+
+    e.ToggleAdvantageAbility(korran.Id, "Reckless Attack");
+    Check(korran.Effects.Any(x => x.Name == "Reckless Attack"), "toggling Reckless Attack on adds the effect");
+    e.ToggleAdvantageAbility(korran.Id, "Reckless Attack");
+    Check(!korran.Effects.Any(x => x.Name == "Reckless Attack"), "toggling it again removes it");
+
+    e.ToggleAdvantageAbility(korran.Id, "Reckless Attack");
+    AdvanceOneRound(e);
+    Check(!korran.Effects.Any(x => x.Name == "Reckless Attack"), "Reckless expires at the next round (≈ until your next turn)");
+
+    e.ToggleAdvantageAbility(korran.Id, "Not A Real Ability");
+    Check(!korran.Effects.Any(x => x.Name == "Not A Real Ability"), "an unknown ability name is ignored");
+    Note("Standing advantage: Reckless boosts the bearer's melee + lets enemies hit them with advantage; Innate Sorcery boosts spell attacks for 10 rounds");
 }
 
 // ───────────────────────── report ─────────────────────────

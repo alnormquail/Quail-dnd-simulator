@@ -72,6 +72,10 @@ public class Combatant
     /// damage triggers a CON save to keep it; dropping to 0 HP ends it.</summary>
     public string? ConcentratingOn { get; set; }
 
+    /// <summary>Class/subclass/species features carried into the encounter (read-only), so the
+    /// UI can offer toggles for advantage-granting abilities the character actually has.</summary>
+    public List<CharacterFeature> Features { get; set; } = new();
+
     // ── Live, shared combat resources ───────────────────────────────────────
     /// <summary>Whether this combatant still has its reaction this round (reset each round).</summary>
     public bool ReactionAvailable { get; set; } = true;

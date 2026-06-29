@@ -1,5 +1,8 @@
 namespace CopilotTest.Models;
 
+/// <summary>Which of a combatant's attacks a standing-advantage effect applies to.</summary>
+public enum AttackKind { Any, Melee, Ranged, Spell }
+
 /// <summary>
 /// A timed, source-tagged effect on a combatant — the foundation for spells and
 /// conditions that should expire on their own instead of living forever.
@@ -32,6 +35,14 @@ public class ActiveEffect
 
     /// <summary>The caster maintaining this effect via concentration, if any.</summary>
     public Guid? ConcentratorId { get; set; }
+
+    // ── Standing advantage (e.g. Reckless Attack, Innate Sorcery) ───────────
+    /// <summary>While active, the bearer's attacks (of <see cref="AppliesTo"/> kind) roll with advantage.</summary>
+    public bool AdvantageOnOwnAttacks { get; set; }
+    /// <summary>While active, attacks made AGAINST the bearer have advantage (e.g. Reckless Attack).</summary>
+    public bool AdvantageToAttackers { get; set; }
+    /// <summary>Which of the bearer's attacks <see cref="AdvantageOnOwnAttacks"/> covers.</summary>
+    public AttackKind AppliesTo { get; set; } = AttackKind.Any;
 
     public bool IsIndefinite => RoundsRemaining < 0;
 

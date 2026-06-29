@@ -709,6 +709,37 @@ public class CombatEngineService
         OnStateChanged?.Invoke();
     }
 
+    /// <summary>Toggle a known standing-advantage ability (Reckless Attack, Innate Sorcery, …) on a combatant.</summary>
+    public void ToggleAdvantageAbility(Guid id, string featureName)
+    {
+        if (!CombatRules.AdvantageAbilities.TryGetValue(featureName, out var a)) return;
+        lock (_gate)
+        {
+            var c = Combatants.FirstOrDefault(x => x.Id == id);
+            if (c == null) return;
+            var existing = c.Effects.FirstOrDefault(e => e.Name == a.Name);
+            if (existing != null)
+            {
+                c.Effects.Remove(existing);
+                AddLog(CurrentRound, c.Name, $"{a.Name} ends", LogEntryType.Condition);
+            }
+            else
+            {
+                c.Effects.Add(new ActiveEffect
+                {
+                    Name = a.Name,
+                    Source = "ability",
+                    AdvantageOnOwnAttacks = a.OnOwnAttacks,
+                    AdvantageToAttackers = a.ToAttackers,
+                    AppliesTo = a.AppliesTo,
+                    RoundsRemaining = a.Rounds,
+                });
+                AddLog(CurrentRound, c.Name, $"uses {a.Name}", LogEntryType.Info);
+            }
+        }
+        OnStateChanged?.Invoke();
+    }
+
     /// <summary>Roll a death save for a downed PC (player- or DM-triggered).</summary>
     public void RollDeathSaveFor(Guid id)
     {

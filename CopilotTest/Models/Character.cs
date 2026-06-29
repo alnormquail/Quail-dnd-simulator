@@ -179,6 +179,9 @@ public class Character
             SpellSlots = SpellSlots
                 .Select(s => new SpellSlotState { Level = s.Level, Max = s.MaxSlots, Used = s.UsedSlots })
                 .OrderBy(s => s.Level).ToList(),
+            Features = Features
+                .Select(f => new CharacterFeature { Name = f.Name, Description = f.Description, Source = f.Source, LevelGained = f.LevelGained })
+                .ToList(),
             Actions = Actions.Select(a => new CombatAction
             {
                 Id           = a.Id,

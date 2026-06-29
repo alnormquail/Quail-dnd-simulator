@@ -47,6 +47,12 @@ public static class CombatRules
         if (attacker.Conditions.Contains(Condition.Invisible)) adv.Add("attacker Invisible");
         if (target.Conditions.Contains(Condition.Invisible))   dis.Add("target Invisible");
 
+        // Standing-advantage effects (Reckless Attack, Innate Sorcery, ...).
+        foreach (var e in attacker.Effects)
+            if (e.AdvantageOnOwnAttacks && EffectAppliesToAttack(e, action, melee)) adv.Add(e.Name);
+        foreach (var e in target.Effects)
+            if (e.AdvantageToAttackers) adv.Add($"target {e.Name}");
+
         // The DM's manual toggle folds in as one more source on its side.
         if (manual == AdvantageMode.Advantage)    adv.Add("DM call");
         if (manual == AdvantageMode.Disadvantage) dis.Add("DM call");
@@ -58,6 +64,29 @@ public static class CombatRules
         return (AdvantageMode.Normal, "");
     }
 
+    /// <summary>Does a standing-advantage effect apply to this particular attack?</summary>
+    private static bool EffectAppliesToAttack(ActiveEffect e, CombatAction action, bool melee) => e.AppliesTo switch
+    {
+        AttackKind.Any    => true,
+        AttackKind.Melee  => action.ActionType == ActionType.Attack && melee,
+        AttackKind.Ranged => action.ActionType == ActionType.Attack && !melee,
+        AttackKind.Spell  => action.ActionType is ActionType.SpellAttack or ActionType.Spell,
+        _                 => false,
+    };
+
+    /// <summary>
+    /// Known abilities that grant standing advantage, keyed by the character-feature name
+    /// that grants them. The live UI offers a toggle for each of these a combatant has.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, AdvantageAbility> AdvantageAbilities =
+        new Dictionary<string, AdvantageAbility>
+        {
+            ["Reckless Attack"] = new("Reckless Attack", OnOwnAttacks: true, ToAttackers: true, AttackKind.Melee, Rounds: 1,
+                "Advantage on your melee attacks this turn; attacks against you have advantage until your next turn."),
+            ["Innate Sorcery"] = new("Innate Sorcery", OnOwnAttacks: true, ToAttackers: false, AttackKind.Spell, Rounds: 10,
+                "Advantage on your spell attacks for 1 minute. (The +1 spell save DC is tracked by you.)"),
+        };
+
     /// <summary>Heuristic: an attack is melee if its range is Touch/Self/Melee or ≤ 5 ft.</summary>
     public static bool IsMelee(CombatAction action)
     {
@@ -68,3 +97,6 @@ public static class CombatRules
         return true;   // default to melee when unspecified
     }
 }
+
+/// <summary>A togglable ability that grants standing advantage while active.</summary>
+public record AdvantageAbility(string Name, bool OnOwnAttacks, bool ToAttackers, AttackKind AppliesTo, int Rounds, string Blurb);
