@@ -221,63 +221,10 @@
             </div>
         }
 
-        @* ── Action panel: shown to whoever controls the current combatant ─ *@
+        @* ── Action panel: a guide-style turn interface wired to the shared engine ─ *@
         else if (Actor != null && Combat.State == CombatState.Active && !Actor.IsUnconscious)
         {
-            <div class="lc-panel lc-me lc-attack">
-                <h4>
-                    @(IsMyTurn ? "Your turn" : $"You control {Actor.Name}") — choose a target &amp; action
-                </h4>
-
-                @{ var abilities = AdvantageAbilitiesFor(Actor); }
-                @if (abilities.Any())
-                {
-                    <div class="lc-row">
-                        <span class="lc-dim">Abilities:</span>
-                        @foreach (var ab in abilities)
-                        {
-                            var active = Actor.Effects.Any(e => e.Name == ab.Name);
-                            <button class="btn btn-sm @(active ? "btn-start" : "btn-reset")" title="@ab.Blurb"
-                                    @onclick="() => Combat.ToggleAdvantageAbility(Actor.Id, ab.Name)">
-                                @(active ? "✓ " : "")@ab.Name
-                            </button>
-                        }
-                    </div>
-                }
-
-                <div class="lc-row">
-                    <span class="lc-dim">Roll:</span>
-                    <button class="btn btn-sm @(advMode == AdvantageMode.Normal ? "btn-start" : "btn-reset")"
-                            @onclick="() => advMode = AdvantageMode.Normal">Normal</button>
-                    <button class="btn btn-sm @(advMode == AdvantageMode.Advantage ? "btn-start" : "btn-reset")"
-                            @onclick="() => advMode = AdvantageMode.Advantage">Advantage</button>
-                    <button class="btn btn-sm @(advMode == AdvantageMode.Disadvantage ? "btn-start" : "btn-reset")"
-                            @onclick="() => advMode = AdvantageMode.Disadvantage">Disadvantage</button>
-                </div>
-
-                <div class="lc-targets">
-                    @foreach (var t in Targets)
-                    {
-                        <button class="btn btn-sm @(selectedTargetId == t.Id ? "btn-start" : "btn-reset")"
-                                @onclick="() => selectedTargetId = t.Id">@t.Name (@t.StatusDisplay)</button>
-                    }
-                </div>
-                @if (!Targets.Any())
-                {
-                    <p class="lc-hint">No valid targets.</p>
-                }
-
-                <div class="lc-actions">
-                    @foreach (var action in Actor.Actions.Where(a => a.CanUse))
-                    {
-                        <button class="btn btn-action" disabled="@(selectedTargetId == null)"
-                                @onclick="() => DoAction(action)">@action.DisplayName</button>
-                    }
-                </div>
-
-                <p class="lc-hint">Take your action, bonus action, and any extra attacks — then end the turn.</p>
-                <button class="btn btn-start" @onclick="EndCurrentTurn">✓ End Turn</button>
-            </div>
+            <TurnPanel Actor="Actor" Template="TemplateFor(Actor)" Targets="Targets" />
         }
 
         @* ── The player's own character panel ──────────────────────────── *@
@@ -366,8 +313,8 @@
 </div>
 
 @code {
-    private Guid? selectedTargetId;
-    private AdvantageMode advMode = AdvantageMode.Normal;
+    // The Character template for a combatant (gives TurnPanel spell casting-times); null for monsters.
+    private Character? TemplateFor(Combatant c) => Combat.SavedRoster.FirstOrDefault(t => t.Id == c.Id);
 
     // DM "apply a timed effect" form state.
     private string fxTargetId = "";
@@ -437,25 +384,12 @@
     // Monster HP is hidden from players/spectators; PCs are visible to all (table sees each other).
     private bool CanSeeExactHp(Combatant c) => IsDm || c.Type != CombatantType.Monster;
 
-    private void DoAction(CombatAction action)
-    {
-        if (selectedTargetId == null || Actor == null) return;
-        var target = Combatants.FirstOrDefault(c => c.Id == selectedTargetId);
-        if (target == null) return;
-
-        if (IsMyTurn && MyId.HasValue)
-            Combat.PlayerAction(MyId.Value, action, target, advMode);
-        else if (IsDm)
-            Combat.DmActOnCurrent(action, target, advMode);
-        // Keep the target & advantage selected so you can take extra attacks / a bonus action.
-    }
-
+    // Ends the turn of the combatant this viewer controls (used by the incapacitated panel;
+    // TurnPanel handles end-turn for normal turns).
     private void EndCurrentTurn()
     {
         if (IsMyTurn && MyId.HasValue) Combat.EndTurn(MyId.Value);
         else if (IsDm) Combat.NextTurn();
-        selectedTargetId = null;
-        advMode = AdvantageMode.Normal;
     }
 
     private void ApplyEffect()
@@ -479,16 +413,6 @@
         if (string.IsNullOrEmpty(val)) return;
         if (Enum.TryParse<Condition>(val, out var cond))
             Combat.ToggleCondition(id, cond);
-    }
-
-    // Known standing-advantage abilities this combatant actually has (by feature name).
-    private static List<AdvantageAbility> AdvantageAbilitiesFor(Combatant c)
-    {
-        var result = new List<AdvantageAbility>();
-        foreach (var f in c.Features)
-            if (CombatRules.AdvantageAbilities.TryGetValue(f.Name, out var a) && !result.Contains(a))
-                result.Add(a);
-        return result;
     }
 
     private static string IncapLabel(Combatant c)

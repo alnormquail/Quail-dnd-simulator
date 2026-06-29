@@ -157,6 +157,29 @@ public class CharacterService
             LinkPreloadedSubclasses(db);
             SetMetaFlag(db, "preloaded-subclass-linked-v2");
         }
+        if (!MetaFlagSet(db, "test-characters-removed-v1"))
+        {
+            RemoveTestCharacters(db);
+            SetMetaFlag(db, "test-characters-removed-v1");
+        }
+    }
+
+    /// <summary>One-time removal of the three early test characters (Spurt/Belqorel/Wally),
+    /// dropped from the seed. Children cascade-delete via the FK relationships.</summary>
+    private static void RemoveTestCharacters(DndDbContext db)
+    {
+        var ids = new[]
+        {
+            new Guid("a1000000-0000-0000-0000-000000000001"),
+            new Guid("a1000000-0000-0000-0000-000000000002"),
+            new Guid("a1000000-0000-0000-0000-000000000003"),
+        };
+        var stale = db.Characters.Where(c => ids.Contains(c.Id)).ToList();
+        if (stale.Count > 0)
+        {
+            db.Characters.RemoveRange(stale);
+            db.SaveChanges();
+        }
     }
 
     private static void LoadPreloadedInventory(DndDbContext db)

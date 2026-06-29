@@ -1001,6 +1001,20 @@ Section("15. Standing-advantage abilities — Reckless Attack & Innate Sorcery")
     Note("Standing advantage: Reckless boosts the bearer's melee + lets enemies hit them with advantage; Innate Sorcery boosts spell attacks for 10 rounds");
 }
 
+// ───────────────────────── 16. Test characters removed from seed ─────────────────────────
+Section("16. Removed test characters are gone from the seed");
+{
+    var testIds = new[]
+    {
+        new Guid("a1000000-0000-0000-0000-000000000001"),
+        new Guid("a1000000-0000-0000-0000-000000000002"),
+        new Guid("a1000000-0000-0000-0000-000000000003"),
+    };
+    Check(PreloadedCharacters.All.Count == 7, $"seed now has 7 party members (was {PreloadedCharacters.All.Count})");
+    Check(!PreloadedCharacters.All.Any(c => testIds.Contains(c.Id)), "Spurt/Belqorel/Wally no longer in the seed (won't re-seed)");
+    Note($"Party: {string.Join(", ", PreloadedCharacters.All.Select(c => c.Name))}");
+}
+
 // ───────────────────────── report ─────────────────────────
 Console.WriteLine($"\n────────────────────────────────────────");
 Console.WriteLine($"Checks run : {checks}");

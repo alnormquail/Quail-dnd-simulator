@@ -1,12 +1,12 @@
 namespace CopilotTest.Models;
 
 /// <summary>
-/// Hard-coded character templates for the three party members.
+/// Hard-coded character templates for the party members.
 /// Used to seed the database on first run.
 /// </summary>
 public static class PreloadedCharacters
 {
-    public static IReadOnlyList<Character> All => [Spurt, Belqorel, Wally, Winnie, Kennyth, Boan, Gideon, Job, Bren, Korran];
+    public static IReadOnlyList<Character> All => [Winnie, Kennyth, Boan, Gideon, Job, Bren, Korran];
 
     /// <summary>Builds Spell entries from the shared library by name (skips unknowns).</summary>
     private static List<Spell> SpellsFor(params string[] names) =>
@@ -20,162 +20,6 @@ public static class PreloadedCharacters
 
     private static CharacterFeature Feat(string name, string source, string desc) =>
         new() { Name = name, Source = source, Description = desc, LevelGained = 1 };
-
-    public static Character Spurt => new()
-    {
-        Id             = new Guid("a1000000-0000-0000-0000-000000000001"),
-        Name           = "Spurt the Sorcerer",
-        Type           = CombatantType.PC,
-        CharacterClass = "Sorcerer",
-        CharacterLevel = 3,
-        Race           = "Kobold",
-
-        Strength     = 7,  Dexterity    = 14, Constitution = 12,
-        Intelligence = 12, Wisdom       = 10, Charisma     = 16,
-
-        MaxHitPoints     = 17,
-        ArmorClass       = 12,
-        Speed            = 30,
-        ProficiencyBonus = 2,
-
-        SaveProfConstitution = true,
-        SaveProfCharisma     = true,
-
-        Actions = new List<CombatAction>
-        {
-            new() { Name = "Dagger",          ActionType = ActionType.Attack,      AttackBonus = 4, DamageDice = "1d4",  DamageBonus = 2,  DamageType = DamageType.Piercing,   Range = "20 ft" },
-            new() { Name = "Scorpion Staff",  ActionType = ActionType.Attack,      AttackBonus = 4, DamageDice = "1d6",  DamageBonus = 2,  DamageType = DamageType.Poison,     Range = "5 ft"  },
-            new() { Name = "Shocking Grasp",  ActionType = ActionType.SpellAttack, AttackBonus = 5, DamageDice = "1d8",  DamageBonus = 0,  DamageType = DamageType.Lightning,  Range = "Touch",  SpellLevel = 0 },
-            new() { Name = "Sorcerous Burst", ActionType = ActionType.SpellAttack, AttackBonus = 5, DamageDice = "1d8",  DamageBonus = 0,  DamageType = DamageType.Acid,       Range = "120 ft", SpellLevel = 0 },
-            new() { Name = "Burning Hands",   ActionType = ActionType.Spell,       SaveDC = 13, SaveAbility = AbilityScore.Dexterity,    DamageDice = "3d6",  DamageType = DamageType.Fire,  Range = "15 ft Cone", SpellLevel = 1, UsesPerDay = 4, UsesRemaining = 4 },
-            new() { Name = "Color Spray",     ActionType = ActionType.Spell,       SaveDC = 13, SaveAbility = AbilityScore.Constitution, DamageDice = "2d6",  DamageType = DamageType.None,  Range = "15 ft Cone", SpellLevel = 1, UsesPerDay = 4, UsesRemaining = 4 },
-            new() { Name = "Dragon's Breath", ActionType = ActionType.Spell,       SaveDC = 13, SaveAbility = AbilityScore.Dexterity,    DamageDice = "3d6",  DamageType = DamageType.Fire,  Range = "15 ft Cone", SpellLevel = 2, UsesPerDay = 2, UsesRemaining = 2 },
-        },
-
-        Spells = new List<Spell>
-        {
-            new() { Name = "Shocking Grasp",  Level = 0, School = "Evocation",    CastingTime = "1 action", Range = "Touch",      Components = "V, S",    Duration = "Instantaneous", Description = "Lightning springs from your hand to deliver a shock to a creature. Make a melee spell attack. On a hit, the target takes 1d8 lightning damage. The target can't take reactions until the start of its next turn." },
-            new() { Name = "Sorcerous Burst", Level = 0, School = "Evocation",    CastingTime = "1 action", Range = "120 ft",     Components = "V, S",    Duration = "Instantaneous", Description = "You cast a burst of magical energy at one creature within range. On a hit, the target takes 1d8 acid damage." },
-            new() { Name = "Burning Hands",   Level = 1, School = "Evocation",    CastingTime = "1 action", Range = "Self (15 ft cone)", Components = "V, S", Duration = "Instantaneous", Description = "As you hold your hands with thumbs touching and fingers spread, a thin sheet of flames shoots forth. Each creature in a 15-foot cone must make a DC 13 Dexterity saving throw. A creature takes 3d6 fire damage on a failed save, or half as much on a successful one." },
-            new() { Name = "Color Spray",     Level = 1, School = "Illusion",     CastingTime = "1 action", Range = "Self (15 ft cone)", Components = "V, S, M", Duration = "1 round", Description = "A dazzling array of flashing, colored light springs from your hand. Roll 6d10; the total is how many hit points of creatures this spell can affect." },
-            new() { Name = "Dragon's Breath", Level = 2, School = "Transmutation",CastingTime = "1 bonus action", Range = "Touch", Components = "V, S, M", Duration = "1 minute", Concentration = true, Description = "You touch one willing creature and imbue it with the power to spew magical energy from its mouth. Until the spell ends, the creature can use an action to exhale energy of a type: fire, cold, lightning, acid, or poison. Each creature in a 15-foot cone must make a DC 13 Dexterity saving throw, taking 3d6 damage on a failed save." },
-        },
-
-        SpellSlots = new List<SpellSlot>
-        {
-            new() { Level = 1, MaxSlots = 4, UsedSlots = 0 },
-            new() { Level = 2, MaxSlots = 2, UsedSlots = 0 },
-        },
-
-        Skills = new List<CharacterSkill>
-        {
-            new() { Skill = Skill.Arcana,     Proficiency = ProficiencyLevel.Proficient },
-            new() { Skill = Skill.Deception,  Proficiency = ProficiencyLevel.Proficient },
-            new() { Skill = Skill.Persuasion, Proficiency = ProficiencyLevel.Proficient },
-            new() { Skill = Skill.Stealth,    Proficiency = ProficiencyLevel.Proficient },
-        },
-    };
-
-    public static Character Belqorel => new()
-    {
-        Id             = new Guid("a1000000-0000-0000-0000-000000000002"),
-        Name           = "Belqorel",
-        Type           = CombatantType.PC,
-        CharacterClass = "Barbarian",
-        CharacterLevel = 5,
-        Race           = "Dwarf",
-
-        Strength     = 15, Dexterity    = 16, Constitution = 14,
-        Intelligence = 10, Wisdom       = 8,  Charisma     = 12,
-
-        MaxHitPoints     = 55,
-        ArmorClass       = 15,
-        Speed            = 40,
-        ProficiencyBonus = 3,
-
-        SaveProfStrength     = true,
-        SaveProfConstitution = true,
-
-        IsBarbarianClass  = true,
-        RageBonus         = 2,
-        RageUsesPerDay    = 3,
-
-        Actions = new List<CombatAction>
-        {
-            new() { Name = "Dagger",         ActionType = ActionType.Attack, AttackBonus = 6, DamageDice = "1d4",  DamageBonus = 3, DamageType = DamageType.Piercing,    Range = "20 ft" },
-            new() { Name = "Greataxe",       ActionType = ActionType.Attack, AttackBonus = 5, DamageDice = "1d12", DamageBonus = 2, DamageType = DamageType.Slashing,    Range = "5 ft"  },
-            new() { Name = "Handaxe",        ActionType = ActionType.Attack, AttackBonus = 5, DamageDice = "1d6",  DamageBonus = 2, DamageType = DamageType.Slashing,    Range = "20 ft" },
-            new() { Name = "Unarmed Strike", ActionType = ActionType.Attack, AttackBonus = 5, DamageDice = "1",    DamageBonus = 3, DamageType = DamageType.Bludgeoning, Range = "5 ft"  },
-        },
-
-        Skills = new List<CharacterSkill>
-        {
-            new() { Skill = Skill.Athletics,    Proficiency = ProficiencyLevel.Proficient },
-            new() { Skill = Skill.Intimidation, Proficiency = ProficiencyLevel.Proficient },
-            new() { Skill = Skill.Perception,   Proficiency = ProficiencyLevel.Proficient },
-            new() { Skill = Skill.Survival,     Proficiency = ProficiencyLevel.Proficient },
-        },
-
-        Inventory = new List<InventoryItem>
-        {
-            new() { Name = "Greataxe",  Quantity = 1, IsEquipped = true,  Category = ItemCategory.Weapon,  Description = "Two-handed axe" },
-            new() { Name = "Handaxe",   Quantity = 2, IsEquipped = true,  Category = ItemCategory.Weapon },
-            new() { Name = "Dagger",    Quantity = 1, IsEquipped = true,  Category = ItemCategory.Weapon },
-            new() { Name = "Explorer's Pack", Quantity = 1, Category = ItemCategory.Other },
-        },
-
-        GoldPieces = 15,
-    };
-
-    public static Character Wally => new()
-    {
-        Id             = new Guid("a1000000-0000-0000-0000-000000000003"),
-        Name           = "Wally Cornbone",
-        Type           = CombatantType.PC,
-        CharacterClass = "Rogue",
-        CharacterLevel = 4,
-        Race           = "Halfling",
-
-        Strength     = 8,  Dexterity    = 15, Constitution = 12,
-        Intelligence = 15, Wisdom       = 12, Charisma     = 13,
-
-        MaxHitPoints     = 27,
-        ArmorClass       = 13,
-        Speed            = 30,
-        ProficiencyBonus = 2,
-
-        SaveProfDexterity    = true,
-        SaveProfIntelligence = true,
-
-        Actions = new List<CombatAction>
-        {
-            new() { Name = "Dagger",      ActionType = ActionType.Attack, AttackBonus = 4, DamageDice = "1d4",  DamageBonus = 2, DamageType = DamageType.Piercing, Range = "20 ft" },
-            new() { Name = "Seeker Dart", ActionType = ActionType.Attack, AttackBonus = 4, DamageDice = "1d4",  DamageBonus = 2, DamageType = DamageType.Piercing, Range = "20 ft" },
-            new() { Name = "Blowgun",     ActionType = ActionType.Attack, AttackBonus = 2, DamageDice = "1",    DamageBonus = 3, DamageType = DamageType.Piercing, Range = "25 ft" },
-        },
-
-        Skills = new List<CharacterSkill>
-        {
-            new() { Skill = Skill.Acrobatics,   Proficiency = ProficiencyLevel.Proficient },
-            new() { Skill = Skill.Deception,    Proficiency = ProficiencyLevel.Expertise  },
-            new() { Skill = Skill.Investigation,Proficiency = ProficiencyLevel.Proficient },
-            new() { Skill = Skill.Perception,   Proficiency = ProficiencyLevel.Proficient },
-            new() { Skill = Skill.SleightOfHand,Proficiency = ProficiencyLevel.Expertise  },
-            new() { Skill = Skill.Stealth,      Proficiency = ProficiencyLevel.Proficient },
-        },
-
-        Inventory = new List<InventoryItem>
-        {
-            new() { Name = "Dagger",      Quantity = 2, IsEquipped = true,  Category = ItemCategory.Weapon },
-            new() { Name = "Seeker Dart", Quantity = 5, IsEquipped = false, Category = ItemCategory.Weapon },
-            new() { Name = "Blowgun",     Quantity = 1, IsEquipped = true,  Category = ItemCategory.Weapon },
-            new() { Name = "Thieves' Tools", Quantity = 1, Category = ItemCategory.Tool, Description = "Proficient" },
-            new() { Name = "Burglar's Pack", Quantity = 1, Category = ItemCategory.Other },
-        },
-
-        GoldPieces = 22,
-        SilverPieces = 10,
-    };
 
     public static Character Winnie => new()
     {
