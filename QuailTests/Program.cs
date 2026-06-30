@@ -24,6 +24,20 @@ using (var seed = factory.CreateDbContext()) seed.Database.EnsureCreated();
 var svc = new CharacterService(factory);
 var content = new ContentService();
 
+// A combat engine that starts from a clean slate. Combat now persists to the DB, so a
+// plain `new CombatEngineService` would resume whatever the previous section left behind;
+// clearing the snapshot first keeps each section isolated. (Section 17 deliberately does
+// NOT clear, to test that a fresh engine resumes a persisted encounter.)
+CombatEngineService FreshEngine()
+{
+    using (var db = factory.CreateDbContext())
+    {
+        var row = db.CombatSnapshots.Find(1);
+        if (row != null) { db.CombatSnapshots.Remove(row); db.SaveChanges(); }
+    }
+    return new CombatEngineService(svc, factory);
+}
+
 Console.WriteLine($"Quail D&D Simulator — headless test run");
 Console.WriteLine($"temp db: {dbPath}");
 
@@ -359,7 +373,7 @@ Section("8. Live combat engine — turn gating, manual controls, conditions, dea
 {
     try
     {
-        var engine = new CombatEngineService(svc);
+        var engine = FreshEngine();
 
         var hero = new Combatant
         {
@@ -499,7 +513,7 @@ Section("9. Combat scenarios — full encounters, balance, advantage, death save
     {
         try
         {
-            var e = new CombatEngineService(svc);
+            var e = FreshEngine();
             foreach (var c in build()) e.AddCombatant(c);
             e.StartCombat();
             var (rounds, terminated, survivors) = RunAuto(e);
@@ -518,7 +532,7 @@ Section("9. Combat scenarios — full encounters, balance, advantage, death save
         int aWins = 0, bWins = 0, draws = 0, maxRounds = 0; bool anyStall = false;
         for (int i = 0; i < 200; i++)
         {
-            var e = new CombatEngineService(svc);
+            var e = FreshEngine();
             e.AddCombatant(Mk("Duelist A", CombatantType.PC, 35, 15, 6, "1d10", 3, 14));
             e.AddCombatant(Mk("Duelist B", CombatantType.Monster, 35, 15, 6, "1d10", 3, 14));
             e.StartCombat();
@@ -536,7 +550,7 @@ Section("9. Combat scenarios — full encounters, balance, advantage, death save
 
     // ── C. Advantage / disadvantage actually shift the hit rate ──
     {
-        var e = new CombatEngineService(svc);
+        var e = FreshEngine();
         var atk = new CombatAction { Name = "Probe", ActionType = ActionType.Attack, AttackBonus = 5 };
         var dummy = Mk("Dummy", CombatantType.Monster, 1, 15, 0, "1d4", 0);
         int N = 4000;
@@ -555,7 +569,7 @@ Section("9. Combat scenarios — full encounters, balance, advantage, death save
 
     // ── D. Death-save outcome distribution over many rolls ──
     {
-        var e = new CombatEngineService(svc);
+        var e = FreshEngine();
         var pc = Mk("Faller", CombatantType.PC, 20, 10, 0, "1d4", 0);
         e.AddCombatant(pc);
         int succ = 0, fail = 0, revived = 0;
@@ -574,7 +588,7 @@ Section("9. Combat scenarios — full encounters, balance, advantage, death save
 
     // ── E. Manual turn flow: round increments, reactions refresh, gating holds ──
     {
-        var e = new CombatEngineService(svc);
+        var e = FreshEngine();
         var pcA = Mk("Aria",  CombatantType.PC, 40, 14, 6, "1d8", 3, 16);
         var orc = Mk("Orc",   CombatantType.Monster, 50, 13, 5, "1d12", 3, 10);
         e.AddCombatant(pcA); e.AddCombatant(orc);
@@ -625,7 +639,7 @@ Section("10. Real party characters, status effects in combat, and rage");
     {
         var party = PreloadedCharacters.All.Where(c => c.Type == CombatantType.PC && c.Actions.Count > 0).Take(4).ToList();
         Check(party.Count >= 2, "preloaded party members carry real combat actions");
-        var e = new CombatEngineService(svc);
+        var e = FreshEngine();
         foreach (var t in party) e.AddCombatant(t.ToCombatant());
         e.AddCombatant(Mk("Adult Dragon", CombatantType.Monster, 220, 18, 11, "2d10", 6, 12));
         foreach (var pc in e.SnapshotCombatants().Where(c => c.Type == CombatantType.PC))
@@ -640,7 +654,7 @@ Section("10. Real party characters, status effects in combat, and rage");
 
     // ── B. Incapacitating conditions skip the turn; others don't ──
     {
-        var e = new CombatEngineService(svc);
+        var e = FreshEngine();
         var striker = Mk("Striker", CombatantType.PC, 40, 18, 12, "1d10", 5, 16);
         var dummy = Mk("Practice Dummy", CombatantType.Monster, 100000, 1, 0, "1d4", 0);
         dummy.Actions.Clear();   // can't fight back, so any HP loss is purely the striker acting
@@ -672,7 +686,7 @@ Section("10. Real party characters, status effects in combat, and rage");
     // ── C. Rage: resistance halves physical damage, and adds melee damage ──
     {
         // Resistance — same ogre attack on the same barbarian, raging vs not (AC 1 = always lands).
-        var e = new CombatEngineService(svc);
+        var e = FreshEngine();
         var barb = Mk("Grog", CombatantType.PC, 100, 1, 6, "1d12", 4, 12);
         barb.IsBarbarianClass = true; barb.RageBonus = 2;
         var ogre = Mk("Ogre", CombatantType.Monster, 100, 15, 6, "2d8", 6, 8);
@@ -692,7 +706,7 @@ Section("10. Real party characters, status effects in combat, and rage");
         Note($"rage resistance: 500 hits dealt {normalDmg} normally, {ragedDmg} while raging (~{(double)ragedDmg / normalDmg:P0})");
 
         // Melee bonus — the barbarian's own physical hits gain +RageBonus while raging.
-        var e2 = new CombatEngineService(svc);
+        var e2 = FreshEngine();
         var grog2 = Mk("Grog2", CombatantType.PC, 80, 15, 12, "1d12", 4, 14);
         grog2.IsBarbarianClass = true; grog2.RageBonus = 2;
         var sack = Mk("Sandbag", CombatantType.Monster, 1_000_000, 1, 0, "1d4", 0); sack.Actions.Clear();
@@ -713,7 +727,7 @@ Section("10. Real party characters, status effects in combat, and rage");
 
     // ── D. Downing a PC vs a monster behaves differently ──
     {
-        var e = new CombatEngineService(svc);
+        var e = FreshEngine();
         var pc = Mk("Hero", CombatantType.PC, 20, 10, 5, "1d8", 3);
         var beast = Mk("Beast", CombatantType.Monster, 20, 10, 5, "1d8", 3);
         e.AddCombatant(pc); e.AddCombatant(beast); e.StartCombat();
@@ -739,7 +753,7 @@ Section("11. Active effects — durations auto-expire, conditions mirror, concen
         while (eng.CurrentRound == r && eng.State == CombatState.Active && guard++ < 30) eng.NextTurn();
     }
 
-    var e = new CombatEngineService(svc);
+    var e = FreshEngine();
     var caster = Mk("Cleric", CombatantType.PC);
     var foe = Mk("Bandit", CombatantType.Monster);
     e.AddCombatant(caster); e.AddCombatant(foe);
@@ -819,7 +833,7 @@ Section("12. Conditions drive advantage/disadvantage; incapacitated combatants c
         Id = Guid.NewGuid(), Name = name, Type = type, MaxHitPoints = 40, CurrentHitPoints = 40, ArmorClass = 14, Dexterity = 14,
         Actions = { new CombatAction { Name = "Strike", ActionType = ActionType.Attack, AttackBonus = 6, DamageDice = "1d8", DamageBonus = 3, Range = "5 ft" } },
     };
-    var e = new CombatEngineService(svc);
+    var e = FreshEngine();
     var hero = Mk("Hero", CombatantType.PC);
     var foe = Mk("Foe", CombatantType.Monster);
     e.AddCombatant(hero); e.AddCombatant(foe); e.StartCombat();
@@ -836,7 +850,7 @@ Section("12. Conditions drive advantage/disadvantage; incapacitated combatants c
 // ───────────────────────── 13. Resistance / immunity / vulnerability ─────────────────────────
 Section("13. Damage resistance, immunity, vulnerability (and rage doesn't stack)");
 {
-    var e = new CombatEngineService(svc);
+    var e = FreshEngine();
     var caster = new Combatant
     {
         Id = Guid.NewGuid(), Name = "Mage", Type = CombatantType.PC, MaxHitPoints = 40, CurrentHitPoints = 40, ArmorClass = 14, Dexterity = 14,
@@ -885,7 +899,7 @@ Section("14. Concentration — damage triggers a CON save that can drop the spel
         ArmorClass = 14, Dexterity = 12, Constitution = con,
         Actions = { new CombatAction { Name = "Hit", ActionType = ActionType.Attack, AttackBonus = 6, DamageDice = "1d8", DamageBonus = 2, Range = "5 ft" } },
     };
-    var e = new CombatEngineService(svc);
+    var e = FreshEngine();
     var mage = Mk("Mage", CombatantType.PC, con: 14);   // CON +2
     var foe = Mk("Brute", CombatantType.Monster);
     e.AddCombatant(mage); e.AddCombatant(foe); e.StartCombat();
@@ -982,7 +996,7 @@ Section("15. Standing-advantage abilities — Reckless Attack & Innate Sorcery")
         while (eng.CurrentRound == r && eng.State == CombatState.Active && guard++ < 30) eng.NextTurn();
     }
 
-    var e = new CombatEngineService(svc);
+    var e = FreshEngine();
     var korran = Mk("Korran", CombatantType.PC, "Reckless Attack");
     var foe = Mk("Bandit", CombatantType.Monster);
     e.AddCombatant(korran); e.AddCombatant(foe); e.StartCombat();
@@ -1013,6 +1027,51 @@ Section("16. Removed test characters are gone from the seed");
     Check(PreloadedCharacters.All.Count == 7, $"seed now has 7 party members (was {PreloadedCharacters.All.Count})");
     Check(!PreloadedCharacters.All.Any(c => testIds.Contains(c.Id)), "Spurt/Belqorel/Wally no longer in the seed (won't re-seed)");
     Note($"Party: {string.Join(", ", PreloadedCharacters.All.Select(c => c.Name))}");
+}
+
+// ───────────────────────── 17. Combat persists & resumes after a restart ─────────────────────────
+Section("17. Combat persists to the DB and resumes after a 'restart'");
+{
+    Combatant Mk(string name, CombatantType type, int hp) => new()
+    {
+        Id = Guid.NewGuid(), Name = name, Type = type, MaxHitPoints = hp, CurrentHitPoints = hp,
+        ArmorClass = 14, Dexterity = 12,
+        Actions = { new CombatAction { Name = "Hit", ActionType = ActionType.Attack, AttackBonus = 6, DamageDice = "1d8", DamageBonus = 2, Range = "5 ft" } },
+    };
+
+    var e1 = FreshEngine();
+    var hero = Mk("Aria", CombatantType.PC, 40);
+    var orc = Mk("Orc", CombatantType.Monster, 60);
+    e1.AddCombatant(hero); e1.AddCombatant(orc); e1.StartCombat();
+    e1.AdjustHp(orc.Id, -15);
+    e1.ToggleCondition(hero.Id, Condition.Poisoned);
+    e1.AddEffect(hero.Id, new ActiveEffect { Name = "Bless", RoundsRemaining = 5 });
+    e1.NextTurn();
+
+    var state1 = e1.State;
+    var round1 = e1.CurrentRound;
+    var orcHp1 = e1.SnapshotCombatants().First(c => c.Name == "Orc").CurrentHitPoints;
+    var logCount1 = e1.SnapshotLog().Count;
+    var current1 = e1.CurrentCombatant?.Name;
+
+    // Simulate an app restart: a brand-new engine instance on the SAME database.
+    var e2 = new CombatEngineService(svc, factory);
+    Check(e2.State == CombatState.Active && e2.State == state1, "encounter resumed as Active");
+    Check(e2.CurrentRound == round1, "round resumed");
+    var c2 = e2.SnapshotCombatants();
+    Check(c2.Count == 2, "combatants resumed");
+    var orc2 = c2.FirstOrDefault(c => c.Name == "Orc");
+    Check(orc2 != null && orc2.CurrentHitPoints == orcHp1, $"monster HP resumed ({orcHp1}/60)");
+    var hero2 = c2.FirstOrDefault(c => c.Name == "Aria");
+    Check(hero2 != null && hero2.Conditions.Contains(Condition.Poisoned), "condition resumed");
+    Check(hero2 != null && hero2.Effects.Any(x => x.Name == "Bless"), "active effect resumed");
+    Check(e2.SnapshotLog().Count == logCount1, "combat log resumed");
+    Check(e2.CurrentCombatant?.Name == current1, "whose-turn resumed");
+
+    // A fresh engine after the snapshot is cleared starts empty (the clean-lobby case).
+    var e3 = FreshEngine();
+    Check(e3.SnapshotCombatants().Count == 0 && e3.State == CombatState.Setup, "cleared snapshot → empty Setup");
+    Note($"Resumed {c2.Count} combatants, round {e2.CurrentRound}, Orc {orc2?.CurrentHitPoints}/60, {e2.SnapshotLog().Count} log entries");
 }
 
 // ───────────────────────── report ─────────────────────────

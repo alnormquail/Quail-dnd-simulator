@@ -1,3 +1,7 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Microsoft.EntityFrameworkCore;
+using CopilotTest.Data;
 using CopilotTest.Models;
 
 namespace CopilotTest.Services;
@@ -6,6 +10,12 @@ public class CombatEngineService
 {
     private readonly Random _random = new();
     private readonly CharacterService _characterService;
+    private readonly IDbContextFactory<DndDbContext> _dbFactory;
+    private bool _loaded;
+    private static readonly JsonSerializerOptions JsonOpts = new()
+    {
+        Converters = { new JsonStringEnumConverter() },
+    };
     private List<Combatant> _lastEncounterMonsters = new();
 
     // This service is now a SINGLETON shared by every connected player's circuit,
@@ -29,30 +39,100 @@ public class CombatEngineService
     /// </summary>
     public List<Character> SavedRoster { get; private set; } = new();
 
-    public CombatEngineService(CharacterService characterService)
+    public CombatEngineService(CharacterService characterService, IDbContextFactory<DndDbContext> dbFactory)
     {
         _characterService = characterService;
-        RefreshRosterFromDb();
+        _dbFactory = dbFactory;
+        SavedRoster = _characterService.GetPCs();   // set the roster without notifying/persisting
+        LoadPersistedState();                         // resume an in-progress encounter, if any
+        _loaded = true;                               // from here on, every change is persisted
     }
 
     public void RefreshRosterFromDb()
     {
         SavedRoster = _characterService.GetPCs();
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     public event Action? OnStateChanged;
 
+    // ── Persistence: keep the live encounter in the DB so a restart resumes it ──
+
+    private sealed class Snapshot
+    {
+        public List<Combatant> Combatants { get; set; } = new();
+        public List<CombatLog> Log { get; set; } = new();
+        public CombatState State { get; set; }
+        public int CurrentRound { get; set; }
+        public int CurrentTurnIndex { get; set; }
+        public List<Combatant> LastEncounterMonsters { get; set; } = new();
+    }
+
+    /// <summary>Update the UI, then save the encounter. Replaces the old bare event invoke
+    /// at every mutation site so persistence happens on every change.</summary>
+    private void NotifyChanged()
+    {
+        OnStateChanged?.Invoke();
+        PersistState();
+    }
+
+    private void PersistState()
+    {
+        if (!_loaded) return;   // never overwrite a real save with the empty startup state
+        string json;
+        lock (_gate)
+        {
+            var snap = new Snapshot
+            {
+                Combatants = Combatants,
+                Log = Log.Count > 300 ? Log.Skip(Log.Count - 300).ToList() : Log,
+                State = State,
+                CurrentRound = CurrentRound,
+                CurrentTurnIndex = CurrentTurnIndex,
+                LastEncounterMonsters = _lastEncounterMonsters,
+            };
+            json = JsonSerializer.Serialize(snap, JsonOpts);
+        }
+        try
+        {
+            using var db = _dbFactory.CreateDbContext();
+            var row = db.CombatSnapshots.Find(1);
+            if (row == null) db.CombatSnapshots.Add(new CombatSnapshot { Id = 1, Json = json });
+            else row.Json = json;
+            db.SaveChanges();
+        }
+        catch { /* best-effort: a DB hiccup must never break combat */ }
+    }
+
+    private void LoadPersistedState()
+    {
+        try
+        {
+            using var db = _dbFactory.CreateDbContext();
+            var row = db.CombatSnapshots.AsNoTracking().FirstOrDefault(s => s.Id == 1);
+            if (row == null || string.IsNullOrWhiteSpace(row.Json)) return;
+            var snap = JsonSerializer.Deserialize<Snapshot>(row.Json, JsonOpts);
+            if (snap == null) return;
+            Combatants = snap.Combatants ?? new();
+            Log = snap.Log ?? new();
+            State = snap.State;
+            CurrentRound = snap.CurrentRound;
+            CurrentTurnIndex = snap.CurrentTurnIndex;
+            _lastEncounterMonsters = snap.LastEncounterMonsters ?? new();
+        }
+        catch { /* corrupt/incompatible snapshot — start fresh rather than crash */ }
+    }
+
     public void AddCombatant(Combatant combatant)
     {
         lock (_gate) { Combatants.Add(combatant); }
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     public void RemoveCombatant(Guid id)
     {
         lock (_gate) { Combatants.RemoveAll(c => c.Id == id); }
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     public void SaveToRoster(Combatant combatant)
@@ -82,7 +162,7 @@ public class CombatEngineService
             if (Combatants.Any(c => c.Id == rosterId)) return;
             Combatants.Add(template.ToCombatant());
         }
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     public void NewEncounter()
@@ -95,7 +175,7 @@ public class CombatEngineService
         State = CombatState.Setup;
         CurrentRound = 0;
         CurrentTurnIndex = 0;
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     public void RetryCombat()
@@ -111,7 +191,7 @@ public class CombatEngineService
         CurrentRound = 0;
         CurrentTurnIndex = 0;
         State = CombatState.Setup;
-        OnStateChanged?.Invoke();
+        NotifyChanged();
         StartCombat();
     }
 
@@ -128,7 +208,7 @@ public class CombatEngineService
             $"🔥 enters a RAGE! (+{combatant.RageBonus} melee damage, resistance to physical damage) "
             + $"[{combatant.RageUsesRemaining} rage(s) remaining]",
             LogEntryType.Info);
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     private void EndAllRages()
@@ -210,7 +290,7 @@ public class CombatEngineService
 
         AddLog(1, "Combat", $"Turn order: {string.Join(" → ", Combatants.Select(c => c.Name))}", LogEntryType.Info);
 
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     public void ResetCombat()
@@ -220,7 +300,7 @@ public class CombatEngineService
         State = CombatState.Setup;
         CurrentRound = 0;
         CurrentTurnIndex = 0;
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     public void SimulateRound()
@@ -269,13 +349,13 @@ public class CombatEngineService
             var winners = ActiveCombatants;
             var winnerNames = winners.Count > 0 ? string.Join(", ", winners.Select(c => c.Name)) : "Nobody";
             AddLog(CurrentRound, "Combat", $"🏆 Combat over! Survivors: {winnerNames}", LogEntryType.RoundStart);
-            OnStateChanged?.Invoke();
+            NotifyChanged();
             return;
         }
 
         CurrentRound++;
         CurrentTurnIndex = 0;
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     public void SimulateTurn()
@@ -307,7 +387,7 @@ public class CombatEngineService
         }
 
         AdvanceTurn(active);
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     public void ExecuteActionForCurrent(CombatAction action)
@@ -343,7 +423,7 @@ public class CombatEngineService
         }
 
         AdvanceTurn(active);
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     public List<Combatant> GetCurrentTargets()
@@ -382,7 +462,7 @@ public class CombatEngineService
         }
 
         AdvanceTurn(active);
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     // ── Live multiplayer entry points (shared singleton; thread-guarded) ─────
@@ -403,7 +483,7 @@ public class CombatEngineService
             if (active.Count == 0) return;
             AdvanceTurn(active);
         }
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     /// <summary>
@@ -429,7 +509,7 @@ public class CombatEngineService
                 ok = true;
             }
         }
-        OnStateChanged?.Invoke();
+        NotifyChanged();
         return ok;
     }
 
@@ -454,7 +534,7 @@ public class CombatEngineService
                 ok = true;
             }
         }
-        OnStateChanged?.Invoke();
+        NotifyChanged();
         return ok;
     }
 
@@ -482,7 +562,7 @@ public class CombatEngineService
             if (active.Count == 0) return;
             AdvanceTurn(active);
         }
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     /// <summary>Resolve one action by the attacker against a target (no turn advance).</summary>
@@ -532,7 +612,7 @@ public class CombatEngineService
                 ApplyDamage(c, -delta);
             }
         }
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     public void SetTempHp(Guid id, int temp)
@@ -544,7 +624,7 @@ public class CombatEngineService
             c.TemporaryHitPoints = Math.Max(0, temp);
             AddLog(CurrentRound, c.Name, $"gains {c.TemporaryHitPoints} temporary HP", LogEntryType.Info);
         }
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     public void ToggleCondition(Guid id, Condition condition)
@@ -561,7 +641,7 @@ public class CombatEngineService
                 AddLog(CurrentRound, c.Name, $"is now {condition}", LogEntryType.Condition);
             }
         }
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     // ── Active effects (timed, source-tagged; the durations layer) ───────────
@@ -581,7 +661,7 @@ public class CombatEngineService
             var src = string.IsNullOrEmpty(effect.Source) ? "" : $" [from {effect.Source}]";
             AddLog(CurrentRound, c.Name, $"gains {effect.Name}{dur}{src}", LogEntryType.Condition);
         }
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     /// <summary>Remove a specific effect, clearing its condition if nothing else imposes it.</summary>
@@ -596,7 +676,7 @@ public class CombatEngineService
             ClearConditionIfOrphaned(c, eff.Condition);
             AddLog(CurrentRound, c.Name, $"loses {eff.Name}", LogEntryType.Condition);
         }
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     /// <summary>End a caster's concentration and all effects it sustains.</summary>
@@ -607,7 +687,7 @@ public class CombatEngineService
             var caster = Combatants.FirstOrDefault(x => x.Id == concentratorId);
             if (caster != null) DropConcentrationCore(caster);
         }
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     private void DropConcentrationCore(Combatant caster)
@@ -638,7 +718,7 @@ public class CombatEngineService
             if (c.ConcentratingOn != null)
                 AddLog(CurrentRound, c.Name, $"is now concentrating on {c.ConcentratingOn}", LogEntryType.Info);
         }
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     /// <summary>CON save (DC = max(10, ½ damage)) to keep concentration; drops the spell on a fail.</summary>
@@ -706,7 +786,7 @@ public class CombatEngineService
             if (!on) set.Remove(type);
             AddLog(CurrentRound, c.Name, $"{mod} to {type} turned {(on ? "on" : "off")}", LogEntryType.Info);
         }
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     /// <summary>Toggle a known standing-advantage ability (Reckless Attack, Innate Sorcery, …) on a combatant.</summary>
@@ -737,7 +817,7 @@ public class CombatEngineService
                 AddLog(CurrentRound, c.Name, $"uses {a.Name}", LogEntryType.Info);
             }
         }
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     /// <summary>Roll a death save for a downed PC (player- or DM-triggered).</summary>
@@ -749,7 +829,7 @@ public class CombatEngineService
             if (c == null || c.Type != CombatantType.PC || !c.IsUnconscious) return;
             PerformDeathSave(c);
         }
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     /// <summary>Spend a reaction (tracked + logged; the DM adjudicates the effect).</summary>
@@ -762,7 +842,7 @@ public class CombatEngineService
             c.ReactionAvailable = false;
             AddLog(CurrentRound, c.Name, "uses their reaction.", LogEntryType.Info);
         }
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     /// <summary>Set how many spell slots of a level are spent (live, shared).</summary>
@@ -774,7 +854,7 @@ public class CombatEngineService
             if (slot == null) return;
             slot.Used = Math.Clamp(used, 0, slot.Max);
         }
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     /// <summary>Set a class resource pool's current value (live, shared).</summary>
@@ -786,7 +866,7 @@ public class CombatEngineService
             if (pool == null) return;
             pool.Current = Math.Clamp(current, 0, pool.Max);
         }
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     /// <summary>End the encounter immediately (DM).</summary>
@@ -799,7 +879,7 @@ public class CombatEngineService
             State = CombatState.Finished;
             AddLog(CurrentRound, "Combat", "🏁 The DM ends the encounter.", LogEntryType.RoundStart);
         }
-        OnStateChanged?.Invoke();
+        NotifyChanged();
     }
 
     /// <summary>Snapshot reads so the live UI can enumerate safely while others mutate.</summary>

@@ -79,6 +79,11 @@ using (var scope = app.Services.CreateScope())
             "Key" TEXT NOT NULL CONSTRAINT "PK_AppMeta" PRIMARY KEY,
             "Value" TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS "CombatSnapshots" (
+            "Id" INTEGER NOT NULL CONSTRAINT "PK_CombatSnapshots" PRIMARY KEY,
+            "Json" TEXT NOT NULL
+        );
         """);
 
     // Add columns introduced after first release (SQLite has no ADD COLUMN IF NOT

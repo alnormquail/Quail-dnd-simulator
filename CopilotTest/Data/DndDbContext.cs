@@ -15,6 +15,7 @@ public class DndDbContext : DbContext
     public DbSet<SpellSlot> SpellSlots => Set<SpellSlot>();
     public DbSet<CharacterFeature> CharacterFeatures => Set<CharacterFeature>();
     public DbSet<AbilityGrant> AbilityGrants => Set<AbilityGrant>();
+    public DbSet<CombatSnapshot> CombatSnapshots => Set<CombatSnapshot>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
