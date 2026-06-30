@@ -54,11 +54,15 @@
                     <span class="lc-turn">▶ @Combat.CurrentCombatant?.Name's turn</span>
                 }
             </div>
-            @if (IsDm && Combat.State == CombatState.Active)
+            @if (IsDm && Combat.State != CombatState.Setup)
             {
                 <div class="lc-row">
-                    <button class="btn btn-action" @onclick="() => Combat.NextTurn()">⏭ Next Turn</button>
-                    <button class="btn btn-reset" @onclick="() => Combat.EndCombat()">🏁 End</button>
+                    @if (Combat.State == CombatState.Active)
+                    {
+                        <button class="btn btn-action" @onclick="() => Combat.NextTurn()">⏭ Next Turn</button>
+                        <button class="btn btn-reset" @onclick="() => Combat.EndCombat()">🏁 End</button>
+                    }
+                    <button class="btn btn-action" @onclick="() => Combat.NewEncounter()">↻ New Encounter</button>
                 </div>
             }
         </div>
