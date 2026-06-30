@@ -3,10 +3,12 @@
 @using CopilotTest.Models
 @using CopilotTest.Services
 @using static Microsoft.AspNetCore.Components.Web.RenderMode
+@using Microsoft.JSInterop
 @rendermode InteractiveServer
 @inject CombatEngineService Combat
 @inject SeatRegistry Seats
 @inject PlayerSeat Seat
+@inject IJSRuntime JS
 @implements IDisposable
 
 <PageTitle>Live Combat</PageTitle>
@@ -34,16 +36,16 @@
                     @foreach (var pc in PartyPcs)
                     {
                         var claimed = Seats.IsClaimed(pc.Id);
-                        <button class="btn @(claimed ? "btn-reset" : "btn-action")" disabled="@claimed"
+                        <button class="btn @(claimed ? "btn-reset" : "btn-action")"
                                 @onclick="() => ClaimCharacter(pc)">
-                            @pc.Name <span class="lc-dim">@pc.ClassDisplay</span>@(claimed ? " — taken" : "")
+                            @pc.Name <span class="lc-dim">@pc.ClassDisplay</span>@(claimed ? " — taken (tap to take over)" : "")
                         </button>
                     }
                 </div>
             </div>
 
             <div class="lobby-section">
-                <button class="btn btn-reset" @onclick="() => Seat.SetSpectator()">👀 Just spectating</button>
+                <button class="btn btn-reset" @onclick="Spectate">👀 Just spectating</button>
             </div>
         </div>
     }
@@ -58,6 +60,9 @@
 </div>
 
 @code {
+    private const string SeatKey = "quailSeat";
+    private bool _restored;
+
     private IReadOnlyList<Character> PartyPcs => Combat.SavedRoster;
 
     protected override void OnInitialized()
@@ -66,28 +71,76 @@
         Combat.OnStateChanged += OnChanged;
     }
 
+    // Restore the saved seat once the circuit is interactive (JS interop isn't available
+    // earlier). This means closing/reopening the browser — or reloading after an app
+    // restart — puts you straight back in your seat instead of the lobby.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _restored) return;
+        _restored = true;
+        if (!Seat.IsUnclaimed) return;   // a reconnected circuit may already be seated
+
+        string? data = null;
+        try { data = await JS.InvokeAsync<string?>("localStorage.getItem", SeatKey); }
+        catch { /* prerender / no JS — ignore */ }
+        if (string.IsNullOrEmpty(data)) return;
+
+        var parts = data.Split('|');
+        switch (parts[0])
+        {
+            case "Dm":
+                Seats.ClaimDm(); Seat.SetDm(); break;
+            case "Player" when parts.Length > 2 && Guid.TryParse(parts[1], out var cid):
+                Seats.ClaimCharacter(cid, parts[2]); Seat.SetPlayer(cid, parts[2]); break;
+            case "Spectator":
+                Seat.SetSpectator(); break;
+            default:
+                return;
+        }
+        StateHasChanged();
+    }
+
     private void OnChanged() => InvokeAsync(StateHasChanged);
 
-    private void ClaimDm()
+    private async Task ClaimDm()
     {
         Seats.ClaimDm();
         Seat.SetDm();
+        await SaveSeat();
     }
 
-    private void ClaimCharacter(Character pc)
+    private async Task ClaimCharacter(Character pc)
     {
-        if (Seats.ClaimCharacter(pc.Id, pc.Name))
-            Seat.SetPlayer(pc.Id, pc.Name);
-        // else: someone claimed it a moment ago; the live-updating lobby will show it taken.
+        Seats.ClaimCharacter(pc.Id, pc.Name);
+        Seat.SetPlayer(pc.Id, pc.Name);
+        await SaveSeat();
     }
 
-    private void LeaveSeat()
+    private async Task Spectate()
+    {
+        Seat.SetSpectator();
+        await SaveSeat();
+    }
+
+    private async Task LeaveSeat()
     {
         if (Seat.Role == SeatRole.Player && Seat.CharacterId.HasValue)
             Seats.ReleaseCharacter(Seat.CharacterId.Value);
         else if (Seat.Role == SeatRole.Dm)
             Seats.ReleaseDm();
         Seat.Clear();
+        await ClearSeat();
+    }
+
+    private async Task SaveSeat()
+    {
+        var data = $"{Seat.Role}|{Seat.CharacterId}|{Seat.Label}";
+        try { await JS.InvokeVoidAsync("localStorage.setItem", SeatKey, data); } catch { }
+    }
+
+    private async Task ClearSeat()
+    {
+        try { await JS.InvokeVoidAsync("localStorage.removeItem", SeatKey); } catch { }
     }
 
     public void Dispose()

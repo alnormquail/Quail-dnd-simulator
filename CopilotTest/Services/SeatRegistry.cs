@@ -38,16 +38,15 @@ public class SeatRegistry
         OnChanged?.Invoke();
     }
 
-    /// <summary>Claim a character seat. Returns false if someone already holds it.</summary>
-    public bool ClaimCharacter(Guid characterId, string label)
+    /// <summary>
+    /// Claim a character seat. Always succeeds — a "taken" seat can be re-claimed, so a
+    /// player whose tab closed (leaving a stale claim) can take their character back, and
+    /// a saved seat can be restored on reload. Trusted-group app; no real ownership.
+    /// </summary>
+    public void ClaimCharacter(Guid characterId, string label)
     {
-        lock (_gate)
-        {
-            if (_claimed.ContainsKey(characterId)) return false;
-            _claimed[characterId] = label;
-        }
+        lock (_gate) { _claimed[characterId] = label; }
         OnChanged?.Invoke();
-        return true;
     }
 
     public void ReleaseCharacter(Guid characterId)
