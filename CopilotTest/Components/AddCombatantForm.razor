@@ -242,6 +242,11 @@
 </div>
 
 @code {
+    // Where added combatants go. Defaults to the solo simulator's engine; the live
+    // table passes its own handler so this form can serve both surfaces.
+    [Parameter] public Action<Combatant>? OnAdd { get; set; }
+    private void Add(Combatant c) { if (OnAdd != null) OnAdd(c); else Combat.AddCombatant(c); }
+
     private string activeTab = "pc";
     private string monsterSubTab = "search";
     private string pcSubTab = "manual";
@@ -350,7 +355,7 @@
         {
             var c = DndApi.MonsterToCombatant(loadedMonster);
             if (monsterQuantity > 1) c.Name = $"{loadedMonster.Name} {i + 1}";
-            Combat.AddCombatant(c);
+            Add(c);
         }
         loadedMonster = null;
         selectedMonsterIndex = "";
@@ -379,7 +384,7 @@
             Charisma = form.Charisma,
             Actions = form.Actions
         };
-        Combat.AddCombatant(c);
+        Add(c);
         form = new Combatant { MaxHitPoints = 30, ArmorClass = 14, ProficiencyBonus = 2,
             Actions = new() { new CombatAction { Name = "Longsword", ActionType = ActionType.Attack, AttackBonus = 5, DamageDice = "1d8", DamageBonus = 3, DamageType = DamageType.Slashing } } };
     }
@@ -411,7 +416,7 @@
                     Range = a.Range, Description = a.Description, UsesPerDay = a.UsesPerDay, UsesRemaining = a.UsesPerDay
                 }).ToList()
             };
-            Combat.AddCombatant(c);
+            Add(c);
         }
         monsterForm = new Combatant { Name = "", MaxHitPoints = 15, ArmorClass = 12, Strength = 14, Dexterity = 10, Constitution = 14, Intelligence = 6, Wisdom = 10, Charisma = 6, ProficiencyBonus = 2,
             Actions = new() { new CombatAction { Name = "Claws", ActionType = ActionType.Attack, AttackBonus = 4, DamageDice = "1d8", DamageBonus = 2, DamageType = DamageType.Slashing } } };

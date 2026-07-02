@@ -22,6 +22,8 @@ builder.Services.AddSingleton<CharacterService>();
 // Combat is now SHARED across all players' circuits so the DM and players see one
 // live encounter. Singleton + internal locking (see CombatEngineService._gate).
 builder.Services.AddSingleton<CombatEngineService>();
+// The live table's initiative tracker — bookkeeping only, no rules automation.
+builder.Services.AddSingleton<LiveEncounterService>();
 builder.Services.AddScoped<PdfImportService>();
 builder.Services.AddScoped<ContentService>();
 

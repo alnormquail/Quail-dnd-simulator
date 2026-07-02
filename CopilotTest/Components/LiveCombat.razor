@@ -1,32 +1,34 @@
 @using CopilotTest.Models
 @using CopilotTest.Services
-@inject CombatEngineService Combat
+@using Microsoft.JSInterop
+@inject LiveEncounterService Live
 @inject PlayerSeat Seat
 @inject SeatRegistry Seats
+@inject IJSRuntime JS
 @implements IDisposable
 
 <div class="live-combat">
 
     @* ── Setup (DM builds the encounter; players wait) ──────────────────── *@
-    @if (Combat.State == CombatState.Setup)
+    @if (Live.State == CombatState.Setup)
     {
         @if (IsDm)
         {
             <div class="lc-panel">
                 <div class="lc-row">
-                    <button class="btn btn-action" @onclick="() => Combat.NewEncounter()">↻ Load Party</button>
-                    <button class="btn btn-start" disabled="@(Combatants.Count < 2)" @onclick="() => Combat.StartCombat()">⚔️ Start Combat</button>
+                    <button class="btn btn-action" @onclick="() => Live.NewEncounter()">↻ Load Party</button>
+                    <button class="btn btn-start" disabled="@(Combatants.Count < 2)" @onclick="() => Live.StartCombat()">⚔️ Roll Initiative &amp; Start</button>
                 </div>
-                <p class="lc-hint">Load the party, add monsters below, then Start Combat. Needs at least 2 combatants.</p>
+                <p class="lc-hint">Load the party, add monsters below, then start. Initiative is rolled automatically — you can edit any number once combat begins.</p>
             </div>
-            <AddCombatantForm />
+            <AddCombatantForm OnAdd="Live.AddCombatant" />
             <div class="lc-panel">
                 <h3>In the encounter (@Combatants.Count)</h3>
                 @foreach (var c in Combatants)
                 {
                     <div class="lc-init-row">
                         <span>@TypeIcon(c) <strong>@c.Name</strong> <span class="lc-dim">@c.ClassDisplay</span></span>
-                        <button class="btn btn-reset btn-sm" @onclick="() => Combat.RemoveCombatant(c.Id)">✕</button>
+                        <button class="btn btn-reset btn-sm" @onclick="() => Live.RemoveCombatant(c.Id)">✕</button>
                     </div>
                 }
             </div>
@@ -44,39 +46,57 @@
         @* ── Active / Finished encounter ───────────────────────────────── *@
         <div class="lc-panel lc-status-bar">
             <div>
-                <span class="lc-round">Round @Combat.CurrentRound</span>
-                @if (Combat.State == CombatState.Finished)
+                <span class="lc-round">Round @Live.CurrentRound</span>
+                @if (Live.State == CombatState.Finished)
                 {
                     <span class="lc-turn">🏁 Combat over</span>
                 }
                 else
                 {
-                    <span class="lc-turn">▶ @Combat.CurrentCombatant?.Name's turn</span>
+                    <span class="lc-turn">▶ @Live.CurrentCombatant?.Name's turn</span>
                 }
             </div>
-            @if (IsDm && Combat.State != CombatState.Setup)
+            @if (IsDm)
             {
                 <div class="lc-row">
-                    @if (Combat.State == CombatState.Active)
+                    @if (Live.State == CombatState.Active)
                     {
-                        <button class="btn btn-action" @onclick="() => Combat.NextTurn()">⏭ Next Turn</button>
-                        <button class="btn btn-reset" @onclick="() => Combat.EndCombat()">🏁 End</button>
+                        <button class="btn btn-action" @onclick="() => Live.NextTurn()">⏭ Next Turn</button>
+                        <button class="btn btn-reset" @onclick="() => Live.EndCombat()">🏁 End</button>
                     }
-                    <button class="btn btn-action" @onclick="() => Combat.NewEncounter()">↻ New Encounter</button>
+                    <button class="btn btn-action" @onclick="() => Live.NewEncounter()">↻ New Encounter</button>
                 </div>
             }
         </div>
+
+        @* ── "It's your turn!" banner ──────────────────────────────────── *@
+        @if (IsMyTurn && Live.State == CombatState.Active)
+        {
+            <div class="lc-panel lc-your-turn">
+                <h2>🎲 It's your turn, @Me?.Name!</h2>
+                <button class="btn btn-start" @onclick="() => Live.EndTurn(MyId!.Value)">✓ End My Turn</button>
+            </div>
+        }
 
         @* Initiative order *@
         <div class="lc-panel">
             <h3>Initiative</h3>
             @foreach (var c in Combatants)
             {
-                var isCurrent = Combat.State == CombatState.Active && Combat.CurrentCombatant?.Id == c.Id;
+                var isCurrent = Live.State == CombatState.Active && Live.CurrentCombatant?.Id == c.Id;
                 var isMe = MyId == c.Id;
                 <div class="lc-init-row @(isCurrent ? "lc-current" : "") @(c.CurrentHitPoints <= 0 ? "lc-down" : "")">
                     <div class="lc-init-main">
-                        <span class="lc-init-num">@(c.Initiative)</span>
+                        @if (IsDm && Live.State == CombatState.Active)
+                        {
+                            <input class="form-input lc-init-edit" type="number" title="Edit initiative"
+                                   value="@c.Initiative"
+                                   @onchange="(e) => OnInitiativeEdit(c.Id, e)" />
+                        }
+                        else
+                        {
+                            <span class="lc-init-num">@(c.Initiative)</span>
+                        }
                         <span>@TypeIcon(c) <strong>@c.Name</strong>@(isMe ? " (you)" : "")</span>
                         @if (!c.ReactionAvailable)
                         {
@@ -93,7 +113,7 @@
                             <span class="lc-hp">@c.StatusDisplay</span>
                         }
                     </div>
-                    @if (c.Conditions.Any() || c.IsRaging || c.Effects.Any())
+                    @if (c.Conditions.Any() || c.IsRaging)
                     {
                         <div class="lc-conditions">
                             @if (c.IsRaging)
@@ -104,47 +124,17 @@
                             {
                                 <span class="lc-cond">@cond</span>
                             }
-                            @foreach (var fx in c.Effects)
-                            {
-                                <span class="lc-effect">
-                                    ✨ @fx.Label
-                                    @if (IsDm)
-                                    {
-                                        <button class="lc-effect-x" title="Remove" @onclick="() => Combat.RemoveEffect(c.Id, fx.Id)">✕</button>
-                                    }
-                                </span>
-                            }
-                        </div>
-                    }
-                    @if (c.Immunities.Any() || c.Resistances.Any() || c.Vulnerabilities.Any())
-                    {
-                        <div class="lc-conditions">
-                            @foreach (var t in c.Immunities) { <span class="lc-cond" title="Immune">🛡️ @t</span> }
-                            @foreach (var t in c.Resistances) { <span class="lc-cond" title="Resistant">½ @t</span> }
-                            @foreach (var t in c.Vulnerabilities) { <span class="lc-cond" title="Vulnerable">×2 @t</span> }
-                        </div>
-                    }
-                    @if (!string.IsNullOrEmpty(c.ConcentratingOn))
-                    {
-                        <div class="lc-conditions">
-                            <span class="lc-effect" title="Concentrating">
-                                🧠 @c.ConcentratingOn
-                                @if (IsDm || MyId == c.Id)
-                                {
-                                    <button class="lc-effect-x" title="Drop concentration" @onclick="() => Combat.DropConcentration(c.Id)">✕</button>
-                                }
-                            </span>
                         </div>
                     }
 
                     @* DM per-combatant controls *@
-                    @if (IsDm && Combat.State == CombatState.Active)
+                    @if (IsDm && Live.State == CombatState.Active)
                     {
                         <div class="lc-dm-controls">
-                            <button class="btn btn-sm btn-reset" @onclick="() => Combat.AdjustHp(c.Id, -5)">-5</button>
-                            <button class="btn btn-sm btn-reset" @onclick="() => Combat.AdjustHp(c.Id, -1)">-1</button>
-                            <button class="btn btn-sm btn-action" @onclick="() => Combat.AdjustHp(c.Id, 1)">+1</button>
-                            <button class="btn btn-sm btn-action" @onclick="() => Combat.AdjustHp(c.Id, 5)">+5</button>
+                            <button class="btn btn-sm btn-reset" @onclick="() => Live.AdjustHp(c.Id, -5)">-5</button>
+                            <button class="btn btn-sm btn-reset" @onclick="() => Live.AdjustHp(c.Id, -1)">-1</button>
+                            <button class="btn btn-sm btn-action" @onclick="() => Live.AdjustHp(c.Id, 1)">+1</button>
+                            <button class="btn btn-sm btn-action" @onclick="() => Live.AdjustHp(c.Id, 5)">+5</button>
                             <select class="form-input lc-cond-select" @onchange="(e) => OnToggleCondition(c.Id, e)">
                                 <option value="">+ condition…</option>
                                 @foreach (var cond in AllConditions)
@@ -154,7 +144,10 @@
                             </select>
                             @if (c.Type == CombatantType.PC && c.IsUnconscious)
                             {
-                                <button class="btn btn-sm" @onclick="() => Combat.RollDeathSaveFor(c.Id)">🎲 Death save (@c.DeathSaveSuccesses✓/@c.DeathSaveFailures✗)</button>
+                                <button class="btn btn-sm" @onclick="() => Live.RollDeathSaveFor(c.Id)">🎲 Death save (@c.DeathSaveSuccesses✓/@c.DeathSaveFailures✗)</button>
+                                <button class="btn btn-sm btn-action" title="Record a success rolled at the table" @onclick="() => Live.RecordDeathSave(c.Id, true)">+✓</button>
+                                <button class="btn btn-sm btn-reset" title="Record a failure rolled at the table" @onclick="() => Live.RecordDeathSave(c.Id, false)">+✗</button>
+                                <button class="btn btn-sm" title="Reset death saves (e.g. stabilized)" @onclick="() => Live.ClearDeathSaves(c.Id)">↺</button>
                             }
                         </div>
                     }
@@ -162,116 +155,77 @@
             }
         </div>
 
-        @* ── DM: apply a timed effect (auto-expires) ───────────────────────── *@
-        @if (IsDm && Combat.State == CombatState.Active)
+        @* ── DM: view any character's guide ────────────────────────────── *@
+        @if (IsDm)
         {
             <div class="lc-panel">
-                <h3>Apply a timed effect</h3>
                 <div class="lc-row">
-                    <select class="form-input" @bind="fxTargetId">
-                        <option value="">Who…</option>
-                        @foreach (var c in Combatants)
+                    <h3 style="margin:0">📖 Character Guides</h3>
+                    <select class="form-input" @onchange="OnPickGuide">
+                        <option value="">View a character's guide…</option>
+                        @foreach (var pc in GuidePcs)
                         {
-                            <option value="@c.Id">@c.Name</option>
+                            <option value="@pc.Id" selected="@(_dmGuideId == pc.Id)">@pc.Name — @pc.ClassDisplay</option>
                         }
                     </select>
-                    <input class="form-input" style="width:140px" placeholder="Effect (e.g. Hex)" @bind="fxName" />
-                    <select class="form-input lc-cond-select" @bind="fxCondition">
-                        <option value="">no condition</option>
-                        @foreach (var cond in AllConditions)
-                        {
-                            <option value="@cond">imposes @cond</option>
-                        }
-                    </select>
-                    <input class="form-input" type="number" min="1" style="width:64px" @bind="fxRounds" /> <span class="lc-dim">rounds</span>
-                    <button class="btn btn-sm btn-action" @onclick="ApplyEffect">+ Add</button>
-                    <button class="btn btn-sm" @onclick="SetConcFromForm" title="Mark the chosen combatant concentrating on the typed name">🧠 Concentrate</button>
                 </div>
-                <p class="lc-hint">Effects count down at the start of each round and clear themselves (and any condition they impose) when they expire.</p>
             </div>
+            @if (DmGuideHero != null)
+            {
+                <GuidePanel Hero="DmGuideHero" />
+            }
+        }
 
-            <div class="lc-panel">
-                <h3>Damage modifiers</h3>
-                <div class="lc-row">
-                    <select class="form-input" @bind="dmTargetId">
-                        <option value="">Who…</option>
-                        @foreach (var c in Combatants)
-                        {
-                            <option value="@c.Id">@c.Name</option>
-                        }
-                    </select>
-                    <select class="form-input lc-cond-select" @bind="dmType">
-                        @foreach (var t in DamageTypes)
-                        {
-                            <option value="@t">@t</option>
-                        }
-                    </select>
-                    <button class="btn btn-sm btn-reset" @onclick="() => ToggleDmg(DamageMod.Resistance)">½ Resist</button>
-                    <button class="btn btn-sm btn-reset" @onclick="() => ToggleDmg(DamageMod.Immunity)">🛡️ Immune</button>
-                    <button class="btn btn-sm btn-action" @onclick="() => ToggleDmg(DamageMod.Vulnerability)">×2 Vulnerable</button>
+        @* ── Your character guide, shown on your turn ──────────────────── *@
+        @if (IsMyTurn && Live.State == CombatState.Active && Me is { IsUnconscious: false })
+        {
+            @if (MyTemplate != null && GuidePanel.HasGuide(MyTemplate.Id))
+            {
+                <GuidePanel Hero="MyTemplate" />
+            }
+            else
+            {
+                <div class="lc-panel lc-me">
+                    <p class="lc-hint">No character guide available for @Me?.Name yet — play from your sheet, and tell the table what you do!</p>
                 </div>
-                <p class="lc-hint">Toggle a type on the chosen combatant: resistance halves it, immunity negates it, vulnerability doubles it.</p>
-            </div>
+            }
         }
 
-        @* ── Incapacitated: the controlled combatant can't act this turn ──── *@
-        @if (Actor != null && Combat.State == CombatState.Active && !Actor.IsUnconscious
-             && CombatEngineService.IsIncapacitated(Actor))
-        {
-            <div class="lc-panel lc-me">
-                <h4>@Actor.Name can't act — @IncapLabel(Actor)</h4>
-                <p class="lc-hint">Incapacitating conditions block actions, bonus actions, and reactions.</p>
-                <button class="btn btn-start" @onclick="EndCurrentTurn">✓ End Turn</button>
-            </div>
-        }
-
-        @* ── Action panel: a guide-style turn interface wired to the shared engine ─ *@
-        else if (Actor != null && Combat.State == CombatState.Active && !Actor.IsUnconscious)
-        {
-            <TurnPanel Actor="Actor" Template="TemplateFor(Actor)" Targets="Targets" />
-        }
-
-        @* ── The player's own character panel ──────────────────────────── *@
+        @* ── The player's own quick panel ──────────────────────────────── *@
         @if (Me != null)
         {
             <div class="lc-panel lc-me">
                 <h3>@Me.Name — @Me.HpDisplay</h3>
 
-                @if (Combat.State == CombatState.Active && Me.IsUnconscious)
+                @if (Live.State == CombatState.Active && Me.IsUnconscious)
                 {
                     <div class="lc-row">
                         <strong>You're down!</strong>
-                        <button class="btn btn-start" @onclick="() => Combat.RollDeathSaveFor(Me.Id)">🎲 Roll Death Save</button>
+                        <button class="btn btn-start" @onclick="() => Live.RollDeathSaveFor(Me.Id)">🎲 Roll Death Save</button>
                         <span>@Me.DeathSaveSuccesses ✓ / @Me.DeathSaveFailures ✗</span>
                     </div>
                 }
                 else
                 {
                     <div class="lc-row lc-self-actions">
-                        @if (Me.IsBarbarianClass && !Me.IsRaging && Me.RageUsesRemaining > 0)
+                        @if (Me.IsBarbarianClass)
                         {
-                            <button class="btn btn-action" @onclick="() => Combat.EnterRage(Me)">🔥 Rage (@Me.RageUsesRemaining left)</button>
+                            @if (Me.IsRaging)
+                            {
+                                <button class="btn btn-reset" @onclick="() => Live.ToggleRaging(Me.Id)">🔥 End Rage</button>
+                            }
+                            else if (Me.RageUsesRemaining > 0)
+                            {
+                                <button class="btn btn-action" @onclick="() => Live.ToggleRaging(Me.Id)">🔥 Rage (@Me.RageUsesRemaining left)</button>
+                            }
                         }
                         @if (Me.ReactionAvailable)
                         {
-                            <button class="btn btn-sm" @onclick="() => Combat.UseReaction(Me.Id)">⚡ Use Reaction</button>
+                            <button class="btn btn-sm" @onclick="() => Live.UseReaction(Me.Id)">⚡ Use Reaction</button>
                         }
                         else
                         {
                             <span class="lc-dim">Reaction used</span>
-                        }
-                    </div>
-
-                    <div class="lc-row">
-                        @if (string.IsNullOrEmpty(Me.ConcentratingOn))
-                        {
-                            <input class="form-input" style="width:150px" placeholder="Concentrating on…" @bind="concInput" />
-                            <button class="btn btn-sm btn-action" @onclick="SetMyConcentration">🧠 Concentrate</button>
-                        }
-                        else
-                        {
-                            <span>🧠 Concentrating: <strong>@Me.ConcentratingOn</strong></span>
-                            <button class="btn btn-sm btn-reset" @onclick="() => Combat.DropConcentration(Me.Id)">Drop</button>
                         }
                     </div>
 
@@ -287,7 +241,7 @@
                                         var pip = i;
                                         var used = pip <= slot.Used;
                                         <button class="lc-pip @(used ? "lc-pip-used" : "")"
-                                                @onclick="() => Combat.SetSlotUsed(Me.Id, slot.Level, used ? pip - 1 : pip)"></button>
+                                                @onclick="() => Live.SetSlotUsed(Me.Id, slot.Level, used ? pip - 1 : pip)"></button>
                                     }
                                 </div>
                             }
@@ -305,82 +259,49 @@
                     }
                 }
 
-                @if (Combat.State == CombatState.Active && !IsMyTurn && !Me.IsUnconscious)
+                @if (Live.State == CombatState.Active && !IsMyTurn && !Me.IsUnconscious)
                 {
-                    <p class="lc-hint">Waiting — it's <strong>@Combat.CurrentCombatant?.Name</strong>'s turn.</p>
+                    <p class="lc-hint">Waiting — it's <strong>@Live.CurrentCombatant?.Name</strong>'s turn.</p>
                 }
             </div>
         }
 
-        <CombatLogPanel />
+        @* ── Encounter log ─────────────────────────────────────────────── *@
+        <div class="lc-panel">
+            <h3>📜 Log</h3>
+            <div class="combat-log lc-log">
+                @foreach (var entry in LogEntries.Reverse())
+                {
+                    <div class="log-entry @Live.GetEntryClass(entry.EntryType)">
+                        <span class="log-icon">@Live.GetEntryIcon(entry.EntryType)</span>
+                        <span class="log-round">R@(entry.Round)</span>
+                        <span class="log-text"><strong>@entry.ActorName</strong> @entry.Message</span>
+                    </div>
+                }
+            </div>
+        </div>
     }
 </div>
 
 @code {
-    // The Character template for a combatant (gives TurnPanel spell casting-times); null for monsters.
-    private Character? TemplateFor(Combatant c) => Combat.SavedRoster.FirstOrDefault(t => t.Id == c.Id);
+    private Character? MyTemplate =>
+        MyId.HasValue ? Live.SavedRoster.FirstOrDefault(t => t.Id == MyId.Value) : null;
 
-    // DM "apply a timed effect" form state.
-    private string fxTargetId = "";
-    private string fxName = "";
-    private string fxCondition = "";
-    private int fxRounds = 3;
-
-    // DM damage-modifier editor state.
-    private string dmTargetId = "";
-    private DamageType dmType = DamageType.Fire;
-    private static readonly DamageType[] DamageTypes =
-        Enum.GetValues<DamageType>().Where(t => t != DamageType.None).ToArray();
-
-    private void ToggleDmg(DamageMod mod)
-    {
-        if (Guid.TryParse(dmTargetId, out var id)) Combat.ToggleDamageMod(id, dmType, mod);
-    }
-
-    // Concentration controls.
-    private string concInput = "";
-
-    private void SetMyConcentration()
-    {
-        if (Me != null && !string.IsNullOrWhiteSpace(concInput))
-        {
-            Combat.SetConcentration(Me.Id, concInput);
-            concInput = "";
-        }
-    }
-
-    private void SetConcFromForm()
-    {
-        if (Guid.TryParse(fxTargetId, out var id) && !string.IsNullOrWhiteSpace(fxName))
-        {
-            Combat.SetConcentration(id, fxName);
-            fxName = "";
-        }
-    }
+    // DM guide viewer: which party member's guide the DM is currently reading.
+    private Guid? _dmGuideId;
+    private IEnumerable<Character> GuidePcs => Live.SavedRoster.Where(c => GuidePanel.HasGuide(c.Id));
+    private Character? DmGuideHero =>
+        _dmGuideId.HasValue ? Live.SavedRoster.FirstOrDefault(c => c.Id == _dmGuideId.Value) : null;
+    private void OnPickGuide(ChangeEventArgs e) =>
+        _dmGuideId = Guid.TryParse(e.Value?.ToString(), out var g) ? g : null;
 
     private bool IsDm => Seat.Role == SeatRole.Dm;
     private Guid? MyId => Seat.CharacterId;
-    private Combatant? Me => MyId.HasValue ? Combat.Find(MyId.Value) : null;
-    private bool IsMyTurn => MyId.HasValue && Combat.IsCurrentTurn(MyId.Value);
+    private Combatant? Me => MyId.HasValue ? Live.Find(MyId.Value) : null;
+    private bool IsMyTurn => MyId.HasValue && Live.IsCurrentTurn(MyId.Value);
 
-    private IReadOnlyList<Combatant> Combatants => Combat.SnapshotCombatants();
-    private List<Combatant> Targets => Combat.GetCurrentTargets();
-
-    private Guid? CurrentId => Combat.CurrentCombatant?.Id;
-    private bool CurrentIsClaimed => CurrentId.HasValue && Seats.IsClaimed(CurrentId.Value);
-
-    // The combatant this viewer controls right now: your PC on your turn, or — for the
-    // DM — the current combatant whenever no player has claimed it (monsters & unseated PCs).
-    private Combatant? Actor
-    {
-        get
-        {
-            if (Combat.State != CombatState.Active) return null;
-            if (IsMyTurn) return Me;
-            if (IsDm && CurrentId.HasValue && !CurrentIsClaimed) return Combat.CurrentCombatant;
-            return null;
-        }
-    }
+    private IReadOnlyList<Combatant> Combatants => Live.SnapshotCombatants();
+    private IReadOnlyList<CombatLog> LogEntries => Live.SnapshotLog();
 
     private static readonly Condition[] AllConditions =
         Enum.GetValues<Condition>().Where(c => c != Condition.None).ToArray();
@@ -388,27 +309,10 @@
     // Monster HP is hidden from players/spectators; PCs are visible to all (table sees each other).
     private bool CanSeeExactHp(Combatant c) => IsDm || c.Type != CombatantType.Monster;
 
-    // Ends the turn of the combatant this viewer controls (used by the incapacitated panel;
-    // TurnPanel handles end-turn for normal turns).
-    private void EndCurrentTurn()
+    private void OnInitiativeEdit(Guid id, ChangeEventArgs e)
     {
-        if (IsMyTurn && MyId.HasValue) Combat.EndTurn(MyId.Value);
-        else if (IsDm) Combat.NextTurn();
-    }
-
-    private void ApplyEffect()
-    {
-        if (!Guid.TryParse(fxTargetId, out var tid) || string.IsNullOrWhiteSpace(fxName)) return;
-        Condition? cond = Enum.TryParse<Condition>(fxCondition, out var cc) && cc != Condition.None ? cc : null;
-        Combat.AddEffect(tid, new ActiveEffect
-        {
-            Name = fxName.Trim(),
-            Source = "DM",
-            Condition = cond,
-            RoundsRemaining = Math.Max(1, fxRounds),
-        });
-        fxName = "";
-        fxCondition = "";
+        if (int.TryParse(e.Value?.ToString(), out var val))
+            Live.SetInitiative(id, val);
     }
 
     private void OnToggleCondition(Guid id, ChangeEventArgs e)
@@ -416,15 +320,7 @@
         var val = e.Value?.ToString();
         if (string.IsNullOrEmpty(val)) return;
         if (Enum.TryParse<Condition>(val, out var cond))
-            Combat.ToggleCondition(id, cond);
-    }
-
-    private static string IncapLabel(Combatant c)
-    {
-        var conds = c.Conditions
-            .Where(x => x is Condition.Stunned or Condition.Paralyzed or Condition.Incapacitated or Condition.Unconscious)
-            .ToList();
-        return conds.Count > 0 ? string.Join(", ", conds) : "incapacitated";
+            Live.ToggleCondition(id, cond);
     }
 
     private static string TypeIcon(Combatant c) => c.Type switch
@@ -434,7 +330,26 @@
         _ => "🛡️"
     };
 
-    protected override void OnInitialized() => Combat.OnStateChanged += OnChanged;
-    private void OnChanged() => InvokeAsync(StateHasChanged);
-    public void Dispose() => Combat.OnStateChanged -= OnChanged;
+    // ── Turn notification: chime once when it BECOMES my turn ───────────────
+    private bool _wasMyTurn;
+
+    protected override void OnInitialized()
+    {
+        Live.OnStateChanged += OnChanged;
+        _wasMyTurn = IsMyTurn;
+    }
+
+    private void OnChanged() => InvokeAsync(async () =>
+    {
+        var nowMyTurn = IsMyTurn;
+        if (nowMyTurn && !_wasMyTurn)
+        {
+            try { await JS.InvokeVoidAsync("quailTurnDing"); }
+            catch { /* no JS (prerender) or audio blocked — the banner still shows */ }
+        }
+        _wasMyTurn = nowMyTurn;
+        StateHasChanged();
+    });
+
+    public void Dispose() => Live.OnStateChanged -= OnChanged;
 }
