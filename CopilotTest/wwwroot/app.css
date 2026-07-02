@@ -2846,3 +2846,6 @@ button.turn-item.rollable:hover .roll-die { opacity: 1; }
 }
 .lc-hp-amt { width: 64px; text-align: center; }
 .lc-up-next { margin-left: 8px; }
+.lc-ac { color: var(--text-dim); font-size: 0.85rem; margin-right: 10px; }
+.lc-hidden-row { opacity: 0.55; border-left: 2px dashed var(--text-dim); }
+.roll-dmg-btn { margin-left: 10px; }

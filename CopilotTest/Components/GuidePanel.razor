@@ -36,7 +36,14 @@
                 <h3>⏱️ On Your Turn <span class="guide-skill-legend">tap an attack/spell 🎲 to roll</span></h3>
                 @if (lastRoll != null)
                 {
-                    <div class="roll-result">@lastRoll <button class="roll-clear" @onclick="() => lastRoll = null">✕</button></div>
+                    <div class="roll-result">
+                        @lastRoll
+                        @if (pendingDamage != null)
+                        {
+                            <button class="btn btn-sm btn-action roll-dmg-btn" @onclick="RollPendingDamage">🎲 Roll damage</button>
+                        }
+                        <button class="roll-clear" @onclick="ClearRoll">✕</button>
+                    </div>
                 }
                 @{
                     // Shared renderer for a turn item. Spells get a caret that expands the
@@ -127,6 +134,67 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Live shared tracker: the encounter's real HP + spell slots, synced to everyone -->
+            @if (LiveActor != null)
+            {
+                <div class="guide-section tracker-section">
+                    <h3>🎲 Session Tracker <span class="guide-skill-legend">shared with the whole table</span></h3>
+                    <div class="tracker-grid">
+                        <div class="tracker-block">
+                            <div class="tracker-label">Hit Points <span class="guide-skill-legend">(the DM applies damage &amp; healing)</span></div>
+                            <div class="tracker-hp-display" style="margin:6px 0">
+                                <span class="tracker-hp-current @(LiveActor.CurrentHitPoints <= LiveActor.MaxHitPoints / 4 ? "hp-critical" : LiveActor.CurrentHitPoints <= LiveActor.MaxHitPoints / 2 ? "hp-low" : "")">@LiveActor.CurrentHitPoints</span>
+                                <span class="tracker-hp-sep">/</span>
+                                <span class="tracker-hp-max">@LiveActor.MaxHitPoints</span>
+                                @if (LiveActor.TemporaryHitPoints > 0)
+                                {
+                                    <span class="tracker-hp-max"> (+@LiveActor.TemporaryHitPoints temp)</span>
+                                }
+                            </div>
+                            <div class="tracker-hp-bar">
+                                <div class="tracker-hp-fill @(LiveActor.CurrentHitPoints <= LiveActor.MaxHitPoints / 4 ? "fill-critical" : LiveActor.CurrentHitPoints <= LiveActor.MaxHitPoints / 2 ? "fill-low" : "")"
+                                     style="width: @(LiveActor.MaxHitPoints > 0 ? Math.Max(0, LiveActor.CurrentHitPoints * 100 / LiveActor.MaxHitPoints) : 0)%"></div>
+                            </div>
+                        </div>
+
+                        @if (LiveActor.SpellSlots.Any())
+                        {
+                            <div class="tracker-block">
+                                <div class="tracker-label">Spell Slots <span class="guide-skill-legend">tap to spend/restore</span></div>
+                                @foreach (var slot in LiveActor.SpellSlots)
+                                {
+                                    <div class="tracker-slot-row">
+                                        <span class="tracker-slot-label">Level @slot.Level</span>
+                                        <div class="tracker-pips">
+                                            @for (int i = 1; i <= slot.Max; i++)
+                                            {
+                                                var pip = i;
+                                                var used = pip <= slot.Used;
+                                                <button class="tracker-pip @(used ? "pip-used" : "pip-avail")"
+                                                        title="@(used ? "Expended — tap to restore" : "Available — tap to spend")"
+                                                        @onclick="() => OnSetSlotUsed?.Invoke(slot.Level, used ? pip - 1 : pip)"></button>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+
+                        @if (LiveActor.Pools.Any())
+                        {
+                            <div class="tracker-block">
+                                <div class="tracker-label">Resources</div>
+                                @foreach (var pool in LiveActor.Pools)
+                                {
+                                    <div class="tracker-slot-row"><span class="tracker-slot-label">@pool.Name</span>
+                                        <span>@pool.Current / @pool.Max@(pool.Note is not null ? $" ({pool.Note})" : "")</span></div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
 
             <!-- Session Tracker (hidden in live play — the shared encounter tracks HP/slots) -->
             @if (!HideTracker)
@@ -510,6 +578,13 @@
     /// uses this to share every roll with the whole table.</summary>
     [Parameter] public Action<string, string>? OnRollShared { get; set; }
 
+    /// <summary>Live play: the shared encounter combatant for this hero. When set, the guide
+    /// shows the SHARED HP/spell-slot tracker (synced to the whole table) instead of nothing.</summary>
+    [Parameter] public Combatant? LiveActor { get; set; }
+
+    /// <summary>Live play: called when the player toggles a shared spell-slot pip (level, used).</summary>
+    [Parameter] public Action<int, int>? OnSetSlotUsed { get; set; }
+
     public static bool HasGuide(Guid id) => GuideData.ContainsKey(id);
 
     private Guid _lastId;
@@ -518,7 +593,7 @@
         if (Hero != null && Hero.Id != _lastId)
         {
             _lastId = Hero.Id;
-            lastRoll = null;
+            ClearRoll();
             ResetTracker(Hero);
         }
     }
@@ -640,10 +715,19 @@
     // ── Dice rolling (reuses the Play-mode DiceService + RollLogService) ───────
     private string? lastRoll;
 
+    // A to-hit has been rolled and its damage roll is waiting (real-table flow:
+    // roll to hit, the DM says whether it lands, THEN roll damage).
+    private CombatAction? pendingDamage;
+    private bool pendingCrit;
+
+    private void ClearRoll() { lastRoll = null; pendingDamage = null; pendingCrit = false; }
+
     private void RollAction(CombatAction a)
     {
         if (Hero == null || !IsRollable(a)) return;
         var who = Hero.Name;
+        pendingDamage = null;
+        pendingCrit = false;
 
         if (a.SaveDC > 0)
         {
@@ -653,17 +737,44 @@
             Log.Add(new RollEntry(DateTime.Now, who, $"{a.Name} (save DC {a.SaveDC})", dmg.Detail, dmg.Total, RollKind.Damage, false, false));
             OnRollShared?.Invoke(who, $"casts {a.Name} — DC {a.SaveDC} {a.SaveAbility} save, {dmg.Total} {a.DamageType} on a fail ({dmg.Detail})");
         }
+        else if (string.IsNullOrEmpty(a.DamageDice) && a.DamageBonus == 0)
+        {
+            // To-hit only (no damage defined).
+            var hit = Dice.RollD20(a.AttackBonus);
+            var critText = hit.IsCrit ? " — CRIT!" : hit.IsFumble ? " — nat 1!" : "";
+            lastRoll = $"🎲 {a.Name}: to hit {hit.Total} ({hit.Detail}){critText}";
+            Log.Add(new RollEntry(DateTime.Now, who, $"{a.Name} attack", hit.Detail, hit.Total, RollKind.Attack, hit.IsCrit, hit.IsFumble));
+            OnRollShared?.Invoke(who, $"rolls {a.Name}: {hit.Total} to hit ({hit.Detail}){critText}");
+        }
         else
         {
-            // Attack: roll to-hit, then damage (doubling dice on a natural 20).
+            // Attack: roll to-hit now; damage waits for its own button press.
             var hit = Dice.RollD20(a.AttackBonus);
-            var dmg = Dice.RollDamage(a.DamageDice, a.DamageBonus, hit.IsCrit);
             var critText = hit.IsCrit ? " — CRIT!" : hit.IsFumble ? " — nat 1!" : "";
-            lastRoll = $"🎲 {a.Name}: to hit {hit.Total} ({hit.Detail}){critText} · damage {dmg.Total} ({dmg.Detail})";
+            lastRoll = $"🎲 {a.Name}: to hit {hit.Total} ({hit.Detail}){critText}";
             Log.Add(new RollEntry(DateTime.Now, who, $"{a.Name} attack", hit.Detail, hit.Total, RollKind.Attack, hit.IsCrit, hit.IsFumble));
-            Log.Add(new RollEntry(DateTime.Now, who, $"{a.Name} damage", dmg.Detail, dmg.Total, RollKind.Damage, hit.IsCrit, false));
-            OnRollShared?.Invoke(who, $"rolls {a.Name}: {hit.Total} to hit ({hit.Detail}){critText} · {dmg.Total} damage ({dmg.Detail})");
+            OnRollShared?.Invoke(who, $"rolls {a.Name}: {hit.Total} to hit ({hit.Detail}){critText}");
+            if (!hit.IsFumble)
+            {
+                pendingDamage = a;
+                pendingCrit = hit.IsCrit;
+            }
         }
+    }
+
+    private void RollPendingDamage()
+    {
+        if (Hero == null || pendingDamage == null) return;
+        var a = pendingDamage;
+        var who = Hero.Name;
+        var dmg = Dice.RollDamage(a.DamageDice, a.DamageBonus, pendingCrit);
+        var critText = pendingCrit ? " (CRIT — dice doubled!)" : "";
+        var dmgType = a.DamageType != DamageType.None ? $" {a.DamageType}" : "";
+        lastRoll = $"🎲 {a.Name} damage: {dmg.Total}{dmgType}{critText} ({dmg.Detail})";
+        Log.Add(new RollEntry(DateTime.Now, who, $"{a.Name} damage", dmg.Detail, dmg.Total, RollKind.Damage, pendingCrit, false));
+        OnRollShared?.Invoke(who, $"rolls {a.Name} damage: {dmg.Total}{dmgType}{critText} ({dmg.Detail})");
+        pendingDamage = null;
+        pendingCrit = false;
     }
 
     private static bool HasSpells(Character c) =>
@@ -819,32 +930,21 @@
                 new("2nd Level", 3),
             ],
             WildMagicInfo: new(
-                Intro: "Wild Magic Sorcerers are driven by an untamed magical force. Every time you spend Sorcery Points or cast a leveled spell, you risk triggering a Wild Magic Surge — a chaotic burst of uncontrolled arcane energy that can help or hinder anyone nearby.",
+                Intro: "Your magic is wild — casting can set off a random Wild Magic Surge (the DM rolls on the d100 surge table).",
                 Triggers:
                 [
-                    "Casting a leveled spell (1st+): The DM may ask you to roll d20. On a 1, roll on the Wild Magic Surge table (d100).",
-                    "Using Tides of Chaos: After you gain advantage from Tides of Chaos, the DM can force a surge the next time you cast a leveled spell — this also recharges Tides of Chaos.",
-                    "Spending Sorcery Points via Font of Magic: Converting SP to spell slots or vice versa can be a surge trigger at DM discretion.",
-                    "Spending SP on Heightened Spell or Subtle Spell: Any Metamagic use is a potential trigger depending on your DM's style."
+                    "Casting a leveled spell (1st+): the DM may ask for a d20 — on a 1, a surge happens.",
+                    "Tides of Chaos: after you use it for advantage, your next leveled spell surges automatically (and recharges Tides of Chaos)."
                 ],
-                SurgeExamples:
-                [
-                    "01–02: Roll on this table again at the start of each turn for 1 minute.",
-                    "03–04: You cast Fireball centered on yourself (3d6 fire, DEX DC 13 save).",
-                    "05–06: You cast Magic Missile as a 5th-level spell.",
-                    "07–08: All spell slots are restored. (Yes, really!)",
-                    "09–10: You become invisible until the start of your next turn.",
-                    "11–12: You regain 2d10 HP.",
-                    "13–14: You can't speak — only emit squeaks for 1 minute.",
-                    "15–16: You cast Confusion centered on yourself (WIS DC 13)."
-                ],
-                PlayTip: "Surges are unpredictable but not all bad. If your DM uses them, lean into Tides of Chaos — using it intentionally lets you control when a surge is most likely, and the advantage it grants is always worth the risk."
+                SurgeExamples: [],
+                PlayTip: "Surges aren't all bad — lean into Tides of Chaos. Using it on purpose lets you pick when the chaos hits, and the advantage is always worth it."
             )
         ),
         // ── Kennyth the Paladin ───────────────────────────────────────────────
         [new Guid("a1000000-0000-0000-0000-000000000005")] = new(
             TurnExtras:
             [
+                new("Bonus Action", "Divine Smite", "After you HIT with a melee weapon: expend a slot — +2d8 Radiant (1st) or +3d8 (2nd), +1d8 vs Undead/Fiends. Dice double on a crit! Triggers a Wild Magic roll."),
                 new("Bonus Action", "Lay on Hands", "Heal from a 25 HP/long-rest pool (touch)"),
                 new("Action", "Channel Divinity: Sacred Weapon", "+CHA to weapon attacks & emit light, 1 min (2/long rest)"),
             ],
@@ -969,6 +1069,7 @@
         [new Guid("a1000000-0000-0000-0000-000000000008")] = new(
             TurnExtras:
             [
+                new("Bonus Action", "Divine Smite", "After you HIT with a melee weapon: expend a slot — +2d8 Radiant (1st) or +3d8 (2nd), +1d8 vs Undead/Fiends. Dice double on a crit!"),
                 new("Bonus Action", "Lay on Hands", "Heal from a 25 HP/long-rest pool (touch)"),
                 new("Bonus Action", "Channel Divinity: Fury of the Tides", "On a hit, push the target 10 ft for bonus damage (2/long rest)"),
             ],

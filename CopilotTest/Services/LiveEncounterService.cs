@@ -178,9 +178,10 @@ public class LiveEncounterService
 
             Log.Clear();
             AddLog(1, "Combat", "⚔️ Combat begins! Round 1", LogEntryType.RoundStart);
-            foreach (var c in Combatants)
+            // Hidden combatants are masked in the log — the log is visible to everyone.
+            foreach (var c in Combatants.Where(c => !c.IsHiddenFromPlayers))
                 AddLog(1, c.Name, $"Initiative: {c.InitiativeRoll} + {c.DexterityModifier} = {c.Initiative}", LogEntryType.Info);
-            AddLog(1, "Combat", $"Turn order: {string.Join(" → ", Combatants.Select(c => c.Name))}", LogEntryType.Info);
+            AddLog(1, "Combat", $"Turn order: {string.Join(" → ", Combatants.Select(c => c.IsHiddenFromPlayers ? "???" : c.Name))}", LogEntryType.Info);
         }
         NotifyChanged();
     }
@@ -391,6 +392,21 @@ public class LiveEncounterService
                 AddLog(CurrentRound, c.Name,
                     $"🔥 enters a RAGE! [{c.RageUsesRemaining} rage(s) remaining]", LogEntryType.Info);
             }
+        }
+        NotifyChanged();
+    }
+
+    /// <summary>DM: hide/reveal a combatant from the players' view (surprise monsters).
+    /// Revealing announces it in the log; hiding is silent (no spoilers).</summary>
+    public void ToggleHidden(Guid id)
+    {
+        lock (_gate)
+        {
+            var c = Combatants.FirstOrDefault(x => x.Id == id);
+            if (c == null || c.Type == CombatantType.PC) return;
+            c.IsHiddenFromPlayers = !c.IsHiddenFromPlayers;
+            if (!c.IsHiddenFromPlayers)
+                AddLog(CurrentRound, c.Name, "👁 appears!", LogEntryType.Condition);
         }
         NotifyChanged();
     }

@@ -79,6 +79,9 @@ public class Combatant
     // ── Live, shared combat resources ───────────────────────────────────────
     /// <summary>Whether this combatant still has its reaction this round (reset each round).</summary>
     public bool ReactionAvailable { get; set; } = true;
+    /// <summary>Live play: the DM has hidden this combatant from the players' view
+    /// (surprise monsters). Only affects what non-DM seats see in the tracker.</summary>
+    public bool IsHiddenFromPlayers { get; set; } = false;
     /// <summary>Spell-slot tiers and how many are spent this encounter (synced to all viewers).</summary>
     public List<SpellSlotState> SpellSlots { get; set; } = new();
     /// <summary>Class resource pools (Lay on Hands, Bardic Inspiration, ...) for live tracking.</summary>
