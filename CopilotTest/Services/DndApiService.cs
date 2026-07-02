@@ -59,7 +59,11 @@ public class DndApiService
             MaxHitPoints     = monster.Hit_Points,
             CurrentHitPoints = monster.Hit_Points,
             ArmorClass       = monster.GetArmorClass(),
-            ProficiencyBonus = monster.Proficiency_Bonus
+            ProficiencyBonus = monster.Proficiency_Bonus,
+            Speed            = monster.Speed_Walk > 0 ? monster.Speed_Walk : 30,
+            MonsterMeta      = $"CR {FormatCr(monster.Challenge_Rating)}"
+                               + (monster.Size.Length > 0 ? $" · {monster.Size}" : "")
+                               + (monster.Type.Length > 0 ? $" {Capitalize(monster.Type)}" : ""),
         };
 
         var attackActions = monster.Actions
@@ -96,6 +100,15 @@ public class DndApiService
 
         return combatant;
     }
+
+    private static string FormatCr(double cr) => cr switch
+    {
+        0.125 => "1/8", 0.25 => "1/4", 0.5 => "1/2",
+        _ => cr % 1 == 0 ? ((int)cr).ToString() : cr.ToString(),
+    };
+
+    private static string Capitalize(string s) =>
+        s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s[1..];
 
     //  Full SRD 5e monster list 
 

@@ -82,6 +82,12 @@ public class Combatant
     /// <summary>Live play: the DM has hidden this combatant from the players' view
     /// (surprise monsters). Only affects what non-DM seats see in the tracker.</summary>
     public bool IsHiddenFromPlayers { get; set; } = false;
+
+    // ── Monster reference data (shown in the DM's monster panel) ────────────
+    /// <summary>One-line lineage for the DM panel, e.g. "CR 1/2 · Medium Humanoid".</summary>
+    public string MonsterMeta { get; set; } = "";
+    /// <summary>Special abilities / traits ("Pack Tactics", …) when the source had them.</summary>
+    public List<MonsterTrait> Traits { get; set; } = new();
     /// <summary>Spell-slot tiers and how many are spent this encounter (synced to all viewers).</summary>
     public List<SpellSlotState> SpellSlots { get; set; } = new();
     /// <summary>Class resource pools (Lay on Hands, Bardic Inspiration, ...) for live tracking.</summary>
@@ -124,4 +130,11 @@ public class Combatant
             return $"✅ Healthy{rageTag}";
         }
     }
+}
+
+/// <summary>A monster special ability shown in the DM's monster panel.</summary>
+public class MonsterTrait
+{
+    public string Name { get; set; } = "";
+    public string Description { get; set; } = "";
 }

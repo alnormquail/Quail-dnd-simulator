@@ -2869,3 +2869,9 @@ button.turn-item.rollable:hover .roll-die { opacity: 1; }
 .turn-item.readable:hover { border-color: var(--gold); }
 .turn-roll-btns { display: flex; gap: 6px; margin-top: 5px; }
 .turn-roll-btns .btn { padding: 3px 10px; font-size: 0.78rem; }
+
+/* ── DM monster stat block ──────────────────────────────────────────────── */
+.monster-panel .mp-header { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.monster-panel .mp-header h3 { margin: 0; }
+.mp-section { margin-top: 12px; }
+.mp-section h4 { margin: 0 0 6px; color: var(--gold); font-size: 0.95rem; }
