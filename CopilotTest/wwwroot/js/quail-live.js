@@ -21,3 +21,23 @@ window.quailTurnDing = function () {
         setTimeout(() => ctx.close(), 1500);
     } catch (e) { /* audio unavailable — the on-screen banner still shows */ }
 };
+
+// Flash the browser tab title while it's your turn, so players who switched
+// tabs/apps notice. quailTitleAlert(true) starts, quailTitleAlert(false) stops.
+(function () {
+    let timer = null;
+    const original = document.title;
+    window.quailTitleAlert = function (on) {
+        if (timer) { clearInterval(timer); timer = null; }
+        if (on) {
+            let flip = false;
+            timer = setInterval(function () {
+                document.title = flip ? original : "🎲 YOUR TURN!";
+                flip = !flip;
+            }, 1000);
+            document.title = "🎲 YOUR TURN!";
+        } else {
+            document.title = original;
+        }
+    };
+})();

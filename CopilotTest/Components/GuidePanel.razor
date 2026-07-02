@@ -128,7 +128,9 @@
                 </div>
             </div>
 
-            <!-- Session Tracker -->
+            <!-- Session Tracker (hidden in live play — the shared encounter tracks HP/slots) -->
+            @if (!HideTracker)
+            {
             <div class="guide-section tracker-section">
                 <h3>🎲 Session Tracker</h3>
                 <div class="tracker-grid">
@@ -195,6 +197,7 @@
 
                 </div>
             </div>
+            }
 
             <!-- Ability Scores -->
             <div class="guide-section">
@@ -500,6 +503,13 @@
 @code {
     [Parameter] public Character? Hero { get; set; }
 
+    /// <summary>Hide the local Session Tracker (live play tracks HP/slots in the shared encounter).</summary>
+    [Parameter] public bool HideTracker { get; set; }
+
+    /// <summary>When set, dice rolls are also announced here (actor name, roll text) — live play
+    /// uses this to share every roll with the whole table.</summary>
+    [Parameter] public Action<string, string>? OnRollShared { get; set; }
+
     public static bool HasGuide(Guid id) => GuideData.ContainsKey(id);
 
     private Guid _lastId;
@@ -641,6 +651,7 @@
             var dmg = Dice.RollDamage(a.DamageDice, a.DamageBonus);
             lastRoll = $"🎲 {a.Name}: enemy makes a DC {a.SaveDC} {a.SaveAbility} save — {dmg.Total} {a.DamageType} on a fail ({dmg.Detail})";
             Log.Add(new RollEntry(DateTime.Now, who, $"{a.Name} (save DC {a.SaveDC})", dmg.Detail, dmg.Total, RollKind.Damage, false, false));
+            OnRollShared?.Invoke(who, $"casts {a.Name} — DC {a.SaveDC} {a.SaveAbility} save, {dmg.Total} {a.DamageType} on a fail ({dmg.Detail})");
         }
         else
         {
@@ -651,6 +662,7 @@
             lastRoll = $"🎲 {a.Name}: to hit {hit.Total} ({hit.Detail}){critText} · damage {dmg.Total} ({dmg.Detail})";
             Log.Add(new RollEntry(DateTime.Now, who, $"{a.Name} attack", hit.Detail, hit.Total, RollKind.Attack, hit.IsCrit, hit.IsFumble));
             Log.Add(new RollEntry(DateTime.Now, who, $"{a.Name} damage", dmg.Detail, dmg.Total, RollKind.Damage, hit.IsCrit, false));
+            OnRollShared?.Invoke(who, $"rolls {a.Name}: {hit.Total} to hit ({hit.Detail}){critText} · {dmg.Total} damage ({dmg.Detail})");
         }
     }
 
