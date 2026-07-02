@@ -982,9 +982,17 @@ else
                             </div>
                         }
 
+                        @{
+                            // If the ASI raises CON, the applied result adds +1 HP per level
+                            // retroactively — show the real final number here.
+                            var conPicks = (asiFirst == "Constitution" ? 1 : 0) + (asiSecond == "Constitution" ? 1 : 0);
+                            var retroHp = Math.Max(0,
+                                Character.GetModifier(Math.Min(20, character.Constitution + conPicks))
+                                - character.ConstitutionModifier) * newLevel;
+                        }
                         <div class="wizard-review-list">
                             <div class="wizard-review-row">✅ Level: @character.CharacterLevel → <strong>@newLevel</strong></div>
-                            <div class="wizard-review-row">✅ Max HP: @character.MaxHitPoints → <strong>@(character.MaxHitPoints + hpGain)</strong></div>
+                            <div class="wizard-review-row">✅ Max HP: @character.MaxHitPoints → <strong>@(character.MaxHitPoints + hpGain + retroHp)</strong>@(retroHp > 0 ? $" (includes +{retroHp} retroactive HP from your CON increase)" : "")</div>
                             @if (newProf != character.ProficiencyBonus)
                             {
                                 <div class="wizard-review-row">✅ Proficiency bonus: +@character.ProficiencyBonus → <strong>+@newProf</strong> (all proficient skills, saves &amp; attacks improve!)</div>
