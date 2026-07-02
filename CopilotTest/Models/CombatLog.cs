@@ -19,5 +19,6 @@ public enum LogEntryType
     Kill,
     DeathSave,
     Condition,
-    RoundStart
+    RoundStart,
+    Roll        // a player's guide dice roll, announced to the table (live play)
 }

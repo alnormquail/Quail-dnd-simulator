@@ -54,6 +54,10 @@
                 else
                 {
                     <span class="lc-turn">▶ @Live.CurrentCombatant?.Name's turn</span>
+                    @if (Live.NextCombatant is { } up)
+                    {
+                        <span class="lc-dim lc-up-next">· up next: @up.Name</span>
+                    }
                 }
             </div>
             @if (IsDm)
@@ -135,6 +139,10 @@
                             <button class="btn btn-sm btn-reset" @onclick="() => Live.AdjustHp(c.Id, -1)">-1</button>
                             <button class="btn btn-sm btn-action" @onclick="() => Live.AdjustHp(c.Id, 1)">+1</button>
                             <button class="btn btn-sm btn-action" @onclick="() => Live.AdjustHp(c.Id, 5)">+5</button>
+                            <input class="form-input lc-hp-amt" type="number" min="1" placeholder="#"
+                                   value="@AmtFor(c.Id)" @onchange="(e) => SetAmt(c.Id, e)" />
+                            <button class="btn btn-sm btn-reset" title="Deal this much damage" @onclick="() => ApplyAmt(c.Id, -1)">💥 Dmg</button>
+                            <button class="btn btn-sm btn-action" title="Heal this much" @onclick="() => ApplyAmt(c.Id, +1)">💚 Heal</button>
                             <select class="form-input lc-cond-select" @onchange="(e) => OnToggleCondition(c.Id, e)">
                                 <option value="">+ condition…</option>
                                 @foreach (var cond in AllConditions)
@@ -162,7 +170,7 @@
                 <div class="lc-row">
                     <h3 style="margin:0">📖 Character Guides</h3>
                     <select class="form-input" @onchange="OnPickGuide">
-                        <option value="">View a character's guide…</option>
+                        <option value="" selected="@(_dmGuideId == null)">Follow the current turn</option>
                         @foreach (var pc in GuidePcs)
                         {
                             <option value="@pc.Id" selected="@(_dmGuideId == pc.Id)">@pc.Name — @pc.ClassDisplay</option>
@@ -172,16 +180,17 @@
             </div>
             @if (DmGuideHero != null)
             {
-                <GuidePanel Hero="DmGuideHero" />
+                <GuidePanel Hero="DmGuideHero" HideTracker="true" OnRollShared="ShareRoll" />
             }
         }
 
-        @* ── Your character guide, shown on your turn ──────────────────── *@
-        @if (IsMyTurn && Live.State == CombatState.Active && Me is { IsUnconscious: false })
+        @* ── Your character guide: automatic on your turn, on demand otherwise ─ *@
+        @if (Me != null && Live.State == CombatState.Active && !Me.IsUnconscious
+             && (IsMyTurn || _showMyGuide))
         {
             @if (MyTemplate != null && GuidePanel.HasGuide(MyTemplate.Id))
             {
-                <GuidePanel Hero="MyTemplate" />
+                <GuidePanel Hero="MyTemplate" HideTracker="true" OnRollShared="ShareRoll" />
             }
             else
             {
@@ -261,7 +270,21 @@
 
                 @if (Live.State == CombatState.Active && !IsMyTurn && !Me.IsUnconscious)
                 {
-                    <p class="lc-hint">Waiting — it's <strong>@Live.CurrentCombatant?.Name</strong>'s turn.</p>
+                    var away = Live.TurnsUntil(Me.Id);
+                    <p class="lc-hint">
+                        Waiting — it's <strong>@Live.CurrentCombatant?.Name</strong>'s turn.
+                        @if (away == 1)
+                        {
+                            <strong> You're up next!</strong>
+                        }
+                        else if (away > 1)
+                        {
+                            @($" {away} turns until you.")
+                        }
+                    </p>
+                    <button class="btn btn-sm" @onclick="() => _showMyGuide = !_showMyGuide">
+                        📖 @(_showMyGuide ? "Hide my guide" : "View my guide")
+                    </button>
                 }
             </div>
         }
@@ -287,13 +310,43 @@
     private Character? MyTemplate =>
         MyId.HasValue ? Live.SavedRoster.FirstOrDefault(t => t.Id == MyId.Value) : null;
 
-    // DM guide viewer: which party member's guide the DM is currently reading.
+    // DM guide viewer. Default (null) follows the current turn — as each PC comes up,
+    // the DM automatically sees their guide; picking a name from the dropdown pins it.
     private Guid? _dmGuideId;
     private IEnumerable<Character> GuidePcs => Live.SavedRoster.Where(c => GuidePanel.HasGuide(c.Id));
-    private Character? DmGuideHero =>
-        _dmGuideId.HasValue ? Live.SavedRoster.FirstOrDefault(c => c.Id == _dmGuideId.Value) : null;
+    private Character? DmGuideHero
+    {
+        get
+        {
+            if (_dmGuideId.HasValue)
+                return Live.SavedRoster.FirstOrDefault(c => c.Id == _dmGuideId.Value);
+            var currentId = Live.State == CombatState.Active ? Live.CurrentCombatant?.Id : null;
+            return currentId.HasValue ? Live.SavedRoster.FirstOrDefault(c => c.Id == currentId.Value) : null;
+        }
+    }
     private void OnPickGuide(ChangeEventArgs e) =>
         _dmGuideId = Guid.TryParse(e.Value?.ToString(), out var g) ? g : null;
+
+    // Player: show my guide while waiting (it always shows on my turn).
+    private bool _showMyGuide;
+
+    // Guide dice rolls get announced to the whole table's log.
+    private void ShareRoll(string who, string message) => Live.AnnounceRoll(who, message);
+
+    // DM typed damage/heal amounts, per combatant row.
+    private readonly Dictionary<Guid, int> _hpAmt = new();
+    private string AmtFor(Guid id) => _hpAmt.TryGetValue(id, out var v) ? v.ToString() : "";
+    private void SetAmt(Guid id, ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var v) && v > 0) _hpAmt[id] = v;
+        else _hpAmt.Remove(id);
+    }
+    private void ApplyAmt(Guid id, int sign)
+    {
+        if (!_hpAmt.TryGetValue(id, out var v) || v <= 0) return;
+        Live.AdjustHp(id, sign * v);
+        _hpAmt.Remove(id);
+    }
 
     private bool IsDm => Seat.Role == SeatRole.Dm;
     private Guid? MyId => Seat.CharacterId;
@@ -344,8 +397,17 @@
         var nowMyTurn = IsMyTurn;
         if (nowMyTurn && !_wasMyTurn)
         {
-            try { await JS.InvokeVoidAsync("quailTurnDing"); }
+            try
+            {
+                await JS.InvokeVoidAsync("quailTurnDing");
+                await JS.InvokeVoidAsync("quailTitleAlert", true);   // flash the tab title
+            }
             catch { /* no JS (prerender) or audio blocked — the banner still shows */ }
+        }
+        else if (!nowMyTurn && _wasMyTurn)
+        {
+            try { await JS.InvokeVoidAsync("quailTitleAlert", false); }
+            catch { }
         }
         _wasMyTurn = nowMyTurn;
         StateHasChanged();

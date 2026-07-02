@@ -2844,3 +2844,5 @@ button.turn-item.rollable:hover .roll-die { opacity: 1; }
     border-left: 2px solid var(--gold);
     border-radius: 4px;
 }
+.lc-hp-amt { width: 64px; text-align: center; }
+.lc-up-next { margin-left: 8px; }

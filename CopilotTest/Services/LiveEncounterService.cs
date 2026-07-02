@@ -217,6 +217,37 @@ public class LiveEncounterService
     public bool IsCurrentTurn(Guid charId) =>
         State == CombatState.Active && CurrentCombatant?.Id == charId;
 
+    /// <summary>Who acts after the current combatant (null when combat isn't running).</summary>
+    public Combatant? NextCombatant
+    {
+        get
+        {
+            if (State != CombatState.Active) return null;
+            var active = ActiveCombatants;
+            if (active.Count < 2) return null;
+            return active[(CurrentTurnIndex + 1) % active.Count];
+        }
+    }
+
+    /// <summary>How many turns until this combatant acts (0 = acting now, -1 = not in the order).</summary>
+    public int TurnsUntil(Guid charId)
+    {
+        if (State != CombatState.Active) return -1;
+        var active = ActiveCombatants;
+        if (active.Count == 0) return -1;
+        var idx = active.FindIndex(c => c.Id == charId);
+        if (idx < 0) return -1;
+        var cur = CurrentTurnIndex % active.Count;
+        return (idx - cur + active.Count) % active.Count;
+    }
+
+    /// <summary>Announce a player's guide dice roll to the whole table's log.</summary>
+    public void AnnounceRoll(string actor, string message)
+    {
+        lock (_gate) { AddLog(CurrentRound, actor, message, LogEntryType.Roll); }
+        NotifyChanged();
+    }
+
     /// <summary>Advance to the next turn (DM control).</summary>
     public void NextTurn()
     {
@@ -510,6 +541,7 @@ public class LiveEncounterService
         LogEntryType.DeathSave => "🎲",
         LogEntryType.Condition => "⚠️",
         LogEntryType.RoundStart=> "📜",
+        LogEntryType.Roll      => "🎲",
         _                      => "ℹ️"
     };
 
@@ -521,6 +553,7 @@ public class LiveEncounterService
         LogEntryType.Kill      => "log-kill",
         LogEntryType.DeathSave => "log-death-save",
         LogEntryType.RoundStart=> "log-round",
+        LogEntryType.Roll      => "log-death-save",   // gold dice styling
         _                      => "log-info"
     };
 }
