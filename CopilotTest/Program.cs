@@ -106,6 +106,66 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+// ── Shared-password gate ──────────────────────────────────────────────────
+// Replaces Caddy's HTTP basic_auth, whose browser popup fired multiple times
+// (parallel first-load requests) and sometimes failed to authenticate Blazor's
+// WebSocket, leaving a "logged in" but dead page. A cookie rides along on every
+// request INCLUDING the WebSocket, so one login per device (~6 months) just works.
+// Enabled only when QUAIL_GATE_PASSWORD is set (production); local dev is open.
+var gatePassword = Environment.GetEnvironmentVariable("QUAIL_GATE_PASSWORD");
+if (!string.IsNullOrEmpty(gatePassword))
+{
+    // Deterministic token: survives app restarts, and rotating the password
+    // invalidates every device's cookie at once.
+    var gateToken = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+        System.Text.Encoding.UTF8.GetBytes("quail-gate-v1:" + gatePassword)));
+
+    app.Use(async (ctx, next) =>
+    {
+        if (ctx.Request.Path.StartsWithSegments("/gate"))
+        {
+            if (HttpMethods.IsPost(ctx.Request.Method))
+            {
+                var form = await ctx.Request.ReadFormAsync();
+                if (form["password"].ToString() == gatePassword)
+                {
+                    ctx.Response.Cookies.Append("quail-gate", gateToken, new CookieOptions
+                    {
+                        HttpOnly = true,
+                        SameSite = SameSiteMode.Lax,
+                        MaxAge = TimeSpan.FromDays(180),
+                        Path = "/",
+                    });
+                    var from = form["from"].ToString();
+                    ctx.Response.Redirect(from.StartsWith('/') && !from.StartsWith("//") ? from : "/");
+                    return;
+                }
+                ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                await WriteGatePage(ctx, wrongPassword: true);
+                return;
+            }
+            await WriteGatePage(ctx, wrongPassword: false);
+            return;
+        }
+
+        if (ctx.Request.Cookies["quail-gate"] == gateToken)
+        {
+            await next();
+            return;
+        }
+
+        // Probes (e.g. the auto-reload script's HEAD poll) get a plain 401;
+        // everything else is sent to the login page, remembering where it was.
+        if (HttpMethods.IsHead(ctx.Request.Method))
+        {
+            ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return;
+        }
+        ctx.Response.Redirect("/gate?from=" +
+            Uri.EscapeDataString(ctx.Request.Path + ctx.Request.QueryString));
+    });
+}
+
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseAntiforgery();
@@ -114,6 +174,47 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.Run();
+
+// The shared-password login page (self-contained: no CSS/JS dependencies, since
+// static files are behind the gate too).
+static async Task WriteGatePage(HttpContext ctx, bool wrongPassword)
+{
+    var from = HttpMethods.IsPost(ctx.Request.Method)
+        ? (await ctx.Request.ReadFormAsync())["from"].ToString()
+        : ctx.Request.Query["from"].ToString();
+    var fromAttr = System.Net.WebUtility.HtmlEncode(from);
+    var error = wrongPassword ? "<p style='color:#e66'>That's not it — try again!</p>" : "";
+    ctx.Response.ContentType = "text/html; charset=utf-8";
+    await ctx.Response.WriteAsync($$"""
+        <!DOCTYPE html>
+        <html lang="en"><head>
+        <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Quail Party — Tavern Door</title>
+        <style>
+            body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+                   background:#101a1e; color:#f0eeea; font-family:system-ui,sans-serif; }
+            .door { background:#16232a; border:1px solid #FFA300; border-radius:12px;
+                    padding:32px 36px; text-align:center; max-width:320px; }
+            h1 { color:#FFA300; font-size:1.4rem; margin:0 0 6px; }
+            p { color:#b9bdc0; font-size:0.9rem; margin:0 0 18px; }
+            input { width:100%; box-sizing:border-box; padding:10px 12px; font-size:1rem;
+                    background:#101a1e; color:#f0eeea; border:1px solid #3a4a52; border-radius:8px; }
+            button { margin-top:12px; width:100%; padding:10px; font-size:1rem; border:0; border-radius:8px;
+                     background:#FFA300; color:#101a1e; font-weight:700; cursor:pointer; }
+        </style></head>
+        <body><div class="door">
+            <h1>🎲 Quail Party</h1>
+            <p>What's the tavern password?</p>
+            {{error}}
+            <form method="post" action="/gate">
+                <input type="password" name="password" placeholder="Tavern password"
+                       autocomplete="current-password" autofocus required>
+                <input type="hidden" name="from" value="{{fromAttr}}">
+                <button type="submit">Enter the Tavern</button>
+            </form>
+        </div></body></html>
+        """);
+}
 
 // Adds a column to a SQLite table only if it isn't already present.
 static void AddColumnIfMissing(DndDbContext db, string table, string column, string columnDef)
