@@ -2849,3 +2849,19 @@ button.turn-item.rollable:hover .roll-die { opacity: 1; }
 .lc-ac { color: var(--text-dim); font-size: 0.85rem; margin-right: 10px; }
 .lc-hidden-row { opacity: 0.55; border-left: 2px dashed var(--text-dim); }
 .roll-dmg-btn { margin-left: 10px; }
+
+/* ── Blazor reconnect modal (auto-reload handled in quail-live.js) ──────── */
+#components-reconnect-modal { display: none; }
+#components-reconnect-modal.components-reconnect-show,
+#components-reconnect-modal.components-reconnect-failed,
+#components-reconnect-modal.components-reconnect-rejected {
+    display: flex; position: fixed; inset: 0; z-index: 1000;
+    align-items: center; justify-content: center;
+    background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(2px);
+}
+.reconnect-box {
+    background: var(--bg-panel, #1a2226); border: 1px solid var(--gold);
+    border-radius: 10px; padding: 24px 32px; text-align: center; max-width: 320px;
+}
+.reconnect-box h3 { color: var(--gold); margin: 0 0 8px; }
+.reconnect-box p { color: var(--text); margin: 0; font-size: 0.9rem; }

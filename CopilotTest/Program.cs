@@ -123,5 +123,8 @@ static void AddColumnIfMissing(DndDbContext db, string table, string column, str
     cmd.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = '{column}';";
     var exists = Convert.ToInt64(cmd.ExecuteScalar()) > 0;
     if (!exists)
+        // Inputs are compile-time constants from the calls above, never user data.
+#pragma warning disable EF1002
         db.Database.ExecuteSqlRaw($"ALTER TABLE \"{table}\" ADD COLUMN \"{column}\" {columnDef};");
+#pragma warning restore EF1002
 }

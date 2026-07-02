@@ -10,6 +10,17 @@
 </head>
 <body>
     <Routes />
+
+    @* Blazor uses this element for its reconnect UI (by id). quail-live.js watches its
+       state and auto-reloads the page once the server is reachable again, so nobody
+       has to manually refresh after a deploy or restart. *@
+    <div id="components-reconnect-modal">
+        <div class="reconnect-box">
+            <h3>🎲 Reconnecting to the table…</h3>
+            <p>Hold tight — this page will refresh itself as soon as the server is back.</p>
+        </div>
+    </div>
+
     <script src="_framework/blazor.web.js"></script>
     <script src="js/quail-live.js"></script>
 </body>

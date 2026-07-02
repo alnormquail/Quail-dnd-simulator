@@ -202,6 +202,9 @@ Replace its contents with (use **your** domain and the **hash** from above):
 
 ```caddyfile
 quail.yourdomain.com {
+    # Compress responses (CSS/JS payloads shrink ~5x for phones on cell data).
+    encode zstd gzip
+
     # One shared login for the whole party. Username is "party".
     basic_auth {
         party PASTE_THE_$2a$_HASH_HERE

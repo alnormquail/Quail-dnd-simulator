@@ -13,7 +13,7 @@ namespace CopilotTest.Services;
 /// condition labels, death saves, resources — and leaves all adjudication to the DM.
 /// Singleton shared by every connected circuit; mutators are lock-guarded.
 /// </summary>
-public class LiveEncounterService
+public class LiveEncounterService : IDisposable
 {
     private readonly Random _random = new();
     private readonly CharacterService _characterService;
@@ -75,7 +75,37 @@ public class LiveEncounterService
 
     private void NotifyChanged()
     {
-        OnStateChanged?.Invoke();
+        // Invoke each subscriber separately: one dead circuit's handler throwing
+        // must not stop the rest of the table from updating.
+        if (OnStateChanged is { } handlers)
+        {
+            foreach (Action h in handlers.GetInvocationList())
+            {
+                try { h(); } catch { /* dead circuit — ignore */ }
+            }
+        }
+        SchedulePersist();
+    }
+
+    // Persistence is debounced onto a timer-thread: button mashing coalesces into
+    // one write, and no circuit's UI thread ever waits on the DB.
+    private readonly object _persistGate = new();
+    private Timer? _persistTimer;
+
+    private void SchedulePersist()
+    {
+        if (!_loaded) return;
+        lock (_persistGate)
+        {
+            _persistTimer ??= new Timer(_ => PersistState(), null, Timeout.Infinite, Timeout.Infinite);
+            _persistTimer.Change(250, Timeout.Infinite);
+        }
+    }
+
+    /// <summary>Flush the pending snapshot on graceful shutdown (systemd restart/deploy).</summary>
+    public void Dispose()
+    {
+        lock (_persistGate) { _persistTimer?.Dispose(); _persistTimer = null; }
         PersistState();
     }
 
