@@ -158,6 +158,9 @@
                                 <button class="btn btn-sm @(c.IsHiddenFromPlayers ? "btn-action" : "")"
                                         title="@(c.IsHiddenFromPlayers ? "Hidden from players — tap to reveal" : "Hide from players (surprise!)")"
                                         @onclick="() => Live.ToggleHidden(c.Id)">@(c.IsHiddenFromPlayers ? "🙈 Hidden" : "👁 Hide")</button>
+                                <button class="btn btn-sm @(_dmMonsterId == c.Id ? "btn-action" : "")"
+                                        title="@(_dmMonsterId == c.Id ? "Pinned — tap to follow the turn again" : "Pin this monster's stat block")"
+                                        @onclick="() => _dmMonsterId = _dmMonsterId == c.Id ? null : c.Id">📖 Stats</button>
                             }
                             <select class="form-input lc-cond-select" @onchange="(e) => OnToggleCondition(c.Id, e)">
                                 <option value="">+ condition…</option>
@@ -200,6 +203,12 @@
                 <GuidePanel Hero="DmGuideHero" HideTracker="true" OnRollShared="ShareRoll"
                             LiveActor="dmActor"
                             OnSetSlotUsed="(lvl, used) => Live.SetSlotUsed(DmGuideHero.Id, lvl, used)" />
+            }
+
+            @* Monster stat block: follows the current turn, or pin one with 📖 Stats. *@
+            @if (DmMonster != null)
+            {
+                <MonsterPanel Monster="DmMonster" OnRollShared="ShareMonsterRoll" />
             }
         }
 
@@ -353,6 +362,28 @@
 
     // Guide dice rolls get announced to the whole table's log.
     private void ShareRoll(string who, string message) => Live.AnnounceRoll(who, message);
+
+    // DM monster stat block: pinned monster, or whoever's turn it is (non-PC).
+    private Guid? _dmMonsterId;
+    private Combatant? DmMonster
+    {
+        get
+        {
+            if (!IsDm) return null;
+            if (_dmMonsterId is { } pinned) return Live.Find(pinned);
+            var cur = Live.State == CombatState.Active ? Live.CurrentCombatant : null;
+            return cur != null && cur.Type != CombatantType.PC ? cur : null;
+        }
+    }
+
+    // Monster rolls stay off the shared log while the monster is hidden — the log
+    // would name it and spoil the surprise. The DM still sees them in the panel.
+    private void ShareMonsterRoll(string who, string message)
+    {
+        var m = Live.Combatants.FirstOrDefault(c => c.Name == who);
+        if (m is { IsHiddenFromPlayers: true }) return;
+        Live.AnnounceRoll(who, message);
+    }
 
     // DM typed damage/heal amounts, per combatant row.
     private readonly Dictionary<Guid, int> _hpAmt = new();

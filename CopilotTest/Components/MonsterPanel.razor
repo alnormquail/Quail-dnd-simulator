@@ -1,0 +1,135 @@
+@using CopilotTest.Models
+@inject CopilotTest.Services.DiceService Dice
+
+@* DM-side monster reference for live combat: a stat block generated from the
+   combatant itself (works for SRD, manual, and PDF-imported monsters alike),
+   with rollable attacks that announce to the shared table log. *@
+
+@if (Monster != null)
+{
+    <div class="lc-panel monster-panel">
+        <div class="mp-header">
+            <h3>👹 @Monster.Name @(Monster.IsHiddenFromPlayers ? "🙈" : "")</h3>
+            @if (!string.IsNullOrEmpty(Monster.MonsterMeta))
+            {
+                <span class="lc-dim">@Monster.MonsterMeta</span>
+            }
+        </div>
+
+        <div class="guide-stats-row">
+            <div class="guide-stat"><span class="stat-label">AC</span><span class="stat-value">@Monster.ArmorClass</span></div>
+            <div class="guide-stat"><span class="stat-label">HP</span><span class="stat-value">@Monster.HpDisplay</span></div>
+            <div class="guide-stat"><span class="stat-label">Speed</span><span class="stat-value">@Monster.Speed ft</span></div>
+            <div class="guide-stat"><span class="stat-label">Prof</span><span class="stat-value">+@Monster.ProficiencyBonus</span></div>
+        </div>
+
+        <div class="guide-abilities">
+            @foreach (var (label, score) in Abilities())
+            {
+                var mod = Combatant.GetModifier(score);
+                <div class="guide-ability">
+                    <div class="ability-label">@label</div>
+                    <div class="ability-score">@score</div>
+                    <div class="ability-mod @(mod >= 0 ? "pos" : "neg")">@(mod >= 0 ? $"+{mod}" : mod.ToString())</div>
+                </div>
+            }
+        </div>
+
+        @if (lastRoll != null)
+        {
+            <div class="roll-result">@lastRoll <button class="roll-clear" @onclick="() => lastRoll = null">✕</button></div>
+        }
+
+        @if (Monster.Actions.Any())
+        {
+            <div class="mp-section">
+                <h4>⚔️ Actions</h4>
+                @foreach (var a in Monster.Actions)
+                {
+                    <div class="turn-item">
+                        <span class="turn-name">@a.Name</span>
+                        <span class="turn-detail">
+                            @(a.AttackBonus >= 0 ? $"+{a.AttackBonus}" : a.AttackBonus.ToString()) to hit
+                            @if (!string.IsNullOrEmpty(a.DamageDice))
+                            {
+                                @($" · {a.DamageDice}{(a.DamageBonus != 0 ? (a.DamageBonus > 0 ? $"+{a.DamageBonus}" : a.DamageBonus.ToString()) : "")} {a.DamageType}")
+                            }
+                        </span>
+                        @if (!string.IsNullOrEmpty(a.Description))
+                        {
+                            <span class="turn-detail">@a.Description</span>
+                        }
+                        <span class="turn-roll-btns">
+                            <button type="button" class="btn btn-sm btn-action" @onclick="() => RollToHit(a)">🎲 Hit</button>
+                            @if (!string.IsNullOrEmpty(a.DamageDice) || a.DamageBonus != 0)
+                            {
+                                <button type="button" class="btn btn-sm" @onclick="() => RollDamage(a)">🎲 Dmg</button>
+                            }
+                        </span>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (Monster.Traits.Any())
+        {
+            <div class="mp-section">
+                <h4>✨ Traits</h4>
+                @foreach (var t in Monster.Traits)
+                {
+                    <div class="turn-item"><span class="turn-name">@t.Name</span><span class="turn-detail">@t.Description</span></div>
+                }
+            </div>
+        }
+
+        @if (Monster.IsHiddenFromPlayers)
+        {
+            <p class="lc-hint">This monster is hidden — its rolls stay off the shared log until you reveal it.</p>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public Combatant? Monster { get; set; }
+
+    /// <summary>Announce a roll to the table (LiveCombat suppresses this while hidden).</summary>
+    [Parameter] public Action<string, string>? OnRollShared { get; set; }
+
+    private string? lastRoll;
+    private CombatAction? lastHitAction;
+    private bool lastHitWasCrit;
+
+    private IEnumerable<(string, int)> Abilities()
+    {
+        yield return ("STR", Monster!.Strength);
+        yield return ("DEX", Monster.Dexterity);
+        yield return ("CON", Monster.Constitution);
+        yield return ("INT", Monster.Intelligence);
+        yield return ("WIS", Monster.Wisdom);
+        yield return ("CHA", Monster.Charisma);
+    }
+
+    private void RollToHit(CombatAction a)
+    {
+        if (Monster == null) return;
+        var hit = Dice.RollD20(a.AttackBonus);
+        var critText = hit.IsCrit ? " — CRIT!" : hit.IsFumble ? " — nat 1!" : "";
+        lastRoll = $"🎲 {a.Name}: to hit {hit.Total} ({hit.Detail}){critText}";
+        OnRollShared?.Invoke(Monster.Name, $"rolls {a.Name}: {hit.Total} to hit ({hit.Detail}){critText}");
+        lastHitAction = a;
+        lastHitWasCrit = hit.IsCrit;
+    }
+
+    private void RollDamage(CombatAction a)
+    {
+        if (Monster == null) return;
+        var crit = lastHitAction == a && lastHitWasCrit;
+        var dmg = Dice.RollDamage(a.DamageDice, a.DamageBonus, crit);
+        var critText = crit ? " (CRIT — dice doubled!)" : "";
+        var dmgType = a.DamageType != DamageType.None ? $" {a.DamageType}" : "";
+        lastRoll = $"🎲 {a.Name} damage: {dmg.Total}{dmgType}{critText} ({dmg.Detail})";
+        OnRollShared?.Invoke(Monster.Name, $"rolls {a.Name} damage: {dmg.Total}{dmgType}{critText} ({dmg.Detail})");
+        lastHitAction = null;
+        lastHitWasCrit = false;
+    }
+}
