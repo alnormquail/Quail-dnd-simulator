@@ -99,6 +99,33 @@
                 }
             </div>
             <div class="field-hint">Your background will add its bonuses on top of these in the next steps.</div>
+
+            @if (AsiPointTotal > 0)
+            {
+                <div class="preview-box" style="margin-top:14px">
+                    <div class="bg-alloc-title">Ability Score Improvements</div>
+                    <p class="field-hint @(AsiPointsLeft < 0 ? "over-budget" : "")">
+                        A level-@level @className has earned <strong>@AsiCount</strong> ASI@(AsiCount > 1 ? "s" : "")
+                        (levels @string.Join(", ", AsiLevels())) — that's <strong>@AsiPointTotal</strong> points of +1s.
+                        Points remaining: <strong>@AsiPointsLeft</strong>. (Skip any you'd rather spend on feats — note those on the sheet.)
+                    </p>
+                    <div class="create-ability-grid">
+                        @foreach (var ab in AbilityOrder)
+                        {
+                            <div class="create-ability-row">
+                                <span class="create-ability-label">@AbilityShort(ab)</span>
+                                <div class="pb-controls">
+                                    <button class="qty-btn" @onclick="() => AsiAdjust(ab, -1)" disabled="@(asiBonus[ab] <= 0)">−</button>
+                                    <span class="pb-score">+@asiBonus[ab]</span>
+                                    <button class="qty-btn" @onclick="() => AsiAdjust(ab, 1)"
+                                            disabled="@(AsiPointsLeft <= 0 || scores[ab] + asiBonus[ab] >= 20)">+</button>
+                                </div>
+                                <span class="create-ability-mod">= @(scores[ab] + asiBonus[ab])</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
         }
 
         @* ── Step 3: Species ── *@
@@ -128,7 +155,7 @@
         @if (step == 4)
         {
             <h3>Background</h3>
-            <select class="form-input" @bind="backgroundKey">
+            <select class="form-input" value="@backgroundKey" @onchange="OnBackgroundChanged">
                 <option value="">— Choose a background —</option>
                 @foreach (var bg in ContentLibrary.Backgrounds)
                 {
@@ -464,6 +491,20 @@
     }
 
     // ── Background allocation ───────────────────────────────────────────────────
+
+    // Reset the +2/+1 picks to the new background's own options — the old defaults
+    // (STR/DEX) silently applied bonuses the background doesn't offer.
+    private void OnBackgroundChanged(ChangeEventArgs e)
+    {
+        backgroundKey = e.Value?.ToString() ?? "";
+        var bg = ContentLibrary.GetBackground(backgroundKey);
+        if (bg != null && bg.AbilityOptions.Count >= 2)
+        {
+            bgPlusTwo = bg.AbilityOptions[0];
+            bgPlusOne = bg.AbilityOptions[1];
+        }
+    }
+
     private void SetBgPlusTwo(BackgroundData bg, string? v)
     {
         if (Enum.TryParse<AbilityScore>(v, out var a))
@@ -482,6 +523,27 @@
         return list;
     }
 
+    // ── Ability Score Improvements (creating at level 4+) ───────────────────────
+    private readonly Dictionary<AbilityScore, int> asiBonus = new()
+    {
+        [AbilityScore.Strength] = 0, [AbilityScore.Dexterity] = 0, [AbilityScore.Constitution] = 0,
+        [AbilityScore.Intelligence] = 0, [AbilityScore.Wisdom] = 0, [AbilityScore.Charisma] = 0,
+    };
+
+    private IEnumerable<int> AsiLevels() =>
+        Enumerable.Range(2, Math.Max(0, level - 1)).Where(l => LevelUpRules.IsAsiLevel(className, l));
+    private int AsiCount => AsiLevels().Count();
+    private int AsiPointTotal => AsiCount * 2;
+    private int AsiPointsLeft => AsiPointTotal - asiBonus.Values.Sum();
+
+    private void AsiAdjust(AbilityScore ab, int delta)
+    {
+        var next = asiBonus[ab] + delta;
+        if (next < 0) return;
+        if (delta > 0 && (AsiPointsLeft <= 0 || scores[ab] + next > 20)) return;
+        asiBonus[ab] = next;
+    }
+
     // ── Skills ──────────────────────────────────────────────────────────────────
     private int SelectedSkillCount => selectedSkills.Count;
     private void ToggleSkill(Skill sk)
@@ -492,10 +554,10 @@
     // ── Review helpers ────────────────────────────────────────────────────────
     private int FinalScore(AbilityScore a)
     {
-        var bonus = 0;
+        var bonus = asiBonus[a];
         var bg = ContentLibrary.GetBackground(backgroundKey);
         if (bg != null) bonus += BuildAllocation(bg).Where(b => b.Ability == a).Sum(b => b.Amount);
-        return scores[a] + bonus;
+        return Math.Min(20, scores[a] + bonus);
     }
 
     private IEnumerable<string> AllSkillNames()
@@ -537,11 +599,43 @@
         foreach (var sk in selectedSkills)
             c.Skills.Add(new CharacterSkill { CharacterId = c.Id, Skill = sk, Proficiency = ProficiencyLevel.Proficient });
 
+        // Ability Score Improvements allocated in the wizard (levels 4, 8, … below creation level).
+        foreach (var (ab, pts) in asiBonus.Where(kv => kv.Value > 0))
+        {
+            switch (ab)
+            {
+                case AbilityScore.Strength:     c.Strength     = Math.Min(20, c.Strength + pts);     break;
+                case AbilityScore.Dexterity:    c.Dexterity    = Math.Min(20, c.Dexterity + pts);    break;
+                case AbilityScore.Constitution: c.Constitution = Math.Min(20, c.Constitution + pts); break;
+                case AbilityScore.Intelligence: c.Intelligence = Math.Min(20, c.Intelligence + pts); break;
+                case AbilityScore.Wisdom:       c.Wisdom       = Math.Min(20, c.Wisdom + pts);       break;
+                case AbilityScore.Charisma:     c.Charisma     = Math.Min(20, c.Charisma + pts);     break;
+            }
+        }
+
         // Apply content (species → background → subclass).
         Content.ApplySpecies(c, speciesKey);
         var bg = ContentLibrary.GetBackground(backgroundKey);
         Content.ApplyBackground(c, backgroundKey, bg != null ? BuildAllocation(bg) : []);
         if (level >= 3 && !string.IsNullOrEmpty(subclassKey)) Content.ApplySubclass(c, subclassKey);
+
+        // Base-class features for every level up to the creation level, so a character
+        // built at level N matches one leveled up to N.
+        for (var lvl = 1; lvl <= level; lvl++)
+        {
+            foreach (var grant in LevelUpRules.FeatureGrants(cd.Name, lvl))
+            {
+                if (!c.Features.Any(f => f.Name.Equals(grant.Name, StringComparison.OrdinalIgnoreCase)))
+                    c.Features.Add(new CharacterFeature
+                    {
+                        CharacterId = c.Id,
+                        Name        = grant.Name,
+                        Description = grant.Description,
+                        Source      = $"{cd.Name} {lvl}",
+                        LevelGained = lvl,
+                    });
+            }
+        }
 
         // Hit points (after background, since CON may have risen).
         var hitDie = LevelUpRules.GetHitDie(cd.Name);

@@ -27,8 +27,16 @@
                 @foreach (var c in Combatants)
                 {
                     <div class="lc-init-row">
-                        <span>@TypeIcon(c) <strong>@c.Name</strong> <span class="lc-dim">@c.ClassDisplay</span></span>
-                        <button class="btn btn-reset btn-sm" @onclick="() => Live.RemoveCombatant(c.Id)">✕</button>
+                        <span>@TypeIcon(c) <strong>@c.Name</strong> <span class="lc-dim">@c.ClassDisplay</span>@(c.IsHiddenFromPlayers ? " 🙈" : "")</span>
+                        <span>
+                            @if (c.Type != CombatantType.PC)
+                            {
+                                <button class="btn btn-sm @(c.IsHiddenFromPlayers ? "btn-action" : "")"
+                                        title="@(c.IsHiddenFromPlayers ? "Hidden from players — tap to reveal" : "Hide from players (surprise!)")"
+                                        @onclick="() => Live.ToggleHidden(c.Id)">@(c.IsHiddenFromPlayers ? "🙈 Hidden" : "👁 Hide")</button>
+                            }
+                            <button class="btn btn-reset btn-sm" @onclick="() => Live.RemoveCombatant(c.Id)">✕</button>
+                        </span>
                     </div>
                 }
             </div>
@@ -53,10 +61,10 @@
                 }
                 else
                 {
-                    <span class="lc-turn">▶ @Live.CurrentCombatant?.Name's turn</span>
+                    <span class="lc-turn">▶ @MaskName(Live.CurrentCombatant)'s turn</span>
                     @if (Live.NextCombatant is { } up)
                     {
-                        <span class="lc-dim lc-up-next">· up next: @up.Name</span>
+                        <span class="lc-dim lc-up-next">· up next: @MaskName(up)</span>
                     }
                 }
             </div>
@@ -87,9 +95,10 @@
             <h3>Initiative</h3>
             @foreach (var c in Combatants)
             {
+                if (!IsDm && c.IsHiddenFromPlayers) { continue; }
                 var isCurrent = Live.State == CombatState.Active && Live.CurrentCombatant?.Id == c.Id;
                 var isMe = MyId == c.Id;
-                <div class="lc-init-row @(isCurrent ? "lc-current" : "") @(c.CurrentHitPoints <= 0 ? "lc-down" : "")">
+                <div class="lc-init-row @(isCurrent ? "lc-current" : "") @(c.CurrentHitPoints <= 0 ? "lc-down" : "") @(c.IsHiddenFromPlayers ? "lc-hidden-row" : "")">
                     <div class="lc-init-main">
                         @if (IsDm && Live.State == CombatState.Active)
                         {
@@ -110,6 +119,7 @@
                     <div class="lc-init-status">
                         @if (CanSeeExactHp(c))
                         {
+                            <span class="lc-ac" title="Armor Class">🛡@c.ArmorClass</span>
                             <span class="lc-hp">@c.HpDisplay</span>
                         }
                         else
@@ -143,6 +153,12 @@
                                    value="@AmtFor(c.Id)" @onchange="(e) => SetAmt(c.Id, e)" />
                             <button class="btn btn-sm btn-reset" title="Deal this much damage" @onclick="() => ApplyAmt(c.Id, -1)">💥 Dmg</button>
                             <button class="btn btn-sm btn-action" title="Heal this much" @onclick="() => ApplyAmt(c.Id, +1)">💚 Heal</button>
+                            @if (c.Type != CombatantType.PC)
+                            {
+                                <button class="btn btn-sm @(c.IsHiddenFromPlayers ? "btn-action" : "")"
+                                        title="@(c.IsHiddenFromPlayers ? "Hidden from players — tap to reveal" : "Hide from players (surprise!)")"
+                                        @onclick="() => Live.ToggleHidden(c.Id)">@(c.IsHiddenFromPlayers ? "🙈 Hidden" : "👁 Hide")</button>
+                            }
                             <select class="form-input lc-cond-select" @onchange="(e) => OnToggleCondition(c.Id, e)">
                                 <option value="">+ condition…</option>
                                 @foreach (var cond in AllConditions)
@@ -180,7 +196,10 @@
             </div>
             @if (DmGuideHero != null)
             {
-                <GuidePanel Hero="DmGuideHero" HideTracker="true" OnRollShared="ShareRoll" />
+                var dmActor = Live.Find(DmGuideHero.Id);
+                <GuidePanel Hero="DmGuideHero" HideTracker="true" OnRollShared="ShareRoll"
+                            LiveActor="dmActor"
+                            OnSetSlotUsed="(lvl, used) => Live.SetSlotUsed(DmGuideHero.Id, lvl, used)" />
             }
         }
 
@@ -190,7 +209,9 @@
         {
             @if (MyTemplate != null && GuidePanel.HasGuide(MyTemplate.Id))
             {
-                <GuidePanel Hero="MyTemplate" HideTracker="true" OnRollShared="ShareRoll" />
+                <GuidePanel Hero="MyTemplate" HideTracker="true" OnRollShared="ShareRoll"
+                            LiveActor="Me"
+                            OnSetSlotUsed="(lvl, used) => Live.SetSlotUsed(Me!.Id, lvl, used)" />
             }
             else
             {
@@ -361,6 +382,10 @@
 
     // Monster HP is hidden from players/spectators; PCs are visible to all (table sees each other).
     private bool CanSeeExactHp(Combatant c) => IsDm || c.Type != CombatantType.Monster;
+
+    // Hidden combatants show as "???" to players (name in the status bar / up-next).
+    private string MaskName(Combatant? c) =>
+        c == null ? "" : (!IsDm && c.IsHiddenFromPlayers ? "???" : c.Name);
 
     private void OnInitiativeEdit(Guid id, ChangeEventArgs e)
     {

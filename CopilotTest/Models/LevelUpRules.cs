@@ -86,13 +86,74 @@ public static class LevelUpRules
     /// <summary>
     /// Class features automatically added to the sheet at a level (base class only —
     /// subclass features vary, so they're surfaced as hints instead).
-    /// Covers levels 2-10 for the classes in the party.
+    /// Covers levels 1-10 for the 2024 PHB classes. The character builder replays
+    /// levels 1..N when creating at level N, so built and leveled sheets match.
     /// </summary>
     public static FeatureGrant[] FeatureGrants(string characterClass, int newLevel)
     {
         var cls = characterClass.Trim().ToLowerInvariant();
         return (cls, newLevel) switch
         {
+            // ── Level 1-4 base features (2024 PHB) ──
+            ("barbarian", 1) => [new("Rage", "Bonus Action: enter a rage for bonus melee damage and resistance to bludgeoning/piercing/slashing damage."),
+                                 new("Unarmored Defense", "Without armor, your AC is 10 + DEX mod + CON mod."),
+                                 new("Weapon Mastery", "Use the mastery property of 2 weapon types you're proficient with.")],
+            ("barbarian", 2) => [new("Reckless Attack", "Gain advantage on STR melee attacks this turn; attacks against you have advantage until your next turn."),
+                                 new("Danger Sense", "Advantage on DEX saving throws unless incapacitated.")],
+            ("barbarian", 3) => [new("Primal Knowledge", "Gain another skill; while raging, use STR for Acrobatics, Intimidation, Perception, Stealth, or Survival.")],
+            ("bard", 1)      => [new("Bardic Inspiration", "Bonus Action: give a creature a d6 to add to a d20 test (CHA mod uses/long rest)."),
+                                 new("Spellcasting", "Cast Bard spells using Charisma.")],
+            ("bard", 2)      => [new("Expertise", "Double proficiency bonus in two skill proficiencies."),
+                                 new("Jack of All Trades", "Add half proficiency to ability checks that don't already use it.")],
+            ("cleric", 1)    => [new("Spellcasting", "Cast Cleric spells using Wisdom."),
+                                 new("Divine Order", "Choose Protector (martial weapons + heavy armor) or Thaumaturge (extra cantrip, bonus to Arcana/Religion).")],
+            ("cleric", 2)    => [new("Channel Divinity", "Divine Spark (deal/heal d8s) or Turn Undead (2 uses/short rest at this level).")],
+            ("druid", 1)     => [new("Spellcasting", "Cast Druid spells using Wisdom."),
+                                 new("Druidic", "You know the secret language of druids."),
+                                 new("Primal Order", "Choose Magician (extra cantrip, bonus to Arcana/Nature) or Warden (martial weapons + medium armor).")],
+            ("druid", 2)     => [new("Wild Shape", "Bonus Action: transform into a beast form (2 uses/long rest at this level)."),
+                                 new("Wild Companion", "Expend a Wild Shape use to cast Find Familiar without components.")],
+            ("fighter", 1)   => [new("Fighting Style", "Choose a Fighting Style feat (e.g. Defense, Great Weapon Fighting, Archery)."),
+                                 new("Second Wind", "Bonus Action: regain 1d10 + Fighter level HP (2 uses, regain on short/long rest)."),
+                                 new("Weapon Mastery", "Use the mastery property of 3 weapon types you're proficient with.")],
+            ("fighter", 2)   => [new("Action Surge", "Take one additional action on your turn (1/short or long rest)."),
+                                 new("Tactical Mind", "When you fail an ability check, expend a Second Wind use to add 1d10.")],
+            ("monk", 1)      => [new("Martial Arts", "Unarmed strikes use a Martial Arts die (d6) and DEX; Bonus Action unarmed strike."),
+                                 new("Unarmored Defense", "Without armor or shield, your AC is 10 + DEX mod + WIS mod.")],
+            ("monk", 2)      => [new("Monk's Focus", "Focus Points fuel Flurry of Blows, Patient Defense, and Step of the Wind."),
+                                 new("Unarmored Movement", "+10 ft speed while unarmored."),
+                                 new("Uncanny Metabolism", "When you roll Initiative, regain all Focus Points (1/long rest).")],
+            ("monk", 3)      => [new("Deflect Attacks", "Reaction: reduce damage from an attack by 1d10 + DEX mod + Monk level.")],
+            ("monk", 4)      => [new("Slow Fall", "Reaction: reduce falling damage by 5 × Monk level.")],
+            ("paladin", 1)   => [new("Lay On Hands", "Restore HP from a pool of 5 × Paladin level (Bonus Action)."),
+                                 new("Spellcasting", "Cast Paladin spells using Charisma."),
+                                 new("Weapon Mastery", "Use the mastery property of 2 weapon types you're proficient with.")],
+            ("paladin", 2)   => [new("Fighting Style", "Choose a Fighting Style feat (or Blessed Warrior for cantrips)."),
+                                 new("Paladin's Smite", "You always have Divine Smite prepared; cast it once per long rest without a slot.")],
+            ("paladin", 3)   => [new("Channel Divinity", "Divine Sense plus your subclass's Channel Divinity option (2 uses/short rest at this level).")],
+            ("ranger", 1)    => [new("Favored Enemy", "You always have Hunter's Mark prepared; cast it twice per long rest without a slot."),
+                                 new("Spellcasting", "Cast Ranger spells using Wisdom."),
+                                 new("Weapon Mastery", "Use the mastery property of 2 weapon types you're proficient with.")],
+            ("ranger", 2)    => [new("Deft Explorer", "Expertise in one skill; learn two languages."),
+                                 new("Fighting Style", "Choose a Fighting Style feat (or Druidic Warrior for cantrips).")],
+            ("rogue", 1)     => [new("Sneak Attack", "Once per turn, +1d6 damage (scales with level) with advantage or an adjacent ally."),
+                                 new("Expertise", "Double proficiency bonus in two skill proficiencies."),
+                                 new("Thieves' Cant", "You know the secret language of rogues."),
+                                 new("Weapon Mastery", "Use the mastery property of 2 weapon types you're proficient with.")],
+            ("rogue", 2)     => [new("Cunning Action", "Bonus Action: Dash, Disengage, or Hide.")],
+            ("rogue", 3)     => [new("Steady Aim", "Bonus Action: advantage on your next attack this turn if you don't move.")],
+            ("sorcerer", 1)  => [new("Spellcasting", "Cast Sorcerer spells using Charisma."),
+                                 new("Innate Sorcery", "Bonus Action: 1 minute of +1 spell save DC and advantage on spell attacks (2/long rest).")],
+            ("sorcerer", 2)  => [new("Font of Magic", "Sorcery Points (= Sorcerer level) convert to/from spell slots."),
+                                 new("Metamagic", "Learn 2 Metamagic options to modify your spells.")],
+            ("warlock", 1)   => [new("Pact Magic", "Cast Warlock spells using Charisma; slots recharge on a short rest."),
+                                 new("Eldritch Invocations", "Learn 1 invocation (e.g. Pact of the Blade, Agonizing Blast prerequisite chain).")],
+            ("warlock", 2)   => [new("Magical Cunning", "1/long rest: regain half your Pact Magic slots after 1 minute of ritual.")],
+            ("wizard", 1)    => [new("Spellcasting", "Cast Wizard spells using Intelligence; maintain a spellbook."),
+                                 new("Arcane Recovery", "Once per day on a short rest, recover spell slots totaling half your Wizard level (rounded up)."),
+                                 new("Ritual Adept", "Cast any ritual spell in your spellbook without preparing it.")],
+            ("wizard", 2)    => [new("Scholar", "Expertise in one of Arcana, History, Investigation, Medicine, Nature, or Religion.")],
+
             // ── Barbarian ──
             ("barbarian", 5) => [new("Extra Attack", "Attack twice whenever you take the Attack action."),
                                  new("Fast Movement", "+10 ft speed while not wearing heavy armor.")],
