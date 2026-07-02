@@ -33,46 +33,47 @@
 
             <!-- On Your Turn (action economy) -->
             <div class="guide-section">
-                <h3>⏱️ On Your Turn <span class="guide-skill-legend">tap an attack/spell 🎲 to roll</span></h3>
+                <h3>⏱️ On Your Turn <span class="guide-skill-legend">tap a spell to read it · 🎲 Hit / 🎲 Dmg to roll</span></h3>
                 @if (lastRoll != null)
                 {
                     <div class="roll-result">
                         @lastRoll
-                        @if (pendingDamage != null)
-                        {
-                            <button class="btn btn-sm btn-action roll-dmg-btn" @onclick="RollPendingDamage">🎲 Roll damage</button>
-                        }
                         <button class="roll-clear" @onclick="ClearRoll">✕</button>
                     </div>
                 }
                 @{
-                    // Shared renderer for a turn item. Spells get a caret that expands the
-                    // full description inline (reusing the OpenSpells toggle).
+                    // Shared renderer for a turn item. Tapping the item READS it (spells expand
+                    // their full description) — rolling only happens via the explicit Hit/Dmg
+                    // buttons, so nobody fires dice while trying to read a spell.
                     RenderFragment<TurnItem> renderTurnItem = t =>
                     @<div class="turn-item-block">
-                        @if (t.Action != null && IsRollable(t.Action))
-                        {
-                            <button type="button" class="turn-item rollable @(t.Highlight ? "feat" : "")" @onclick="() => RollAction(t.Action)">
-                                <span class="turn-name">@t.Name <span class="roll-die">🎲</span>
-                                    @if (t.Spell != null)
+                        <div class="turn-item @(t.Highlight ? "feat" : "") @(t.Spell != null ? "readable" : "")"
+                             @onclick="() => { if (t.Spell != null) ToggleGuideSpell(t.Spell.Id); }">
+                            <span class="turn-name">@t.Name
+                                @if (t.Spell != null)
+                                {
+                                    <span class="turn-spell-caret">@(OpenSpells.Contains(t.Spell.Id) ? "▲" : "▼")</span>
+                                }
+                            </span>
+                            <span class="turn-detail">@t.Detail</span>
+                            @if (t.Action != null && IsRollable(t.Action))
+                            {
+                                <span class="turn-roll-btns">
+                                    @if (t.Action.SaveDC > 0)
                                     {
-                                        <span class="turn-spell-caret" @onclick="() => ToggleGuideSpell(t.Spell.Id)" @onclick:stopPropagation="true">@(OpenSpells.Contains(t.Spell.Id) ? "▲" : "▼")</span>
+                                        <button type="button" class="btn btn-sm btn-action" @onclick="() => RollDamageFor(t.Action)" @onclick:stopPropagation="true">🎲 Dmg</button>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="btn btn-sm btn-action" @onclick="() => RollToHit(t.Action)" @onclick:stopPropagation="true">🎲 Hit</button>
+                                        @if (!string.IsNullOrEmpty(t.Action.DamageDice) || t.Action.DamageBonus != 0)
+                                        {
+                                            <button type="button" class="btn btn-sm" @onclick="() => RollDamageFor(t.Action)" @onclick:stopPropagation="true">🎲 Dmg</button>
+                                        }
                                     }
                                 </span>
-                                <span class="turn-detail">@t.Detail</span>
-                            </button>
-                        }
-                        else if (t.Spell != null)
-                        {
-                            <button type="button" class="turn-item @(t.Highlight ? "feat" : "")" @onclick="() => ToggleGuideSpell(t.Spell.Id)">
-                                <span class="turn-name">@t.Name <span class="turn-spell-caret">@(OpenSpells.Contains(t.Spell.Id) ? "▲" : "▼")</span></span>
-                                <span class="turn-detail">@t.Detail</span>
-                            </button>
-                        }
-                        else
-                        {
-                            <div class="turn-item @(t.Highlight ? "feat" : "")"><span class="turn-name">@t.Name</span><span class="turn-detail">@t.Detail</span></div>
-                        }
+                            }
+                        </div>
                         @if (t.Spell != null && OpenSpells.Contains(t.Spell.Id))
                         {
                             <div class="spell-detail turn-spell-detail">
@@ -82,9 +83,10 @@
                                     @if (!string.IsNullOrEmpty(t.Spell.Components))  { <span><strong>Components:</strong> @t.Spell.Components</span> }
                                     @if (!string.IsNullOrEmpty(t.Spell.Duration))    { <span><strong>Duration:</strong> @t.Spell.Duration</span> }
                                 </div>
-                                @if (!string.IsNullOrEmpty(t.Spell.Description))
+                                @{ var fullDesc = FullDescription(t.Spell); }
+                                @if (!string.IsNullOrEmpty(fullDesc))
                                 {
-                                    <p class="spell-desc">@t.Spell.Description</p>
+                                    <p class="spell-desc">@fullDesc</p>
                                 }
                             </div>
                         }
@@ -416,9 +418,10 @@
                                             @if (!string.IsNullOrEmpty(spell.Components))  { <span><strong>Components:</strong> @spell.Components</span> }
                                             @if (!string.IsNullOrEmpty(spell.Duration))    { <span><strong>Duration:</strong> @spell.Duration</span> }
                                         </div>
-                                        @if (!string.IsNullOrEmpty(spell.Description))
+                                        @{ var listDesc = FullDescription(spell); }
+                                        @if (!string.IsNullOrEmpty(listDesc))
                                         {
-                                            <p class="spell-desc">@spell.Description</p>
+                                            <p class="spell-desc">@listDesc</p>
                                         }
                                     </div>
                                 }
@@ -715,66 +718,58 @@
     // ── Dice rolling (reuses the Play-mode DiceService + RollLogService) ───────
     private string? lastRoll;
 
-    // A to-hit has been rolled and its damage roll is waiting (real-table flow:
-    // roll to hit, the DM says whether it lands, THEN roll damage).
-    private CombatAction? pendingDamage;
-    private bool pendingCrit;
+    // Remember the most recent to-hit so a following damage roll for the SAME
+    // action doubles its dice on a crit.
+    private CombatAction? lastHitAction;
+    private bool lastHitWasCrit;
 
-    private void ClearRoll() { lastRoll = null; pendingDamage = null; pendingCrit = false; }
+    private void ClearRoll() { lastRoll = null; }
 
-    private void RollAction(CombatAction a)
+    private void RollToHit(CombatAction a)
     {
-        if (Hero == null || !IsRollable(a)) return;
+        if (Hero == null) return;
         var who = Hero.Name;
-        pendingDamage = null;
-        pendingCrit = false;
+        var hit = Dice.RollD20(a.AttackBonus);
+        var critText = hit.IsCrit ? " — CRIT!" : hit.IsFumble ? " — nat 1!" : "";
+        lastRoll = $"🎲 {a.Name}: to hit {hit.Total} ({hit.Detail}){critText}";
+        Log.Add(new RollEntry(DateTime.Now, who, $"{a.Name} attack", hit.Detail, hit.Total, RollKind.Attack, hit.IsCrit, hit.IsFumble));
+        OnRollShared?.Invoke(who, $"rolls {a.Name}: {hit.Total} to hit ({hit.Detail}){critText}");
+        lastHitAction = a;
+        lastHitWasCrit = hit.IsCrit;
+    }
+
+    private void RollDamageFor(CombatAction a)
+    {
+        if (Hero == null) return;
+        var who = Hero.Name;
 
         if (a.SaveDC > 0)
         {
-            // Save-based: enemy makes the save; we roll the damage.
-            var dmg = Dice.RollDamage(a.DamageDice, a.DamageBonus);
-            lastRoll = $"🎲 {a.Name}: enemy makes a DC {a.SaveDC} {a.SaveAbility} save — {dmg.Total} {a.DamageType} on a fail ({dmg.Detail})";
-            Log.Add(new RollEntry(DateTime.Now, who, $"{a.Name} (save DC {a.SaveDC})", dmg.Detail, dmg.Total, RollKind.Damage, false, false));
-            OnRollShared?.Invoke(who, $"casts {a.Name} — DC {a.SaveDC} {a.SaveAbility} save, {dmg.Total} {a.DamageType} on a fail ({dmg.Detail})");
+            // Save-based: enemy makes the save; we just roll the damage.
+            var save = Dice.RollDamage(a.DamageDice, a.DamageBonus);
+            lastRoll = $"🎲 {a.Name}: enemy makes a DC {a.SaveDC} {a.SaveAbility} save — {save.Total} {a.DamageType} on a fail ({save.Detail})";
+            Log.Add(new RollEntry(DateTime.Now, who, $"{a.Name} (save DC {a.SaveDC})", save.Detail, save.Total, RollKind.Damage, false, false));
+            OnRollShared?.Invoke(who, $"casts {a.Name} — DC {a.SaveDC} {a.SaveAbility} save, {save.Total} {a.DamageType} on a fail ({save.Detail})");
+            return;
         }
-        else if (string.IsNullOrEmpty(a.DamageDice) && a.DamageBonus == 0)
-        {
-            // To-hit only (no damage defined).
-            var hit = Dice.RollD20(a.AttackBonus);
-            var critText = hit.IsCrit ? " — CRIT!" : hit.IsFumble ? " — nat 1!" : "";
-            lastRoll = $"🎲 {a.Name}: to hit {hit.Total} ({hit.Detail}){critText}";
-            Log.Add(new RollEntry(DateTime.Now, who, $"{a.Name} attack", hit.Detail, hit.Total, RollKind.Attack, hit.IsCrit, hit.IsFumble));
-            OnRollShared?.Invoke(who, $"rolls {a.Name}: {hit.Total} to hit ({hit.Detail}){critText}");
-        }
-        else
-        {
-            // Attack: roll to-hit now; damage waits for its own button press.
-            var hit = Dice.RollD20(a.AttackBonus);
-            var critText = hit.IsCrit ? " — CRIT!" : hit.IsFumble ? " — nat 1!" : "";
-            lastRoll = $"🎲 {a.Name}: to hit {hit.Total} ({hit.Detail}){critText}";
-            Log.Add(new RollEntry(DateTime.Now, who, $"{a.Name} attack", hit.Detail, hit.Total, RollKind.Attack, hit.IsCrit, hit.IsFumble));
-            OnRollShared?.Invoke(who, $"rolls {a.Name}: {hit.Total} to hit ({hit.Detail}){critText}");
-            if (!hit.IsFumble)
-            {
-                pendingDamage = a;
-                pendingCrit = hit.IsCrit;
-            }
-        }
-    }
 
-    private void RollPendingDamage()
-    {
-        if (Hero == null || pendingDamage == null) return;
-        var a = pendingDamage;
-        var who = Hero.Name;
-        var dmg = Dice.RollDamage(a.DamageDice, a.DamageBonus, pendingCrit);
-        var critText = pendingCrit ? " (CRIT — dice doubled!)" : "";
+        var crit = lastHitAction == a && lastHitWasCrit;
+        var dmg = Dice.RollDamage(a.DamageDice, a.DamageBonus, crit);
+        var critText = crit ? " (CRIT — dice doubled!)" : "";
         var dmgType = a.DamageType != DamageType.None ? $" {a.DamageType}" : "";
         lastRoll = $"🎲 {a.Name} damage: {dmg.Total}{dmgType}{critText} ({dmg.Detail})";
-        Log.Add(new RollEntry(DateTime.Now, who, $"{a.Name} damage", dmg.Detail, dmg.Total, RollKind.Damage, pendingCrit, false));
+        Log.Add(new RollEntry(DateTime.Now, who, $"{a.Name} damage", dmg.Detail, dmg.Total, RollKind.Damage, crit, false));
         OnRollShared?.Invoke(who, $"rolls {a.Name} damage: {dmg.Total}{dmgType}{critText} ({dmg.Detail})");
-        pendingDamage = null;
-        pendingCrit = false;
+        lastHitAction = null;   // the crit is consumed by this damage roll
+        lastHitWasCrit = false;
+    }
+
+    /// <summary>Prefer the spell library's full rules text over the character
+    /// record's short summary when showing a spell's description.</summary>
+    private static string FullDescription(Spell s)
+    {
+        var full = SpellLibrary.FullText(s.Name);
+        return !string.IsNullOrEmpty(full) ? full : (s.Description ?? "");
     }
 
     private static bool HasSpells(Character c) =>
@@ -944,7 +939,7 @@
         [new Guid("a1000000-0000-0000-0000-000000000005")] = new(
             TurnExtras:
             [
-                new("Bonus Action", "Divine Smite", "After you HIT with a melee weapon: expend a slot — +2d8 Radiant (1st) or +3d8 (2nd), +1d8 vs Undead/Fiends. Dice double on a crit! Triggers a Wild Magic roll."),
+                new("Bonus Action", "Divine Smite", "After you HIT with a melee weapon: expend a slot — +2d8 Radiant (1st) or +3d8 (2nd), +1d8 vs Undead/Fiends. Dice double on a crit!"),
                 new("Bonus Action", "Lay on Hands", "Heal from a 25 HP/long-rest pool (touch)"),
                 new("Action", "Channel Divinity: Sacred Weapon", "+CHA to weapon attacks & emit light, 1 min (2/long rest)"),
             ],
@@ -960,7 +955,7 @@
             ClassFeatures:
             [
                 "Lay on Hands (25 HP pool/long rest): Restore any amount of HP from your pool to a touched creature, or spend 5 HP to cure one disease or poison.",
-                "Divine Smite (after a melee hit): Expend a spell slot — 1st = +2d8 Radiant, 2nd = +3d8. Add +1d8 vs Undead/Fiends. Triggers a Wild Magic roll!",
+                "Divine Smite (after a melee hit): Expend a spell slot — 1st = +2d8 Radiant, 2nd = +3d8. Add +1d8 vs Undead/Fiends.",
                 "Channel Divinity: Sacred Weapon — Add CHA modifier to attack rolls with one weapon for 1 minute (Bonus Action).",
                 "Extra Attack: Make 2 attacks whenever you take the Attack action.",
                 "Spellcasting (CHA-based): Spell Save DC 11, Spell Attack +3. Slots: 4 × 1st, 2 × 2nd."

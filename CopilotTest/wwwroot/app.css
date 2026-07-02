@@ -2865,3 +2865,7 @@ button.turn-item.rollable:hover .roll-die { opacity: 1; }
 }
 .reconnect-box h3 { color: var(--gold); margin: 0 0 8px; }
 .reconnect-box p { color: var(--text); margin: 0; font-size: 0.9rem; }
+.turn-item.readable { cursor: pointer; }
+.turn-item.readable:hover { border-color: var(--gold); }
+.turn-roll-btns { display: flex; gap: 6px; margin-top: 5px; }
+.turn-roll-btns .btn { padding: 3px 10px; font-size: 0.78rem; }
