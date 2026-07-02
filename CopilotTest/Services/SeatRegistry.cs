@@ -14,6 +14,16 @@ public class SeatRegistry
 
     public event Action? OnChanged;
 
+    // Invoke each subscriber separately so one dead circuit can't block the rest.
+    private void Notify()
+    {
+        if (OnChanged is { } handlers)
+            foreach (Action h in handlers.GetInvocationList())
+            {
+                try { h(); } catch { /* dead circuit — ignore */ }
+            }
+    }
+
     public bool DmTaken { get { lock (_gate) { return _dmTaken; } } }
 
     public bool IsClaimed(Guid characterId)
@@ -29,13 +39,13 @@ public class SeatRegistry
     public void ClaimDm()
     {
         lock (_gate) { _dmTaken = true; }
-        OnChanged?.Invoke();
+        Notify();
     }
 
     public void ReleaseDm()
     {
         lock (_gate) { _dmTaken = false; }
-        OnChanged?.Invoke();
+        Notify();
     }
 
     /// <summary>
@@ -46,12 +56,12 @@ public class SeatRegistry
     public void ClaimCharacter(Guid characterId, string label)
     {
         lock (_gate) { _claimed[characterId] = label; }
-        OnChanged?.Invoke();
+        Notify();
     }
 
     public void ReleaseCharacter(Guid characterId)
     {
         lock (_gate) { _claimed.Remove(characterId); }
-        OnChanged?.Invoke();
+        Notify();
     }
 }

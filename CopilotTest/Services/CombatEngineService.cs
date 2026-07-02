@@ -72,7 +72,15 @@ public class CombatEngineService
     /// at every mutation site so persistence happens on every change.</summary>
     private void NotifyChanged()
     {
-        OnStateChanged?.Invoke();
+        // Invoke each subscriber separately so one broken handler (e.g. a dead
+        // circuit) can't stop the others from updating.
+        if (OnStateChanged is { } handlers)
+        {
+            foreach (Action h in handlers.GetInvocationList())
+            {
+                try { h(); } catch { /* dead circuit — ignore */ }
+            }
+        }
         PersistState();
     }
 

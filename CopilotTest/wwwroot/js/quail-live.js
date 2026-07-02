@@ -22,6 +22,30 @@ window.quailTurnDing = function () {
     } catch (e) { /* audio unavailable — the on-screen banner still shows */ }
 };
 
+// Auto-recover from a server restart: Blazor toggles CSS classes on
+// #components-reconnect-modal as the circuit drops and reconnect attempts run.
+// Once attempts fail (or the server rejects the dead circuit), poll until the
+// server answers again, then reload — the seat and encounter restore themselves.
+(function () {
+    const modal = document.getElementById("components-reconnect-modal");
+    if (!modal) return;
+    let polling = false;
+    function pollAndReload() {
+        if (polling) return;
+        polling = true;
+        const tick = setInterval(function () {
+            fetch(window.location.href, { method: "HEAD", cache: "no-store" })
+                .then(function (r) { if (r.ok) { clearInterval(tick); window.location.reload(); } })
+                .catch(function () { /* still down — keep polling */ });
+        }, 2000);
+    }
+    new MutationObserver(function () {
+        const cls = modal.className || "";
+        if (cls.includes("components-reconnect-failed") || cls.includes("components-reconnect-rejected"))
+            pollAndReload();
+    }).observe(modal, { attributes: true, attributeFilter: ["class"] });
+})();
+
 // Flash the browser tab title while it's your turn, so players who switched
 // tabs/apps notice. quailTitleAlert(true) starts, quailTitleAlert(false) stops.
 (function () {
