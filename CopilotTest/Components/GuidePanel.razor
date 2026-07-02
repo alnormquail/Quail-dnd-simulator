@@ -38,19 +38,57 @@
                 {
                     <div class="roll-result">@lastRoll <button class="roll-clear" @onclick="() => lastRoll = null">✕</button></div>
                 }
+                @{
+                    // Shared renderer for a turn item. Spells get a caret that expands the
+                    // full description inline (reusing the OpenSpells toggle).
+                    RenderFragment<TurnItem> renderTurnItem = t =>
+                    @<div class="turn-item-block">
+                        @if (t.Action != null && IsRollable(t.Action))
+                        {
+                            <button type="button" class="turn-item rollable @(t.Highlight ? "feat" : "")" @onclick="() => RollAction(t.Action)">
+                                <span class="turn-name">@t.Name <span class="roll-die">🎲</span>
+                                    @if (t.Spell != null)
+                                    {
+                                        <span class="turn-spell-caret" @onclick="() => ToggleGuideSpell(t.Spell.Id)" @onclick:stopPropagation="true">@(OpenSpells.Contains(t.Spell.Id) ? "▲" : "▼")</span>
+                                    }
+                                </span>
+                                <span class="turn-detail">@t.Detail</span>
+                            </button>
+                        }
+                        else if (t.Spell != null)
+                        {
+                            <button type="button" class="turn-item @(t.Highlight ? "feat" : "")" @onclick="() => ToggleGuideSpell(t.Spell.Id)">
+                                <span class="turn-name">@t.Name <span class="turn-spell-caret">@(OpenSpells.Contains(t.Spell.Id) ? "▲" : "▼")</span></span>
+                                <span class="turn-detail">@t.Detail</span>
+                            </button>
+                        }
+                        else
+                        {
+                            <div class="turn-item @(t.Highlight ? "feat" : "")"><span class="turn-name">@t.Name</span><span class="turn-detail">@t.Detail</span></div>
+                        }
+                        @if (t.Spell != null && OpenSpells.Contains(t.Spell.Id))
+                        {
+                            <div class="spell-detail turn-spell-detail">
+                                <div class="spell-meta">
+                                    @if (!string.IsNullOrEmpty(t.Spell.CastingTime)) { <span><strong>Cast:</strong> @t.Spell.CastingTime</span> }
+                                    @if (!string.IsNullOrEmpty(t.Spell.Range))       { <span><strong>Range:</strong> @t.Spell.Range</span> }
+                                    @if (!string.IsNullOrEmpty(t.Spell.Components))  { <span><strong>Components:</strong> @t.Spell.Components</span> }
+                                    @if (!string.IsNullOrEmpty(t.Spell.Duration))    { <span><strong>Duration:</strong> @t.Spell.Duration</span> }
+                                </div>
+                                @if (!string.IsNullOrEmpty(t.Spell.Description))
+                                {
+                                    <p class="spell-desc">@t.Spell.Description</p>
+                                }
+                            </div>
+                        }
+                    </div>;
+                }
                 <div class="turn-grid">
                     <div class="turn-col turn-action">
                         <div class="turn-col-head">⚔️ Action <span class="turn-col-sub">one per turn</span></div>
                         @foreach (var t in TurnItemsFor(Hero, guide, "Action"))
                         {
-                            @if (t.Action != null && IsRollable(t.Action))
-                            {
-                                <button type="button" class="turn-item rollable @(t.Highlight ? "feat" : "")" @onclick="() => RollAction(t.Action)"><span class="turn-name">@t.Name <span class="roll-die">🎲</span></span><span class="turn-detail">@t.Detail</span></button>
-                            }
-                            else
-                            {
-                                <div class="turn-item @(t.Highlight ? "feat" : "")"><span class="turn-name">@t.Name</span><span class="turn-detail">@t.Detail</span></div>
-                            }
+                            @renderTurnItem(t)
                         }
                         <div class="turn-item muted"><span class="turn-name">Standard</span><span class="turn-detail">Dash · Disengage · Dodge · Help · Hide · Ready · Search · Shove · Grapple</span></div>
                     </div>
@@ -61,14 +99,7 @@
                         {
                             @foreach (var t in bonus)
                             {
-                                @if (t.Action != null && IsRollable(t.Action))
-                            {
-                                <button type="button" class="turn-item rollable @(t.Highlight ? "feat" : "")" @onclick="() => RollAction(t.Action)"><span class="turn-name">@t.Name <span class="roll-die">🎲</span></span><span class="turn-detail">@t.Detail</span></button>
-                            }
-                            else
-                            {
-                                <div class="turn-item @(t.Highlight ? "feat" : "")"><span class="turn-name">@t.Name</span><span class="turn-detail">@t.Detail</span></div>
-                            }
+                                @renderTurnItem(t)
                             }
                         }
                         else
@@ -80,14 +111,7 @@
                         <div class="turn-col-head">🛡️ Reaction <span class="turn-col-sub">one per round</span></div>
                         @foreach (var t in TurnItemsFor(Hero, guide, "Reaction"))
                         {
-                            @if (t.Action != null && IsRollable(t.Action))
-                            {
-                                <button type="button" class="turn-item rollable @(t.Highlight ? "feat" : "")" @onclick="() => RollAction(t.Action)"><span class="turn-name">@t.Name <span class="roll-die">🎲</span></span><span class="turn-detail">@t.Detail</span></button>
-                            }
-                            else
-                            {
-                                <div class="turn-item @(t.Highlight ? "feat" : "")"><span class="turn-name">@t.Name</span><span class="turn-detail">@t.Detail</span></div>
-                            }
+                            @renderTurnItem(t)
                         }
                         <div class="turn-item muted"><span class="turn-name">Opportunity Attack</span><span class="turn-detail">when an enemy leaves your reach</span></div>
                     </div>
@@ -98,14 +122,7 @@
                         @{ var other = TurnItemsFor(Hero, guide, "Other"); }
                         @foreach (var t in other)
                         {
-                            @if (t.Action != null && IsRollable(t.Action))
-                            {
-                                <button type="button" class="turn-item rollable @(t.Highlight ? "feat" : "")" @onclick="() => RollAction(t.Action)"><span class="turn-name">@t.Name <span class="roll-die">🎲</span></span><span class="turn-detail">@t.Detail</span></button>
-                            }
-                            else
-                            {
-                                <div class="turn-item @(t.Highlight ? "feat" : "")"><span class="turn-name">@t.Name</span><span class="turn-detail">@t.Detail</span></div>
-                            }
+                            @renderTurnItem(t)
                         }
                     </div>
                 </div>
@@ -555,7 +572,7 @@
     };
 
     // ── "On Your Turn" action-economy breakdown ──────────────────────────────
-    private record TurnItem(string Name, string Detail, bool Highlight = false, CombatAction? Action = null);
+    private record TurnItem(string Name, string Detail, bool Highlight = false, CombatAction? Action = null, Spell? Spell = null);
 
     /// <summary>Map a spell's casting time to an action-economy bucket.</summary>
     private static string CastingBucket(string castingTime)
@@ -599,7 +616,7 @@
             var detail = match != null && IsRollable(match)
                 ? $"{lvl} · {ActionDetail(match)}"
                 : $"{lvl} · {s.Range}".TrimEnd(' ', '·');
-            items.Add(new($"✦ {s.Name}", detail, Action: match));
+            items.Add(new($"✦ {s.Name}", detail, Action: match, Spell: s));
         }
 
         // Curated class-feature options.
