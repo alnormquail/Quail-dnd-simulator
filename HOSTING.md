@@ -146,6 +146,8 @@ Environment=ASPNETCORE_URLS=http://127.0.0.1:5179
 # Trust the X-Forwarded-* headers Caddy adds, so the app knows it's behind HTTPS.
 Environment=ASPNETCORE_FORWARDEDHEADERS_ENABLED=true
 Environment=DOTNET_CLI_TELEMETRY_OPTOUT=1
+# The shared table password — shown as a friendly login page on first visit.
+Environment=QUAIL_GATE_PASSWORD=your-table-password
 
 [Install]
 WantedBy=multi-user.target
@@ -205,16 +207,19 @@ quail.yourdomain.com {
     # Compress responses (CSS/JS payloads shrink ~5x for phones on cell data).
     encode zstd gzip
 
-    # One shared login for the whole party. Username is "party".
-    basic_auth {
-        party PASTE_THE_$2a$_HASH_HERE
-    }
-
     # Hand requests to the app. Caddy handles WebSockets (Blazor needs them)
     # automatically — no extra config required.
     reverse_proxy 127.0.0.1:5179
 }
 ```
+
+> **Login is handled by the app, not Caddy.** Set `QUAIL_GATE_PASSWORD` in the
+> systemd unit (see below) and the app shows a styled "tavern password" page on
+> first visit, then remembers each device with a ~6-month cookie. This replaced
+> Caddy `basic_auth`, whose browser popup fired multiple times on first load and
+> sometimes failed to authenticate Blazor's WebSocket (logged in but dead page).
+> Changing the password logs every device out at once. If the env var is unset
+> (e.g. local dev), the app is open.
 
 > On Caddy versions older than 2.8 the directive is spelled `basicauth`
 > (no underscore). Check with `caddy version` if it complains.
